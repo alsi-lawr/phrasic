@@ -7,7 +7,10 @@ import type {
   PlaybackStreamOutcome,
   PlaybackWireState,
 } from "@/domain/playback-stream";
-import { providerFailure } from "@/domain/playback";
+import {
+  providerFailure,
+  type PlaybackPollDelayMilliseconds,
+} from "@/domain/playback";
 import { spotifyTrackService } from "@/services/SpotifyClient/SpotifyTrackServiceController";
 
 type PlaybackStreamEmission =
@@ -82,7 +85,7 @@ export async function GET(req: Request): Promise<Response> {
           }
 
           await waitForNextPoll(
-            spotifyTrackService.getTimeoutMs(),
+            spotifyTrackService.getPlaybackPollDelay(),
             pollAbortController.signal,
           );
         }
@@ -124,7 +127,7 @@ function playbackStreamEmission(
 }
 
 function waitForNextPoll(
-  delayMilliseconds: number,
+  delay: PlaybackPollDelayMilliseconds,
   signal: AbortSignal,
 ): Promise<void> {
   return new Promise((resolve): void => {
@@ -135,7 +138,7 @@ function waitForNextPoll(
     const timeout = setTimeout((): void => {
       signal.removeEventListener("abort", onAbort);
       resolve();
-    }, delayMilliseconds);
+    }, delay.value);
 
     signal.addEventListener("abort", onAbort, { once: true });
   });

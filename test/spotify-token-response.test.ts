@@ -5,7 +5,10 @@ import {
   parseSpotifyAuthorizationCodeTokenResponse,
   type SpotifyTokenResponseParseFailure,
 } from "../services/SpotifyClient/SpotifyTokenResponse.ts";
-import type { Result } from "../domain/playback.ts";
+import {
+  maximumPlatformTimerDelayMilliseconds,
+  type Result,
+} from "../domain/playback.ts";
 
 test("Spotify authorization-code token responses parse access and refresh tokens", () => {
   const response = expectSuccess(
@@ -55,6 +58,30 @@ test("Spotify refresh token responses reject malformed expiry values", () => {
   });
 
   assert.deepEqual(expectFailure(response), {
+    kind: "invalid-spotify-token-response",
+    exchange: "refresh-token",
+    path: "$.expires_in",
+    code: "expected-positive-integer",
+  });
+});
+
+test("Spotify token responses reject lifetimes beyond the timer-safe boundary", () => {
+  const maximumExpiresInSeconds = Math.floor(
+    maximumPlatformTimerDelayMilliseconds / 1_000,
+  );
+  const validResponse = expectSuccess(
+    parseSpotifyAccessTokenRefreshResponse({
+      access_token: "refreshed-access-token",
+      expires_in: maximumExpiresInSeconds,
+    }),
+  );
+  const invalidResponse = parseSpotifyAccessTokenRefreshResponse({
+    access_token: "refreshed-access-token",
+    expires_in: maximumExpiresInSeconds + 1,
+  });
+
+  assert.equal(validResponse.expiresInSeconds.value, maximumExpiresInSeconds);
+  assert.deepEqual(expectFailure(invalidResponse), {
     kind: "invalid-spotify-token-response",
     exchange: "refresh-token",
     path: "$.expires_in",

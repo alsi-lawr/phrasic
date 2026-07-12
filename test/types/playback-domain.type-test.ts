@@ -9,6 +9,7 @@ import {
   DisplayText,
   OriginalArtworkUrl,
   PlaybackDurationMilliseconds,
+  PlaybackPollDelayMilliseconds,
   PlaybackPositionMilliseconds,
   ProviderCollectionId,
   ProviderId,
@@ -29,6 +30,7 @@ const refreshToken = expectSuccess(RefreshToken.create("refresh-1"));
 const expiresIn = expectSuccess(AccessTokenExpiresInSeconds.create(3_600));
 const refreshDelay =
   AccessTokenRefreshDelayMilliseconds.fromExpiresInSeconds(expiresIn);
+const pollDelay = expectSuccess(PlaybackPollDelayMilliseconds.create(5_000));
 const position = expectSuccess(PlaybackPositionMilliseconds.create(1_000));
 const duration = expectSuccess(PlaybackDurationMilliseconds.create(3_000));
 const text = expectSuccess(DisplayText.create("Track title"));
@@ -104,8 +106,26 @@ void position;
 void accessToken;
 void expiresIn;
 void refreshDelay;
+void pollDelay;
 void refreshToken;
 void positiveIntegerSpotifyPlaybackFailure;
+
+type AssertFalse<Value extends false> = Value;
+
+const playbackPollDelayCannotBeUsedAsRefreshDelay: AssertFalse<
+  PlaybackPollDelayMilliseconds extends AccessTokenRefreshDelayMilliseconds
+    ? true
+    : false
+> = false;
+
+const refreshDelayCannotBeUsedAsPlaybackPollDelay: AssertFalse<
+  AccessTokenRefreshDelayMilliseconds extends PlaybackPollDelayMilliseconds
+    ? true
+    : false
+> = false;
+
+void playbackPollDelayCannotBeUsedAsRefreshDelay;
+void refreshDelayCannotBeUsedAsPlaybackPollDelay;
 
 function expectSuccess<Value, Failure>(result: Result<Value, Failure>): Value {
   if (result.kind === "success") {

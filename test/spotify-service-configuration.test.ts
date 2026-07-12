@@ -4,7 +4,10 @@ import {
   parseSpotifyServiceConfiguration,
   type SpotifyServiceConfigurationParseFailure,
 } from "../services/SpotifyClient/SpotifyServiceConfiguration.ts";
-import type { Result } from "../domain/playback.ts";
+import {
+  maximumPlatformTimerDelayMilliseconds,
+  type Result,
+} from "../domain/playback.ts";
 
 const validConfiguration = {
   authorization: {
@@ -12,7 +15,7 @@ const validConfiguration = {
     scopes:
       "user-read-playback-state user-read-currently-playing user-modify-playback-state",
     responseType: "code",
-    callbackAddress: "http://localhost:3000/nowplaying",
+    callbackAddress: "http://127.0.0.1:3000/nowplaying",
     spotifyClientId: "spotify-client-id",
     spotifyClientSecret: "spotify-client-secret",
   },
@@ -24,7 +27,6 @@ const validConfiguration = {
   },
   refresh: {
     authTokenRefreshAddress: "https://accounts.spotify.com/api/token",
-    authTokenRefreshIntervalMs: 30_000,
   },
 };
 
@@ -47,16 +49,45 @@ test("Spotify service configuration parses complete authorization, track, and re
     configuration.trackAgent.currentlyPlayingAddress,
     "https://api.spotify.com/v1/me/player/currently-playing",
   );
-  assert.equal(configuration.trackAgent.spotifyTrackRefreshIntervalMs, 5_000);
+  assert.equal(configuration.trackAgent.playbackPollDelay.value, 5_000);
   assert.equal(configuration.trackAgent.artworkSize, "large");
   assert.equal(
     configuration.refresh.authTokenRefreshAddress,
     "https://accounts.spotify.com/api/token",
   );
-  assert.equal(configuration.refresh.authTokenRefreshIntervalMs, 30_000);
 });
 
-test("Spotify service configuration rejects malformed objects and values", () => {
+test("Spotify service configuration permits HTTPS callbacks and IP-loopback HTTP callbacks", () => {
+  const httpsCallbackConfiguration = expectSuccess(
+    parseSpotifyServiceConfiguration({
+      ...validConfiguration,
+      authorization: {
+        ...validConfiguration.authorization,
+        callbackAddress: "https://nowplaying.example/callback",
+      },
+    }),
+  );
+  const ipv6LoopbackCallbackConfiguration = expectSuccess(
+    parseSpotifyServiceConfiguration({
+      ...validConfiguration,
+      authorization: {
+        ...validConfiguration.authorization,
+        callbackAddress: "http://[::1]:3000/nowplaying",
+      },
+    }),
+  );
+
+  assert.equal(
+    httpsCallbackConfiguration.authorization.callbackAddress,
+    "https://nowplaying.example/callback",
+  );
+  assert.equal(
+    ipv6LoopbackCallbackConfiguration.authorization.callbackAddress,
+    "http://[::1]:3000/nowplaying",
+  );
+});
+
+test("Spotify service configuration rejects insecure endpoint and callback schemes", () => {
   const cases: ReadonlyArray<{
     readonly source: unknown;
     readonly expected: SpotifyServiceConfigurationParseFailure;
@@ -75,13 +106,92 @@ test("Spotify service configuration rejects malformed objects and values", () =>
     {
       source: {
         ...validConfiguration,
-        refresh: {
-          ...validConfiguration.refresh,
-          authTokenRefreshIntervalMs: 0,
+        authorization: {
+          ...validConfiguration.authorization,
+          authorizationAddress: "http://accounts.spotify.com/authorize",
         },
       },
       expected: configurationFailure(
-        "$.refresh.authTokenRefreshIntervalMs",
+        "$.authorization.authorizationAddress",
+        "expected-https-url",
+      ),
+    },
+    {
+      source: {
+        ...validConfiguration,
+        trackAgent: {
+          ...validConfiguration.trackAgent,
+          currentlyPlayingAddress:
+            "http://api.spotify.com/v1/me/player/currently-playing",
+        },
+      },
+      expected: configurationFailure(
+        "$.trackAgent.currentlyPlayingAddress",
+        "expected-https-url",
+      ),
+    },
+    {
+      source: {
+        ...validConfiguration,
+        refresh: {
+          authTokenRefreshAddress: "http://accounts.spotify.com/api/token",
+        },
+      },
+      expected: configurationFailure(
+        "$.refresh.authTokenRefreshAddress",
+        "expected-https-url",
+      ),
+    },
+    {
+      source: {
+        ...validConfiguration,
+        authorization: {
+          ...validConfiguration.authorization,
+          callbackAddress: "http://localhost:3000/nowplaying",
+        },
+      },
+      expected: configurationFailure(
+        "$.authorization.callbackAddress",
+        "expected-https-or-loopback-http-url",
+      ),
+    },
+    {
+      source: {
+        ...validConfiguration,
+        authorization: {
+          ...validConfiguration.authorization,
+          callbackAddress: "http://192.168.1.20:3000/nowplaying",
+        },
+      },
+      expected: configurationFailure(
+        "$.authorization.callbackAddress",
+        "expected-https-or-loopback-http-url",
+      ),
+    },
+    {
+      source: {
+        ...validConfiguration,
+        authorization: {
+          ...validConfiguration.authorization,
+          callbackAddress: "ftp://127.0.0.1/nowplaying",
+        },
+      },
+      expected: configurationFailure(
+        "$.authorization.callbackAddress",
+        "expected-https-or-loopback-http-url",
+      ),
+    },
+    {
+      source: {
+        ...validConfiguration,
+        trackAgent: {
+          ...validConfiguration.trackAgent,
+          spotifyTrackRefreshIntervalMs:
+            maximumPlatformTimerDelayMilliseconds + 1,
+        },
+      },
+      expected: configurationFailure(
+        "$.trackAgent.spotifyTrackRefreshIntervalMs",
         "expected-positive-integer",
       ),
     },

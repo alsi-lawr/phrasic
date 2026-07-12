@@ -1,76 +1,135 @@
 import axios from "axios";
 import {
+  authorizationRequiredPlaybackWireState,
   emptyPlaybackWireState,
   failurePlaybackWireState,
   serializePlaybackState,
-} from "@/domain/playback-stream";
-import type { PlaybackWireState } from "@/domain/playback-stream";
-import { providerFailure } from "@/domain/playback";
-import type { PlaybackFailure } from "@/domain/playback";
-import { parseSpotifyPlaybackPayload } from "@/providers/spotify/playback";
-import type { SpotifyTrackAgentConfiguration } from "./SpotifyServiceConfiguration";
+  type PlaybackWireState,
+} from "../../domain/playback-stream.ts";
+import { providerFailure, type AccessToken } from "../../domain/playback.ts";
+import { parseSpotifyPlaybackPayload } from "../../providers/spotify/playback.ts";
+import type { SpotifyTrackAgentConfiguration } from "./SpotifyServiceConfiguration.ts";
+
+export type SpotifyCurrentlyPlayingResponse = {
+  readonly status: number;
+  readonly data: unknown;
+};
+
+export type SpotifyCurrentlyPlayingTransport = {
+  readonly fetchCurrentlyPlaying: (
+    currentlyPlayingAddress: string,
+    accessToken: AccessToken,
+  ) => Promise<SpotifyCurrentlyPlayingResponse>;
+};
+
+const defaultSpotifyCurrentlyPlayingTransport: SpotifyCurrentlyPlayingTransport =
+  Object.freeze({
+    fetchCurrentlyPlaying: async (
+      currentlyPlayingAddress: string,
+      accessToken: AccessToken,
+    ): Promise<SpotifyCurrentlyPlayingResponse> => {
+      const response = await axios.get<unknown>(currentlyPlayingAddress, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: bearerAuthorization(accessToken),
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+        validateStatus: (): boolean => true,
+      });
+      const currentlyPlayingResponse: SpotifyCurrentlyPlayingResponse = {
+        status: response.status,
+        data: response.data,
+      };
+
+      return Object.freeze(currentlyPlayingResponse);
+    },
+  });
 
 export class SpotifyTrackAgent {
   private readonly config: SpotifyTrackAgentConfiguration;
+  private readonly transport: SpotifyCurrentlyPlayingTransport;
 
-  public constructor(config: SpotifyTrackAgentConfiguration) {
+  public constructor(
+    config: SpotifyTrackAgentConfiguration,
+    transport: SpotifyCurrentlyPlayingTransport = defaultSpotifyCurrentlyPlayingTransport,
+  ) {
     this.config = config;
+    this.transport = transport;
   }
 
-  public async pollPlayback(accessToken: string): Promise<PlaybackWireState> {
-    return this.fetchPlaybackState(accessToken);
-  }
-
-  private async fetchPlaybackState(
-    accessToken: string,
+  public async pollPlayback(
+    accessToken: AccessToken,
   ): Promise<PlaybackWireState> {
     try {
-      const response = await axios.get<unknown>(
+      const response = await this.transport.fetchCurrentlyPlaying(
         this.config.currentlyPlayingAddress,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
-            Expires: "0",
-          },
-        },
+        accessToken,
       );
 
-      if (response.status === 204) {
-        return emptyPlaybackWireState();
-      }
-
-      const payload: unknown = response.data;
-      const playback = parseSpotifyPlaybackPayload(
-        payload,
-        this.config.artworkSize,
-      );
-      if (playback.kind === "failure") {
-        return failurePlaybackWireState(providerFailure("malformed-response"));
-      }
-
-      return serializePlaybackState(playback.value);
+      return playbackWireStateFromResponse(response, this.config);
     } catch (error: unknown) {
-      return failurePlaybackWireState(playbackFailureFromUnknown(error));
+      return playbackWireStateFromTransportError(error);
     }
   }
 }
 
-function playbackFailureFromUnknown(error: unknown): PlaybackFailure {
-  if (!axios.isAxiosError(error)) {
-    return providerFailure("network");
+function bearerAuthorization(accessToken: AccessToken): string {
+  return `Bearer ${accessToken.value}`;
+}
+
+function playbackWireStateFromResponse(
+  response: SpotifyCurrentlyPlayingResponse,
+  configuration: SpotifyTrackAgentConfiguration,
+): PlaybackWireState {
+  if (response.status === 204) {
+    return emptyPlaybackWireState();
   }
 
-  const status = error.response?.status;
+  if (response.status < 200 || response.status >= 300) {
+    return playbackWireStateFromProviderStatus(response.status);
+  }
+
+  const playback = parseSpotifyPlaybackPayload(
+    response.data,
+    configuration.artworkSize,
+  );
+  if (playback.kind === "failure") {
+    return failurePlaybackWireState(providerFailure("malformed-response"));
+  }
+
+  return serializePlaybackState(playback.value);
+}
+
+function playbackWireStateFromTransportError(
+  error: unknown,
+): PlaybackWireState {
+  if (axios.isAxiosError(error) && typeof error.response?.status === "number") {
+    return playbackWireStateFromProviderStatus(error.response.status);
+  }
+
+  return failurePlaybackWireState(providerFailure("network"));
+}
+
+function playbackWireStateFromProviderStatus(
+  status: number,
+): PlaybackWireState {
+  if (status === 401) {
+    return authorizationRequiredPlaybackWireState("not-authorized");
+  }
+
+  if (status === 403) {
+    return authorizationRequiredPlaybackWireState("permission-required");
+  }
+
   if (status === 429) {
-    return providerFailure("rate-limited");
+    return failurePlaybackWireState(providerFailure("rate-limited"));
   }
 
-  if (status !== undefined && status >= 500) {
-    return providerFailure("server-error");
+  if (status >= 500) {
+    return failurePlaybackWireState(providerFailure("server-error"));
   }
 
-  return providerFailure("network");
+  return failurePlaybackWireState(providerFailure("network"));
 }

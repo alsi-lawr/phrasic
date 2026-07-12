@@ -1,4 +1,7 @@
-import type { Result } from "../../domain/playback.ts";
+import {
+  PlaybackPollDelayMilliseconds,
+  type Result,
+} from "../../domain/playback.ts";
 
 type UnknownJsonObject = {
   readonly [key: string]: unknown;
@@ -24,13 +27,12 @@ export type SpotifyAuthorizationConfiguration = {
 
 export type SpotifyTrackAgentConfiguration = {
   readonly currentlyPlayingAddress: string;
-  readonly spotifyTrackRefreshIntervalMs: number;
+  readonly playbackPollDelay: PlaybackPollDelayMilliseconds;
   readonly artworkSize: SpotifyArtworkSize;
 };
 
 export type SpotifyRefreshConfiguration = {
   readonly authTokenRefreshAddress: string;
-  readonly authTokenRefreshIntervalMs: number;
 };
 
 export type SpotifyServiceConfiguration = {
@@ -43,7 +45,8 @@ export type SpotifyServiceConfigurationParseFailure = {
   readonly kind: "invalid-spotify-service-configuration";
   readonly path: string;
   readonly code:
-    | "expected-http-url"
+    | "expected-https-or-loopback-http-url"
+    | "expected-https-url"
     | "expected-non-empty-string"
     | "expected-object"
     | "expected-positive-integer"
@@ -169,7 +172,7 @@ function parseAuthorizationConfiguration(
     source.value,
     "authorizationAddress",
     `${path}.authorizationAddress`,
-    parseHttpUrl,
+    parseHttpsUrl,
   );
   if (authorizationAddress.kind === "failure") {
     return authorizationAddress;
@@ -199,7 +202,7 @@ function parseAuthorizationConfiguration(
     source.value,
     "callbackAddress",
     `${path}.callbackAddress`,
-    parseHttpUrl,
+    parseCallbackAddress,
   );
   if (callbackAddress.kind === "failure") {
     return callbackAddress;
@@ -262,20 +265,20 @@ function parseTrackAgentConfiguration(
     source.value,
     "currentlyPlayingAddress",
     `${path}.currentlyPlayingAddress`,
-    parseHttpUrl,
+    parseHttpsUrl,
   );
   if (currentlyPlayingAddress.kind === "failure") {
     return currentlyPlayingAddress;
   }
 
-  const spotifyTrackRefreshIntervalMs = readAndParse(
+  const playbackPollDelay = readAndParse(
     source.value,
     "spotifyTrackRefreshIntervalMs",
     `${path}.spotifyTrackRefreshIntervalMs`,
-    parsePositiveInteger,
+    parsePlaybackPollDelay,
   );
-  if (spotifyTrackRefreshIntervalMs.kind === "failure") {
-    return spotifyTrackRefreshIntervalMs;
+  if (playbackPollDelay.kind === "failure") {
+    return playbackPollDelay;
   }
 
   const artworkSize = readAndParse(
@@ -290,7 +293,7 @@ function parseTrackAgentConfiguration(
 
   const configuration: SpotifyTrackAgentConfiguration = {
     currentlyPlayingAddress: currentlyPlayingAddress.value,
-    spotifyTrackRefreshIntervalMs: spotifyTrackRefreshIntervalMs.value,
+    playbackPollDelay: playbackPollDelay.value,
     artworkSize: artworkSize.value,
   };
 
@@ -311,7 +314,7 @@ function parseRefreshConfiguration(
 
   const expectedKeys = rejectUnexpectedKeys(
     source.value,
-    ["authTokenRefreshAddress", "authTokenRefreshIntervalMs"],
+    ["authTokenRefreshAddress"],
     path,
   );
   if (expectedKeys.kind === "failure") {
@@ -322,25 +325,14 @@ function parseRefreshConfiguration(
     source.value,
     "authTokenRefreshAddress",
     `${path}.authTokenRefreshAddress`,
-    parseHttpUrl,
+    parseHttpsUrl,
   );
   if (authTokenRefreshAddress.kind === "failure") {
     return authTokenRefreshAddress;
   }
 
-  const authTokenRefreshIntervalMs = readAndParse(
-    source.value,
-    "authTokenRefreshIntervalMs",
-    `${path}.authTokenRefreshIntervalMs`,
-    parsePositiveInteger,
-  );
-  if (authTokenRefreshIntervalMs.kind === "failure") {
-    return authTokenRefreshIntervalMs;
-  }
-
   const configuration: SpotifyRefreshConfiguration = {
     authTokenRefreshAddress: authTokenRefreshAddress.value,
-    authTokenRefreshIntervalMs: authTokenRefreshIntervalMs.value,
   };
 
   return succeeded(Object.freeze(configuration));
@@ -400,7 +392,7 @@ function parseObject(
   return succeeded(input);
 }
 
-function parseHttpUrl(
+function parseHttpsUrl(
   input: unknown,
   path: string,
 ): Result<string, SpotifyServiceConfigurationParseFailure> {
@@ -411,14 +403,43 @@ function parseHttpUrl(
 
   try {
     const url = new URL(value.value);
-    if (url.protocol === "http:" || url.protocol === "https:") {
+    if (url.protocol === "https:") {
       return value;
     }
   } catch {
-    return failed(configurationFailure(path, "expected-http-url"));
+    return failed(configurationFailure(path, "expected-https-url"));
   }
 
-  return failed(configurationFailure(path, "expected-http-url"));
+  return failed(configurationFailure(path, "expected-https-url"));
+}
+
+function parseCallbackAddress(
+  input: unknown,
+  path: string,
+): Result<string, SpotifyServiceConfigurationParseFailure> {
+  const value = parseNonEmptyString(input, path);
+  if (value.kind === "failure") {
+    return value;
+  }
+
+  try {
+    const url = new URL(value.value);
+    if (url.protocol === "https:") {
+      return value;
+    }
+
+    if (url.protocol === "http:" && isIpLoopbackHostname(url.hostname)) {
+      return value;
+    }
+  } catch {
+    return failed(
+      configurationFailure(path, "expected-https-or-loopback-http-url"),
+    );
+  }
+
+  return failed(
+    configurationFailure(path, "expected-https-or-loopback-http-url"),
+  );
 }
 
 function parseNonEmptyString(
@@ -432,15 +453,19 @@ function parseNonEmptyString(
   return succeeded(input);
 }
 
-function parsePositiveInteger(
+function parsePlaybackPollDelay(
   input: unknown,
   path: string,
-): Result<number, SpotifyServiceConfigurationParseFailure> {
-  if (typeof input !== "number" || !Number.isSafeInteger(input) || input <= 0) {
+): Result<
+  PlaybackPollDelayMilliseconds,
+  SpotifyServiceConfigurationParseFailure
+> {
+  const delay = PlaybackPollDelayMilliseconds.create(input);
+  if (delay.kind === "failure") {
     return failed(configurationFailure(path, "expected-positive-integer"));
   }
 
-  return succeeded(input);
+  return succeeded(delay.value);
 }
 
 function parseResponseType(
@@ -523,6 +548,15 @@ function configurationFailure(
 
 function isUnknownJsonObject(input: unknown): input is UnknownJsonObject {
   return typeof input === "object" && input !== null && !Array.isArray(input);
+}
+
+function isIpLoopbackHostname(hostname: string): boolean {
+  if (hostname === "[::1]") {
+    return true;
+  }
+
+  const octets = hostname.split(".");
+  return octets.length === 4 && octets[0] === "127";
 }
 
 function succeeded<Value, Failure>(value: Value): Result<Value, Failure> {

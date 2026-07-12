@@ -19,7 +19,7 @@ test("Spotify track service authorization URLs preserve redirect queries and mul
         scopes: "user-read-playback-state user-read-currently-playing",
         responseType: "code",
         callbackAddress:
-          "http://localhost:3000/nowplaying?source=obs&display=main",
+          "http://127.0.0.1:3000/nowplaying?source=obs&display=main",
         spotifyClientId: "spotify-client-id",
         spotifyClientSecret: "spotify-client-secret",
       },
@@ -31,7 +31,6 @@ test("Spotify track service authorization URLs preserve redirect queries and mul
       },
       refresh: {
         authTokenRefreshAddress: "https://accounts.spotify.com/api/token",
-        authTokenRefreshIntervalMs: 30_000,
       },
     }),
   );
@@ -48,7 +47,7 @@ test("Spotify track service authorization URLs preserve redirect queries and mul
   assert.equal(authorizationUrl.searchParams.get("response_type"), "code");
   assert.equal(
     authorizationUrl.searchParams.get("redirect_uri"),
-    "http://localhost:3000/nowplaying?source=obs&display=main",
+    "http://127.0.0.1:3000/nowplaying?source=obs&display=main",
   );
   assert.equal(
     authorizationUrl.searchParams.get("scope"),

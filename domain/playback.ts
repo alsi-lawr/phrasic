@@ -17,6 +17,7 @@ export type ValueValidationError = {
     | "authorization-code"
     | "display-text"
     | "original-artwork-url"
+    | "playback-poll-delay-milliseconds"
     | "playback-duration-milliseconds"
     | "playback-position-milliseconds"
     | "provider-collection-id"
@@ -298,8 +299,11 @@ export class AccessToken {
 }
 
 const millisecondsPerSecond = 1_000;
+
+export const maximumPlatformTimerDelayMilliseconds = 2_147_483_647;
+
 const maximumAccessTokenExpiresInSeconds = Math.floor(
-  Number.MAX_SAFE_INTEGER / millisecondsPerSecond,
+  maximumPlatformTimerDelayMilliseconds / millisecondsPerSecond,
 );
 
 export class AccessTokenExpiresInSeconds {
@@ -353,7 +357,7 @@ export class AccessTokenRefreshDelayMilliseconds {
   public static create(
     input: unknown,
   ): Result<AccessTokenRefreshDelayMilliseconds, ValueValidationError> {
-    const result = validatePositiveInteger(
+    const result = validateTimerDelayMilliseconds(
       "access-token-refresh-delay-milliseconds",
       input,
     );
@@ -370,6 +374,33 @@ export class AccessTokenRefreshDelayMilliseconds {
     return new AccessTokenRefreshDelayMilliseconds(
       expiresIn.value * millisecondsPerSecond,
     );
+  }
+}
+
+export class PlaybackPollDelayMilliseconds {
+  private readonly rawValue: number;
+
+  private constructor(value: number) {
+    this.rawValue = value;
+    Object.freeze(this);
+  }
+
+  public get value(): number {
+    return this.rawValue;
+  }
+
+  public static create(
+    input: unknown,
+  ): Result<PlaybackPollDelayMilliseconds, ValueValidationError> {
+    const result = validateTimerDelayMilliseconds(
+      "playback-poll-delay-milliseconds",
+      input,
+    );
+    if (result.kind === "failure") {
+      return result;
+    }
+
+    return succeeded(new PlaybackPollDelayMilliseconds(result.value));
   }
 }
 
@@ -908,6 +939,22 @@ function validatePositiveInteger(
   }
 
   return succeeded(input);
+}
+
+function validateTimerDelayMilliseconds(
+  value: ValueValidationError["value"],
+  input: unknown,
+): Result<number, ValueValidationError> {
+  const result = validatePositiveInteger(value, input);
+  if (result.kind === "failure") {
+    return result;
+  }
+
+  if (result.value > maximumPlatformTimerDelayMilliseconds) {
+    return failed(invalidValue(value, "expected-positive-integer"));
+  }
+
+  return result;
 }
 
 function validateHttpUrl(

@@ -9,6 +9,7 @@ import {
   type Result,
 } from "../domain/playback.ts";
 import {
+  authorizationRequiredPlaybackWireState,
   emptyPlaybackWireState,
   type PlaybackWireState,
 } from "../domain/playback-stream.ts";
@@ -126,6 +127,47 @@ test("the listener exposes authorization-required lifecycle states for rejected 
   });
   assert.equal(poller.accessTokens.length, 0);
   assert.equal(scheduler.scheduled.length, 0);
+});
+
+test("the listener transitions to authorization-required after playback authorization failures", async () => {
+  const scheduler = manualRefreshScheduler();
+  const tokenService: SpotifyTrackListenerTokenService = {
+    exchangeAuthorizationCode: async () =>
+      succeeded<
+        SpotifyAuthorizationCodeTokenResponse,
+        SpotifyTokenResponseParseFailure
+      >(authorizationCodeResponse()),
+    refreshAccessToken: async () =>
+      succeeded<
+        SpotifyAccessTokenRefreshResponse,
+        SpotifyTokenResponseParseFailure
+      >(refreshResponse("access-token-1", 3_600)),
+  };
+  let pollCount = 0;
+  const playbackPoller: SpotifyTrackListenerPlaybackPoller = Object.freeze({
+    pollPlayback: async (): Promise<PlaybackWireState> => {
+      pollCount += 1;
+      return authorizationRequiredPlaybackWireState("permission-required");
+    },
+  });
+  const listener = SpotifyTrackListener.createWithDependencies(
+    listenerDependencies(tokenService, playbackPoller, scheduler.scheduler),
+  );
+
+  listener.setRefreshToken(refreshToken());
+  await settleAsyncWork();
+
+  assert.equal(scheduler.scheduled.length, 1);
+  assert.deepEqual(await listener.pollPlayback(), {
+    kind: "authorization-required",
+    reason: "permission-required",
+  });
+  assert.equal(scheduler.scheduled[0]?.isCancelled(), true);
+  assert.deepEqual(await listener.pollPlayback(), {
+    kind: "authorization-required",
+    reason: "permission-required",
+  });
+  assert.equal(pollCount, 1);
 });
 
 test("the listener schedules one token refresh at the converted expiry boundary without timers", async () => {

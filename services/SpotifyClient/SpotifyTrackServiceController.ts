@@ -3,7 +3,11 @@ import path from "node:path";
 import { failurePlaybackWireState } from "@/domain/playback-stream";
 import type { PlaybackWireState } from "@/domain/playback-stream";
 import { providerFailure } from "@/domain/playback";
-import type { AuthorizationCode, RefreshToken } from "@/domain/playback";
+import type {
+  AuthorizationCode,
+  PlaybackPollDelayMilliseconds,
+  RefreshToken,
+} from "@/domain/playback";
 import { RefreshTokenService } from "./SpotifyRefreshService";
 import {
   SpotifyTrackListener,
@@ -69,8 +73,8 @@ class SpotifyTrackServiceController {
     return buildSpotifyAuthorizationUrl(this.configuration.authorization);
   }
 
-  public getTimeoutMs(): number {
-    return this.configuration.trackAgent.spotifyTrackRefreshIntervalMs;
+  public getPlaybackPollDelay(): PlaybackPollDelayMilliseconds {
+    return this.configuration.trackAgent.playbackPollDelay;
   }
 
   private stopExistingListener(): void {
@@ -97,7 +101,7 @@ function createSpotifyTrackListenerDependencies(
   const trackPollService = new SpotifyTrackAgent(configuration.trackAgent);
   const playbackPoller: SpotifyTrackListenerPlaybackPoller = Object.freeze({
     pollPlayback: (accessToken): Promise<PlaybackWireState> =>
-      trackPollService.pollPlayback(accessToken.value),
+      trackPollService.pollPlayback(accessToken),
   });
   const dependencies: SpotifyTrackListenerDependencies = {
     tokenService: new RefreshTokenService(

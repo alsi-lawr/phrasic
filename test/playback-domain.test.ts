@@ -12,6 +12,7 @@ import {
   EpisodeItem,
   initialPlaybackState,
   OriginalArtworkUrl,
+  PlaybackPollDelayMilliseconds,
   PlaybackDurationMilliseconds,
   PlaybackPositionMilliseconds,
   PlaybackSnapshot,
@@ -25,6 +26,7 @@ import {
   TrackItem,
   transitionPlaybackState,
   unavailableOriginalArtwork,
+  maximumPlatformTimerDelayMilliseconds,
   type OriginalArtwork,
   type PlaybackState,
   type Result,
@@ -65,13 +67,38 @@ test("validated values reject invalid boundaries and preserve distinct values", 
   });
 });
 
-test("access token lifetimes convert to scheduler delays without changing units", () => {
+test("access token lifetimes and scheduler delays stay within platform timer bounds", () => {
   const expiresIn = expectSuccess(AccessTokenExpiresInSeconds.create(3_600));
   const delay =
     AccessTokenRefreshDelayMilliseconds.fromExpiresInSeconds(expiresIn);
+  const maximumRefreshDelay = expectSuccess(
+    AccessTokenRefreshDelayMilliseconds.create(
+      maximumPlatformTimerDelayMilliseconds,
+    ),
+  );
+  const maximumPollDelay = expectSuccess(
+    PlaybackPollDelayMilliseconds.create(maximumPlatformTimerDelayMilliseconds),
+  );
+  const maximumExpiresInSeconds = Math.floor(
+    maximumPlatformTimerDelayMilliseconds / 1_000,
+  );
+  const maximumLifetime = expectSuccess(
+    AccessTokenExpiresInSeconds.create(maximumExpiresInSeconds),
+  );
+  const maximumLifetimeDelay =
+    AccessTokenRefreshDelayMilliseconds.fromExpiresInSeconds(maximumLifetime);
 
   assert.equal(expiresIn.value, 3_600);
   assert.equal(delay.value, 3_600_000);
+  assert.equal(
+    maximumRefreshDelay.value,
+    maximumPlatformTimerDelayMilliseconds,
+  );
+  assert.equal(maximumPollDelay.value, maximumPlatformTimerDelayMilliseconds);
+  assert.equal(maximumLifetimeDelay.value, maximumExpiresInSeconds * 1_000);
+  assert.ok(
+    maximumLifetimeDelay.value <= maximumPlatformTimerDelayMilliseconds,
+  );
   assert.deepEqual(expectFailure(AccessTokenExpiresInSeconds.create(0)), {
     kind: "invalid-value",
     value: "access-token-expires-in-seconds",
@@ -82,6 +109,40 @@ test("access token lifetimes convert to scheduler delays without changing units"
     {
       kind: "invalid-value",
       value: "access-token-refresh-delay-milliseconds",
+      reason: "expected-positive-integer",
+    },
+  );
+  assert.deepEqual(
+    expectFailure(
+      AccessTokenExpiresInSeconds.create(maximumExpiresInSeconds + 1),
+    ),
+    {
+      kind: "invalid-value",
+      value: "access-token-expires-in-seconds",
+      reason: "expected-positive-integer",
+    },
+  );
+  assert.deepEqual(
+    expectFailure(
+      AccessTokenRefreshDelayMilliseconds.create(
+        maximumPlatformTimerDelayMilliseconds + 1,
+      ),
+    ),
+    {
+      kind: "invalid-value",
+      value: "access-token-refresh-delay-milliseconds",
+      reason: "expected-positive-integer",
+    },
+  );
+  assert.deepEqual(
+    expectFailure(
+      PlaybackPollDelayMilliseconds.create(
+        maximumPlatformTimerDelayMilliseconds + 1,
+      ),
+    ),
+    {
+      kind: "invalid-value",
+      value: "playback-poll-delay-milliseconds",
       reason: "expected-positive-integer",
     },
   );

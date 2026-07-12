@@ -168,8 +168,17 @@ export class SpotifyTrackListener {
         return authorizingPlaybackWireState();
       case "reconnecting":
         return reconnectingPlaybackWireState(unavailableLastPlaybackItem());
-      case "ready":
-        return this.playbackPoller.pollPlayback(this.state.accessToken);
+      case "ready": {
+        const playback = await this.playbackPoller.pollPlayback(
+          this.state.accessToken,
+        );
+        if (playback.kind === "authorization-required") {
+          this.stopRefreshSchedule();
+          this.state = authorizationRequiredListenerState(playback.reason);
+        }
+
+        return playback;
+      }
       case "failure":
         return failurePlaybackWireState(this.state.error);
     }
