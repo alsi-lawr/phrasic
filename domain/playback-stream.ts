@@ -198,6 +198,10 @@ export type PlaybackStreamEvaluation = {
   readonly outcome: PlaybackStreamOutcome;
 };
 
+export type PlaybackStreamSubscription = {
+  readonly evaluate: (state: PlaybackWireState) => PlaybackStreamOutcome;
+};
+
 export type PlaybackWireItemAvailability =
   | {
       readonly kind: "available";
@@ -251,6 +255,19 @@ export function failurePlaybackWireState(
 
 export function initialPlaybackStreamCursor(): PlaybackStreamCursor {
   return Object.freeze({ kind: "unobserved" });
+}
+
+export function createPlaybackStreamSubscription(): PlaybackStreamSubscription {
+  let cursor = initialPlaybackStreamCursor();
+  const subscription: PlaybackStreamSubscription = {
+    evaluate: (state: PlaybackWireState): PlaybackStreamOutcome => {
+      const evaluation = evaluatePlaybackStream(cursor, state);
+      cursor = evaluation.cursor;
+      return evaluation.outcome;
+    },
+  };
+
+  return Object.freeze(subscription);
 }
 
 export function serializePlaybackState(
@@ -594,12 +611,12 @@ function sameStreamState(
     case "playing":
       return (
         right.kind === "playing" &&
-        samePlaybackWireItem(left.snapshot.item, right.snapshot.item)
+        samePlaybackWireSnapshot(left.snapshot, right.snapshot)
       );
     case "paused":
       return (
         right.kind === "paused" &&
-        samePlaybackWireItem(left.snapshot.item, right.snapshot.item)
+        samePlaybackWireSnapshot(left.snapshot, right.snapshot)
       );
     case "unsupported":
       return right.kind === "unsupported" && left.reason === right.reason;
@@ -618,15 +635,146 @@ function sameStreamState(
   return assertNever(left);
 }
 
+function samePlaybackWireSnapshot(
+  left: PlaybackWireSnapshot,
+  right: PlaybackWireSnapshot,
+): boolean {
+  return (
+    left.positionMilliseconds === right.positionMilliseconds &&
+    left.durationMilliseconds === right.durationMilliseconds &&
+    samePlaybackWireItem(left.item, right.item)
+  );
+}
+
 function samePlaybackWireItem(
   left: PlaybackWireItem,
   right: PlaybackWireItem,
 ): boolean {
+  if (left.kind !== right.kind) {
+    return false;
+  }
+
+  switch (left.kind) {
+    case "track":
+      return right.kind === "track" && samePlaybackWireTrackItem(left, right);
+    case "episode":
+      return (
+        right.kind === "episode" && samePlaybackWireEpisodeItem(left, right)
+      );
+  }
+
+  return assertNever(left);
+}
+
+function samePlaybackWireTrackItem(
+  left: PlaybackWireTrackItem,
+  right: PlaybackWireTrackItem,
+): boolean {
   return (
-    left.kind === right.kind &&
     left.providerId === right.providerId &&
-    left.itemId === right.itemId
+    left.itemId === right.itemId &&
+    left.title === right.title &&
+    samePlaybackWireCreators(left.artists, right.artists) &&
+    samePlaybackWireCollection(left.collection, right.collection) &&
+    samePlaybackWireArtwork(left.artwork, right.artwork) &&
+    samePlaybackWireLinks(left.links, right.links)
   );
+}
+
+function samePlaybackWireEpisodeItem(
+  left: PlaybackWireEpisodeItem,
+  right: PlaybackWireEpisodeItem,
+): boolean {
+  return (
+    left.providerId === right.providerId &&
+    left.itemId === right.itemId &&
+    left.title === right.title &&
+    samePlaybackWireShow(left.show, right.show) &&
+    samePlaybackWireArtwork(left.artwork, right.artwork) &&
+    samePlaybackWireLinks(left.links, right.links)
+  );
+}
+
+function samePlaybackWireCreators(
+  left: ReadonlyArray<PlaybackWireCreator>,
+  right: ReadonlyArray<PlaybackWireCreator>,
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((creator, index): boolean => {
+    const other = right[index];
+    return other !== undefined && samePlaybackWireCreator(creator, other);
+  });
+}
+
+function samePlaybackWireCreator(
+  left: PlaybackWireCreator,
+  right: PlaybackWireCreator,
+): boolean {
+  return (
+    left.name === right.name && samePlaybackWireLinks(left.links, right.links)
+  );
+}
+
+function samePlaybackWireCollection(
+  left: PlaybackWireCollection,
+  right: PlaybackWireCollection,
+): boolean {
+  return (
+    left.id === right.id &&
+    left.title === right.title &&
+    samePlaybackWireLinks(left.links, right.links)
+  );
+}
+
+function samePlaybackWireShow(
+  left: PlaybackWireShow,
+  right: PlaybackWireShow,
+): boolean {
+  return (
+    left.id === right.id &&
+    left.title === right.title &&
+    left.publisher === right.publisher &&
+    samePlaybackWireLinks(left.links, right.links)
+  );
+}
+
+function samePlaybackWireArtwork(
+  left: PlaybackWireArtwork,
+  right: PlaybackWireArtwork,
+): boolean {
+  if (left.kind !== right.kind) {
+    return false;
+  }
+
+  switch (left.kind) {
+    case "available":
+      return right.kind === "available" && left.url === right.url;
+    case "unavailable":
+      return right.kind === "unavailable" && left.reason === right.reason;
+  }
+
+  return assertNever(left);
+}
+
+function samePlaybackWireLinks(
+  left: ReadonlyArray<PlaybackWireLink>,
+  right: ReadonlyArray<PlaybackWireLink>,
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((link, index): boolean => {
+    const other = right[index];
+    return (
+      other !== undefined &&
+      link.providerId === other.providerId &&
+      link.href === other.href
+    );
+  });
 }
 
 function samePlaybackWireItemAvailability(

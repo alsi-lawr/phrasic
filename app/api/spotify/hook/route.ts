@@ -1,4 +1,5 @@
 import {
+  createPlaybackStreamSubscription,
   emptyPlaybackWireState,
   failurePlaybackWireState,
 } from "@/domain/playback-stream";
@@ -28,6 +29,7 @@ export async function GET(req: Request): Promise<Response> {
     start(controller): void {
       const encoder = new TextEncoder();
       const pollAbortController = new AbortController();
+      const subscription = createPlaybackStreamSubscription();
       let closed = false;
 
       const stopPolling = (): void => {
@@ -58,12 +60,14 @@ export async function GET(req: Request): Promise<Response> {
       const pollForUpdates = async (): Promise<void> => {
         while (!pollAbortController.signal.aborted) {
           try {
-            const outcome = await spotifyTrackService.pollPlayback();
+            const state = await spotifyTrackService.pollPlayback();
             if (pollAbortController.signal.aborted) {
               break;
             }
 
-            const emission = playbackStreamEmission(outcome);
+            const emission = playbackStreamEmission(
+              subscription.evaluate(state),
+            );
             if (emission.kind === "emit") {
               send(emission.state);
             }

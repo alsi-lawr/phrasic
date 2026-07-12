@@ -8,7 +8,10 @@ import {
   RefreshToken,
   type Result,
 } from "../domain/playback.ts";
-import type { PlaybackStreamOutcome } from "../domain/playback-stream.ts";
+import {
+  emptyPlaybackWireState,
+  type PlaybackWireState,
+} from "../domain/playback-stream.ts";
 import {
   SpotifyTrackListener,
   type SpotifyTrackListenerDependencies,
@@ -51,12 +54,9 @@ test("the listener reports malformed authorization-code token responses as safe 
 
   assert.deepEqual(await listener.pollPlayback(), {
     kind: "failure",
-    state: {
-      kind: "failure",
-      error: {
-        kind: "provider-failed",
-        reason: "malformed-response",
-      },
+    error: {
+      kind: "provider-failed",
+      reason: "malformed-response",
     },
   });
   assert.equal(poller.accessTokens.length, 0);
@@ -86,12 +86,9 @@ test("the listener reports network refresh failures as safe failures instead of 
   const outcome = await listener.pollPlayback();
   assert.deepEqual(outcome, {
     kind: "failure",
-    state: {
-      kind: "failure",
-      error: {
-        kind: "provider-failed",
-        reason: "network",
-      },
+    error: {
+      kind: "provider-failed",
+      reason: "network",
     },
   });
   assert.equal(JSON.stringify(outcome).includes("refresh-token-secret"), false);
@@ -124,11 +121,8 @@ test("the listener exposes authorization-required lifecycle states for rejected 
   await settleAsyncWork();
 
   assert.deepEqual(await listener.pollPlayback(), {
-    kind: "changed",
-    state: {
-      kind: "authorization-required",
-      reason: "authorization-revoked",
-    },
+    kind: "authorization-required",
+    reason: "authorization-revoked",
   });
   assert.equal(poller.accessTokens.length, 0);
   assert.equal(scheduler.scheduled.length, 0);
@@ -208,9 +202,9 @@ function playbackPoller(): {
   const poller: SpotifyTrackListenerPlaybackPoller = Object.freeze({
     pollPlayback: async (
       accessToken: AccessToken,
-    ): Promise<PlaybackStreamOutcome> => {
+    ): Promise<PlaybackWireState> => {
       accessTokens.push(accessToken);
-      return Object.freeze({ kind: "empty" });
+      return emptyPlaybackWireState();
     },
   });
 

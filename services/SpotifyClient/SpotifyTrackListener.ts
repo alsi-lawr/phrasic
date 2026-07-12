@@ -17,7 +17,6 @@ import {
   failurePlaybackWireState,
   initializingPlaybackWireState,
   reconnectingPlaybackWireState,
-  type PlaybackStreamOutcome,
   type PlaybackWireState,
 } from "../../domain/playback-stream.ts";
 import type {
@@ -45,7 +44,7 @@ export type SpotifyTrackListenerTokenService = {
 export type SpotifyTrackListenerPlaybackPoller = {
   readonly pollPlayback: (
     accessToken: AccessToken,
-  ) => Promise<PlaybackStreamOutcome>;
+  ) => Promise<PlaybackWireState>;
 };
 
 export type SpotifyTrackListenerRefreshSchedule = {
@@ -100,15 +99,6 @@ type TokenExchangeFailure =
       readonly kind: "failure";
       readonly error: PlaybackFailure;
     };
-
-type ListenerLifecycleWireState = Exclude<
-  PlaybackWireState,
-  | { readonly kind: "empty" }
-  | { readonly kind: "failure" }
-  | { readonly kind: "paused" }
-  | { readonly kind: "playing" }
-  | { readonly kind: "unsupported" }
->;
 
 export class SpotifyTrackListener {
   private refreshToken: RefreshToken | undefined;
@@ -168,27 +158,20 @@ export class SpotifyTrackListener {
     void this.refreshAccessToken(generation);
   }
 
-  public async pollPlayback(): Promise<PlaybackStreamOutcome> {
+  public async pollPlayback(): Promise<PlaybackWireState> {
     switch (this.state.kind) {
       case "initializing":
-        return lifecyclePlaybackStreamOutcome(initializingPlaybackWireState());
+        return initializingPlaybackWireState();
       case "authorization-required":
-        return lifecyclePlaybackStreamOutcome(
-          authorizationRequiredPlaybackWireState(this.state.reason),
-        );
+        return authorizationRequiredPlaybackWireState(this.state.reason);
       case "authorizing":
-        return lifecyclePlaybackStreamOutcome(authorizingPlaybackWireState());
+        return authorizingPlaybackWireState();
       case "reconnecting":
-        return lifecyclePlaybackStreamOutcome(
-          reconnectingPlaybackWireState(unavailableLastPlaybackItem()),
-        );
+        return reconnectingPlaybackWireState(unavailableLastPlaybackItem());
       case "ready":
         return this.playbackPoller.pollPlayback(this.state.accessToken);
       case "failure":
-        return Object.freeze({
-          kind: "failure",
-          state: failurePlaybackWireState(this.state.error),
-        });
+        return failurePlaybackWireState(this.state.error);
     }
 
     return assertNever(this.state);
@@ -330,12 +313,6 @@ function refreshDelayForTokenLifetime(
   expiresIn: AccessTokenExpiresInSeconds,
 ): AccessTokenRefreshDelayMilliseconds {
   return AccessTokenRefreshDelayMilliseconds.fromExpiresInSeconds(expiresIn);
-}
-
-function lifecyclePlaybackStreamOutcome(
-  state: ListenerLifecycleWireState,
-): PlaybackStreamOutcome {
-  return Object.freeze({ kind: "changed", state });
 }
 
 function initializingListenerState(): SpotifyTrackListenerState {

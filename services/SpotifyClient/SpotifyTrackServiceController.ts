@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { failurePlaybackWireState } from "@/domain/playback-stream";
-import type { PlaybackStreamOutcome } from "@/domain/playback-stream";
+import type { PlaybackWireState } from "@/domain/playback-stream";
 import { providerFailure } from "@/domain/playback";
 import type { AuthorizationCode, RefreshToken } from "@/domain/playback";
 import { RefreshTokenService } from "./SpotifyRefreshService";
@@ -45,12 +45,9 @@ class SpotifyTrackServiceController {
     );
   }
 
-  public async pollPlayback(): Promise<PlaybackStreamOutcome> {
+  public async pollPlayback(): Promise<PlaybackWireState> {
     if (!this.isRunning || this.spotifyTrackListener === undefined) {
-      return Object.freeze({
-        kind: "failure",
-        state: failurePlaybackWireState(providerFailure("network")),
-      });
+      return failurePlaybackWireState(providerFailure("network"));
     }
 
     return this.spotifyTrackListener.pollPlayback();
@@ -99,7 +96,7 @@ function createSpotifyTrackListenerDependencies(
 ): SpotifyTrackListenerDependencies {
   const trackPollService = new SpotifyTrackAgent(configuration.trackAgent);
   const playbackPoller: SpotifyTrackListenerPlaybackPoller = Object.freeze({
-    pollPlayback: (accessToken): Promise<PlaybackStreamOutcome> =>
+    pollPlayback: (accessToken): Promise<PlaybackWireState> =>
       trackPollService.pollPlayback(accessToken.value),
   });
   const dependencies: SpotifyTrackListenerDependencies = {

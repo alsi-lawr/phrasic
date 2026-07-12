@@ -1,16 +1,10 @@
 import axios from "axios";
 import {
   emptyPlaybackWireState,
-  evaluatePlaybackStream,
   failurePlaybackWireState,
-  initialPlaybackStreamCursor,
   serializePlaybackState,
 } from "@/domain/playback-stream";
-import type {
-  PlaybackStreamCursor,
-  PlaybackStreamOutcome,
-  PlaybackWireState,
-} from "@/domain/playback-stream";
+import type { PlaybackWireState } from "@/domain/playback-stream";
 import { providerFailure } from "@/domain/playback";
 import type { PlaybackFailure } from "@/domain/playback";
 import { parseSpotifyPlaybackPayload } from "@/providers/spotify/playback";
@@ -18,28 +12,13 @@ import type { SpotifyTrackAgentConfiguration } from "./SpotifyServiceConfigurati
 
 export class SpotifyTrackAgent {
   private readonly config: SpotifyTrackAgentConfiguration;
-  private cursor: PlaybackStreamCursor;
 
   public constructor(config: SpotifyTrackAgentConfiguration) {
     this.config = config;
-    this.cursor = initialPlaybackStreamCursor();
   }
 
-  public async pollPlayback(
-    accessToken: string,
-  ): Promise<PlaybackStreamOutcome> {
-    const state = await this.fetchPlaybackState(accessToken);
-    return this.evaluate(state);
-  }
-
-  public reportEmptyPlayback(): PlaybackStreamOutcome {
-    return this.evaluate(emptyPlaybackWireState());
-  }
-
-  private evaluate(state: PlaybackWireState): PlaybackStreamOutcome {
-    const evaluation = evaluatePlaybackStream(this.cursor, state);
-    this.cursor = evaluation.cursor;
-    return evaluation.outcome;
+  public async pollPlayback(accessToken: string): Promise<PlaybackWireState> {
+    return this.fetchPlaybackState(accessToken);
   }
 
   private async fetchPlaybackState(
