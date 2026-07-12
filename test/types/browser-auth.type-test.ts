@@ -14,6 +14,15 @@ import {
   type PkceVerifier,
   type SpotifyAuthorizationCode,
 } from "../../browser/auth/pkce.ts";
+import type { RefreshSpotifyConnectionResult } from "../../browser/auth/session.ts";
+import {
+  SpotifyRefreshTokenConnection,
+  type SpotifyAuthStoragePort,
+} from "../../browser/auth/storage.ts";
+import {
+  type SpotifyAccessToken,
+  type SpotifyRefreshToken,
+} from "../../browser/auth/token.ts";
 
 declare const clientId: SpotifyClientId;
 declare const redirectUri: SpotifyRedirectUri;
@@ -24,6 +33,10 @@ declare const authorizationCode: SpotifyAuthorizationCode;
 declare const createdAt: AuthorizationAttemptTimestamp;
 declare const expiresAt: AuthorizationAttemptTimestamp;
 declare const width: DisplayWidth;
+declare const accessToken: SpotifyAccessToken;
+declare const refreshToken: SpotifyRefreshToken;
+declare const storage: SpotifyAuthStoragePort;
+declare const refreshResult: RefreshSpotifyConnectionResult;
 
 const returnTo: DisplayReturnConfiguration = Object.freeze({
   width,
@@ -39,6 +52,7 @@ const pendingOptions: PendingAuthorizationAttemptOptions = Object.freeze({
   returnTo,
 });
 const pending = PendingAuthorizationAttempt.create(pendingOptions);
+const refreshConnection = SpotifyRefreshTokenConnection.create(refreshToken);
 const rawConfiguration = Object.freeze({
   spotify: Object.freeze({
     clientId: "browser-client-id",
@@ -77,6 +91,13 @@ const arbitraryExpiry = PendingAuthorizationAttempt.create({
 const constructedClientId = new SpotifyClientId("browser-client-id");
 // @ts-expect-error PKCE states can only be constructed by their parser.
 const constructedState = new PkceState("A".repeat(43));
+void storage.saveSpotifyRefreshTokenConnection(refreshConnection);
+if (refreshResult.kind === "success") {
+  // @ts-expect-error Access-token refresh success retains credentials only in trusted memory.
+  void refreshResult.refreshToken;
+}
+// @ts-expect-error Refresh-token storage cannot accept an access token.
+void storage.saveSpotifyRefreshTokenConnection(accessToken);
 
 void configuration;
 void pending;
@@ -88,3 +109,4 @@ void candidatePendingOptions;
 void arbitraryExpiry;
 void constructedClientId;
 void constructedState;
+void refreshConnection;
