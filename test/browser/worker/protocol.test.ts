@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Result } from "../../../domain/playback.ts";
 import {
+  createPlaybackWorkerFatalInitializationFailure,
   parsePlaybackWorkerCommand,
   parsePlaybackWorkerEvent,
 } from "../../../browser/worker/protocol.ts";
@@ -90,6 +91,20 @@ test("worker events carry only validated provider-neutral wire state or fixed di
     state: { kind: "empty" },
     accessToken: "token-value",
   });
+  const capabilityFailure = expectSuccess(
+    parsePlaybackWorkerEvent(
+      createPlaybackWorkerFatalInitializationFailure(
+        "browser-capability-unavailable",
+      ),
+    ),
+  );
+  const leakedDiagnostic = parsePlaybackWorkerEvent({
+    kind: "safe-diagnostic",
+    operation: "playback-poll",
+    code: "playback-payload-invalid",
+    metadata: { kind: "none" },
+    payload: { access_token: "token-value" },
+  });
 
   assert.deepEqual(playback, {
     kind: "playback-state",
@@ -106,6 +121,11 @@ test("worker events carry only validated provider-neutral wire state or fixed di
     },
   });
   assert.equal(leaked.kind, "failure");
+  assert.deepEqual(capabilityFailure, {
+    kind: "fatal-initialization-failure",
+    code: "browser-capability-unavailable",
+  });
+  assert.equal(leakedDiagnostic.kind, "failure");
 });
 
 function expectSuccess<Value, Failure>(result: Result<Value, Failure>): Value {

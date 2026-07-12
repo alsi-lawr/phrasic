@@ -96,6 +96,8 @@ if (refreshResult.kind === "success") {
   // @ts-expect-error Access-token refresh success retains credentials only in trusted memory.
   void refreshResult.refreshToken;
 }
+// @ts-expect-error Access tokens have no persistence representation.
+void accessToken.toStorageValue();
 // @ts-expect-error Refresh-token storage cannot accept an access token.
 void storage.saveSpotifyRefreshTokenConnection(accessToken);
 

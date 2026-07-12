@@ -1036,6 +1036,7 @@ export function createPlaybackWorkerRuntime(
   function transitionToFailure(
     failure: Extract<PlaybackEvent, { readonly kind: "failure" }>["failure"],
   ): void {
+    cancelAllSchedules();
     transition({ kind: "failure", failure });
   }
 

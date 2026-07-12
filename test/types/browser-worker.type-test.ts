@@ -56,9 +56,49 @@ const payloadBearingDiagnostic: PlaybackWorkerSafeDiagnostic = {
   payload: { access_token: "token-value" },
 };
 
+const callbackBearingDiagnostic: PlaybackWorkerSafeDiagnostic = {
+  kind: "safe-diagnostic",
+  operation: "authorization",
+  code: "authorization-required",
+  metadata: { kind: "none" },
+  // @ts-expect-error Safe diagnostics cannot contain callback values.
+  callbackUrl: "https://nowplaying.example/spotify/?code=callback-value",
+};
+
+const headersBearingDiagnostic: PlaybackWorkerSafeDiagnostic = {
+  kind: "safe-diagnostic",
+  operation: "playback-poll",
+  code: "playback-server-failure",
+  metadata: { kind: "none" },
+  // @ts-expect-error Safe diagnostics cannot contain request headers.
+  headers: { Authorization: "Bearer token-value" },
+};
+
+const bodyBearingDiagnostic: PlaybackWorkerSafeDiagnostic = {
+  kind: "safe-diagnostic",
+  operation: "token-refresh",
+  code: "authorization-transient-failure",
+  metadata: { kind: "none" },
+  // @ts-expect-error Safe diagnostics cannot contain request bodies.
+  body: "refresh_token=token-value",
+};
+
+const rawErrorBearingDiagnostic: PlaybackWorkerSafeDiagnostic = {
+  kind: "safe-diagnostic",
+  operation: "storage",
+  code: "storage-failure",
+  metadata: { kind: "none" },
+  // @ts-expect-error Safe diagnostics cannot contain raw errors.
+  error: new Error("raw error"),
+};
+
 void initialize;
 void playbackEvent;
 void diagnostic;
 void tokenBearingCommand;
 void tokenBearingEvent;
 void payloadBearingDiagnostic;
+void callbackBearingDiagnostic;
+void headersBearingDiagnostic;
+void bodyBearingDiagnostic;
+void rawErrorBearingDiagnostic;
