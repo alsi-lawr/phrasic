@@ -1,18 +1,23 @@
-import { RefreshToken, type Result } from "../../domain/playback.ts";
+import {
+  AccessToken,
+  AccessTokenExpiresInSeconds,
+  RefreshToken,
+  type Result,
+} from "../../domain/playback.ts";
 
 type UnknownJsonObject = {
   readonly [key: string]: unknown;
 };
 
 export type SpotifyAuthorizationCodeTokenResponse = {
-  readonly accessToken: string;
-  readonly expiresIn: number;
+  readonly accessToken: AccessToken;
+  readonly expiresInSeconds: AccessTokenExpiresInSeconds;
   readonly refreshToken: RefreshToken;
 };
 
 export type SpotifyAccessTokenRefreshResponse = {
-  readonly accessToken: string;
-  readonly expiresIn: number;
+  readonly accessToken: AccessToken;
+  readonly expiresInSeconds: AccessTokenExpiresInSeconds;
 };
 
 export type SpotifyTokenResponseParseFailure = {
@@ -64,7 +69,7 @@ export function parseSpotifyAuthorizationCodeTokenResponse(
 
   const response: SpotifyAuthorizationCodeTokenResponse = {
     accessToken: tokenFields.value.accessToken,
-    expiresIn: tokenFields.value.expiresIn,
+    expiresInSeconds: tokenFields.value.expiresInSeconds,
     refreshToken: refreshToken.value,
   };
 
@@ -86,15 +91,15 @@ export function parseSpotifyAccessTokenRefreshResponse(
 
   const response: SpotifyAccessTokenRefreshResponse = {
     accessToken: tokenFields.value.accessToken,
-    expiresIn: tokenFields.value.expiresIn,
+    expiresInSeconds: tokenFields.value.expiresInSeconds,
   };
 
   return succeeded(Object.freeze(response));
 }
 
 type SpotifyTokenFields = {
-  readonly accessToken: string;
-  readonly expiresIn: number;
+  readonly accessToken: AccessToken;
+  readonly expiresInSeconds: AccessTokenExpiresInSeconds;
 };
 
 function parseTokenFields(
@@ -106,13 +111,11 @@ function parseTokenFields(
     return accessToken;
   }
 
-  const parsedAccessToken = parseNonEmptyString(
-    accessToken.value,
-    "$.access_token",
-    exchange,
-  );
+  const parsedAccessToken = AccessToken.create(accessToken.value);
   if (parsedAccessToken.kind === "failure") {
-    return parsedAccessToken;
+    return failed(
+      tokenFailure(exchange, "$.access_token", "expected-non-empty-string"),
+    );
   }
 
   const expiresIn = readRequired(source, "expires_in", exchange);
@@ -120,18 +123,16 @@ function parseTokenFields(
     return expiresIn;
   }
 
-  const parsedExpiresIn = parsePositiveInteger(
-    expiresIn.value,
-    "$.expires_in",
-    exchange,
-  );
+  const parsedExpiresIn = AccessTokenExpiresInSeconds.create(expiresIn.value);
   if (parsedExpiresIn.kind === "failure") {
-    return parsedExpiresIn;
+    return failed(
+      tokenFailure(exchange, "$.expires_in", "expected-positive-integer"),
+    );
   }
 
   const fields: SpotifyTokenFields = {
     accessToken: parsedAccessToken.value,
-    expiresIn: parsedExpiresIn.value,
+    expiresInSeconds: parsedExpiresIn.value,
   };
 
   return succeeded(Object.freeze(fields));
@@ -174,30 +175,6 @@ function tokenPathForKey(
   }
 
   return assertNever(key);
-}
-
-function parseNonEmptyString(
-  input: unknown,
-  path: "$.access_token" | "$.refresh_token",
-  exchange: SpotifyTokenResponseParseFailure["exchange"],
-): Result<string, SpotifyTokenResponseParseFailure> {
-  if (typeof input !== "string" || input.length === 0) {
-    return failed(tokenFailure(exchange, path, "expected-non-empty-string"));
-  }
-
-  return succeeded(input);
-}
-
-function parsePositiveInteger(
-  input: unknown,
-  path: "$.expires_in",
-  exchange: SpotifyTokenResponseParseFailure["exchange"],
-): Result<number, SpotifyTokenResponseParseFailure> {
-  if (typeof input !== "number" || !Number.isSafeInteger(input) || input <= 0) {
-    return failed(tokenFailure(exchange, path, "expected-positive-integer"));
-  }
-
-  return succeeded(input);
 }
 
 function tokenFailure(

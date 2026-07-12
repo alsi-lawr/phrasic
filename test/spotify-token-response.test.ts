@@ -16,8 +16,8 @@ test("Spotify authorization-code token responses parse access and refresh tokens
     }),
   );
 
-  assert.equal(response.accessToken, "initial-access-token");
-  assert.equal(response.expiresIn, 3_600);
+  assert.equal(response.accessToken.value, "initial-access-token");
+  assert.equal(response.expiresInSeconds.value, 3_600);
   assert.equal(response.refreshToken.value, "initial-refresh-token");
 });
 
@@ -44,8 +44,8 @@ test("Spotify refresh token responses parse access-token refreshes", () => {
     }),
   );
 
-  assert.equal(response.accessToken, "refreshed-access-token");
-  assert.equal(response.expiresIn, 1_800);
+  assert.equal(response.accessToken.value, "refreshed-access-token");
+  assert.equal(response.expiresInSeconds.value, 1_800);
 });
 
 test("Spotify refresh token responses reject malformed expiry values", () => {

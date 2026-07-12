@@ -4,9 +4,16 @@ import { failurePlaybackWireState } from "@/domain/playback-stream";
 import type { PlaybackStreamOutcome } from "@/domain/playback-stream";
 import { providerFailure } from "@/domain/playback";
 import type { AuthorizationCode, RefreshToken } from "@/domain/playback";
-import { SpotifyTrackListener } from "./SpotifyTrackListener";
+import { RefreshTokenService } from "./SpotifyRefreshService";
+import {
+  SpotifyTrackListener,
+  type SpotifyTrackListenerDependencies,
+  type SpotifyTrackListenerPlaybackPoller,
+  type SpotifyTrackListenerRefreshScheduler,
+} from "./SpotifyTrackListener";
 import { parseSpotifyServiceConfiguration } from "./SpotifyServiceConfiguration";
 import type { SpotifyServiceConfiguration } from "./SpotifyServiceConfiguration";
+import { SpotifyTrackAgent } from "./SpotifyTrackAgent";
 
 class SpotifyTrackServiceController {
   private isRunning = false;
@@ -25,7 +32,7 @@ class SpotifyTrackServiceController {
     this.spotifyTrackListener =
       SpotifyTrackListener.createWithAuthorizationCode(
         authorizationCode,
-        this.configuration,
+        createSpotifyTrackListenerDependencies(this.configuration),
       );
   }
 
@@ -34,7 +41,7 @@ class SpotifyTrackServiceController {
     this.isRunning = true;
     this.spotifyTrackListener = SpotifyTrackListener.createWithRefreshToken(
       refreshToken,
-      this.configuration,
+      createSpotifyTrackListenerDependencies(this.configuration),
     );
   }
 
@@ -73,6 +80,38 @@ class SpotifyTrackServiceController {
     this.spotifyTrackListener?.dispose();
     this.spotifyTrackListener = undefined;
   }
+}
+
+const defaultRefreshScheduler: SpotifyTrackListenerRefreshScheduler =
+  Object.freeze({
+    schedule: (delay, refresh) => {
+      const timeout = setTimeout(refresh, delay.value);
+      return Object.freeze({
+        cancel: (): void => {
+          clearTimeout(timeout);
+        },
+      });
+    },
+  });
+
+function createSpotifyTrackListenerDependencies(
+  configuration: SpotifyServiceConfiguration,
+): SpotifyTrackListenerDependencies {
+  const trackPollService = new SpotifyTrackAgent(configuration.trackAgent);
+  const playbackPoller: SpotifyTrackListenerPlaybackPoller = Object.freeze({
+    pollPlayback: (accessToken): Promise<PlaybackStreamOutcome> =>
+      trackPollService.pollPlayback(accessToken.value),
+  });
+  const dependencies: SpotifyTrackListenerDependencies = {
+    tokenService: new RefreshTokenService(
+      configuration.refresh,
+      configuration.authorization,
+    ),
+    playbackPoller,
+    refreshScheduler: defaultRefreshScheduler,
+  };
+
+  return Object.freeze(dependencies);
 }
 
 class SingletonWrapper {

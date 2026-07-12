@@ -1,40 +1,143 @@
 import axios from "axios";
-import type { AuthorizationCode, RefreshToken } from "../../domain/playback";
-import type { PlaybackStreamOutcome } from "../../domain/playback-stream";
-import type { SpotifyServiceConfiguration } from "./SpotifyServiceConfiguration";
-import { RefreshTokenService } from "./SpotifyRefreshService";
-import { SpotifyTrackAgent } from "./SpotifyTrackAgent";
+import {
+  AccessTokenRefreshDelayMilliseconds,
+  providerFailure,
+  unavailableLastPlaybackItem,
+  type AccessToken,
+  type AccessTokenExpiresInSeconds,
+  type AuthorizationCode,
+  type AuthorizationRequiredReason,
+  type PlaybackFailure,
+  type RefreshToken,
+  type Result,
+} from "../../domain/playback.ts";
+import {
+  authorizingPlaybackWireState,
+  authorizationRequiredPlaybackWireState,
+  failurePlaybackWireState,
+  initializingPlaybackWireState,
+  reconnectingPlaybackWireState,
+  type PlaybackStreamOutcome,
+  type PlaybackWireState,
+} from "../../domain/playback-stream.ts";
+import type {
+  SpotifyAccessTokenRefreshResponse,
+  SpotifyAuthorizationCodeTokenResponse,
+  SpotifyTokenResponseParseFailure,
+} from "./SpotifyTokenResponse.ts";
+
+export type SpotifyTrackListenerTokenService = {
+  readonly exchangeAuthorizationCode: (
+    authorizationCode: AuthorizationCode,
+  ) => Promise<
+    Result<
+      SpotifyAuthorizationCodeTokenResponse,
+      SpotifyTokenResponseParseFailure
+    >
+  >;
+  readonly refreshAccessToken: (
+    refreshToken: RefreshToken,
+  ) => Promise<
+    Result<SpotifyAccessTokenRefreshResponse, SpotifyTokenResponseParseFailure>
+  >;
+};
+
+export type SpotifyTrackListenerPlaybackPoller = {
+  readonly pollPlayback: (
+    accessToken: AccessToken,
+  ) => Promise<PlaybackStreamOutcome>;
+};
+
+export type SpotifyTrackListenerRefreshSchedule = {
+  readonly cancel: () => void;
+};
+
+export type SpotifyTrackListenerRefreshScheduler = {
+  readonly schedule: (
+    delay: AccessTokenRefreshDelayMilliseconds,
+    refresh: () => void,
+  ) => SpotifyTrackListenerRefreshSchedule;
+};
+
+export type SpotifyTrackListenerDependencies = {
+  readonly tokenService: SpotifyTrackListenerTokenService;
+  readonly playbackPoller: SpotifyTrackListenerPlaybackPoller;
+  readonly refreshScheduler: SpotifyTrackListenerRefreshScheduler;
+};
+
+type SpotifyTrackListenerState =
+  | {
+      readonly kind: "initializing";
+    }
+  | {
+      readonly kind: "authorization-required";
+      readonly reason: AuthorizationRequiredReason;
+    }
+  | {
+      readonly kind: "authorizing";
+    }
+  | {
+      readonly kind: "reconnecting";
+    }
+  | {
+      readonly kind: "ready";
+      readonly accessToken: AccessToken;
+    }
+  | {
+      readonly kind: "failure";
+      readonly error: PlaybackFailure;
+    };
+
+type SpotifyTokenExchangeOperation =
+  "spotify-access-token-refresh" | "spotify-auth-code-exchange";
+
+type TokenExchangeFailure =
+  | {
+      readonly kind: "authorization-required";
+      readonly reason: AuthorizationRequiredReason;
+    }
+  | {
+      readonly kind: "failure";
+      readonly error: PlaybackFailure;
+    };
+
+type ListenerLifecycleWireState = Exclude<
+  PlaybackWireState,
+  | { readonly kind: "empty" }
+  | { readonly kind: "failure" }
+  | { readonly kind: "paused" }
+  | { readonly kind: "playing" }
+  | { readonly kind: "unsupported" }
+>;
 
 export class SpotifyTrackListener {
-  private accessToken: string | undefined;
   private refreshToken: RefreshToken | undefined;
-  private refreshInterval: ReturnType<typeof setInterval> | undefined;
-  private readonly refreshTokenService: RefreshTokenService;
-  private readonly trackPollService: SpotifyTrackAgent;
+  private refreshSchedule: SpotifyTrackListenerRefreshSchedule | undefined;
+  private state: SpotifyTrackListenerState;
+  private tokenExchangeGeneration = 0;
+  private readonly tokenService: SpotifyTrackListenerTokenService;
+  private readonly playbackPoller: SpotifyTrackListenerPlaybackPoller;
+  private readonly refreshScheduler: SpotifyTrackListenerRefreshScheduler;
 
-  public constructor(configuration: SpotifyServiceConfiguration) {
-    this.refreshTokenService = new RefreshTokenService(
-      configuration.refresh,
-      configuration.authorization,
-    );
-    this.trackPollService = new SpotifyTrackAgent(configuration.trackAgent);
+  private constructor(dependencies: SpotifyTrackListenerDependencies) {
+    this.tokenService = dependencies.tokenService;
+    this.playbackPoller = dependencies.playbackPoller;
+    this.refreshScheduler = dependencies.refreshScheduler;
+    this.state = initializingListenerState();
   }
 
-  public setAuthorizationCode(authorizationCode: AuthorizationCode): void {
-    this.stopRefreshSchedule();
-    void this.getFirstAccessToken(authorizationCode);
-  }
-
-  public setRefreshToken(refreshToken: RefreshToken): void {
-    this.refreshToken = refreshToken;
-    this.scheduleRefresh(1_000);
+  public static createWithDependencies(
+    dependencies: SpotifyTrackListenerDependencies,
+  ): SpotifyTrackListener {
+    return new SpotifyTrackListener(dependencies);
   }
 
   public static createWithAuthorizationCode(
     authorizationCode: AuthorizationCode,
-    configuration: SpotifyServiceConfiguration,
+    dependencies: SpotifyTrackListenerDependencies,
   ): SpotifyTrackListener {
-    const trackListener = new SpotifyTrackListener(configuration);
+    const trackListener =
+      SpotifyTrackListener.createWithDependencies(dependencies);
     trackListener.setAuthorizationCode(authorizationCode);
 
     return trackListener;
@@ -42,88 +145,274 @@ export class SpotifyTrackListener {
 
   public static createWithRefreshToken(
     refreshToken: RefreshToken,
-    configuration: SpotifyServiceConfiguration,
+    dependencies: SpotifyTrackListenerDependencies,
   ): SpotifyTrackListener {
-    const trackListener = new SpotifyTrackListener(configuration);
+    const trackListener =
+      SpotifyTrackListener.createWithDependencies(dependencies);
     trackListener.setRefreshToken(refreshToken);
 
     return trackListener;
   }
 
+  public setAuthorizationCode(authorizationCode: AuthorizationCode): void {
+    const generation = this.beginTokenExchange();
+    this.refreshToken = undefined;
+    this.state = authorizingListenerState();
+    void this.exchangeAuthorizationCode(authorizationCode, generation);
+  }
+
+  public setRefreshToken(refreshToken: RefreshToken): void {
+    const generation = this.beginTokenExchange();
+    this.refreshToken = refreshToken;
+    this.state = reconnectingListenerState();
+    void this.refreshAccessToken(generation);
+  }
+
   public async pollPlayback(): Promise<PlaybackStreamOutcome> {
-    if (this.accessToken === undefined) {
-      return this.trackPollService.reportEmptyPlayback();
+    switch (this.state.kind) {
+      case "initializing":
+        return lifecyclePlaybackStreamOutcome(initializingPlaybackWireState());
+      case "authorization-required":
+        return lifecyclePlaybackStreamOutcome(
+          authorizationRequiredPlaybackWireState(this.state.reason),
+        );
+      case "authorizing":
+        return lifecyclePlaybackStreamOutcome(authorizingPlaybackWireState());
+      case "reconnecting":
+        return lifecyclePlaybackStreamOutcome(
+          reconnectingPlaybackWireState(unavailableLastPlaybackItem()),
+        );
+      case "ready":
+        return this.playbackPoller.pollPlayback(this.state.accessToken);
+      case "failure":
+        return Object.freeze({
+          kind: "failure",
+          state: failurePlaybackWireState(this.state.error),
+        });
     }
 
-    return this.trackPollService.pollPlayback(this.accessToken);
+    return assertNever(this.state);
   }
 
   public dispose(): void {
     this.stopRefreshSchedule();
-    this.accessToken = undefined;
+    this.tokenExchangeGeneration += 1;
     this.refreshToken = undefined;
+    this.state = initializingListenerState();
   }
 
-  private async getFirstAccessToken(
+  private beginTokenExchange(): number {
+    this.stopRefreshSchedule();
+    this.tokenExchangeGeneration += 1;
+    return this.tokenExchangeGeneration;
+  }
+
+  private async exchangeAuthorizationCode(
     authorizationCode: AuthorizationCode,
+    generation: number,
   ): Promise<void> {
     try {
       const tokenExchange =
-        await this.refreshTokenService.exchangeAuthorizationCode(
-          authorizationCode,
-        );
-      if (tokenExchange.kind === "failure") {
-        console.error({ operation: "spotify-auth-code-exchange" });
+        await this.tokenService.exchangeAuthorizationCode(authorizationCode);
+      if (!this.isCurrentTokenExchange(generation)) {
         return;
       }
 
-      this.accessToken = tokenExchange.value.accessToken;
-      this.setRefreshToken(tokenExchange.value.refreshToken);
+      if (tokenExchange.kind === "failure") {
+        this.state = failedListenerState(providerFailure("malformed-response"));
+        logSpotifyMalformedTokenResponse("spotify-auth-code-exchange");
+        return;
+      }
+
+      this.refreshToken = tokenExchange.value.refreshToken;
+      this.setAccessToken(
+        tokenExchange.value.accessToken,
+        tokenExchange.value.expiresInSeconds,
+        generation,
+      );
     } catch (error: unknown) {
-      logSpotifyError("spotify-auth-code-exchange", error);
+      if (!this.isCurrentTokenExchange(generation)) {
+        return;
+      }
+
+      this.applyTokenExchangeFailure("spotify-auth-code-exchange", error);
     }
   }
 
-  private async getNewAccessToken(): Promise<void> {
-    const refreshToken = this.refreshToken;
-    if (refreshToken === undefined) {
-      console.error({ operation: "spotify-access-token-refresh" });
+  private async refreshAccessToken(generation: number): Promise<void> {
+    if (!this.isCurrentTokenExchange(generation)) {
       return;
     }
 
+    const refreshToken = this.refreshToken;
+    if (refreshToken === undefined) {
+      this.state = authorizationRequiredListenerState("authorization-expired");
+      return;
+    }
+
+    this.state = reconnectingListenerState();
+
     try {
       const tokenExchange =
-        await this.refreshTokenService.refreshAccessToken(refreshToken);
-      if (tokenExchange.kind === "failure") {
-        console.error({ operation: "spotify-access-token-refresh" });
+        await this.tokenService.refreshAccessToken(refreshToken);
+      if (!this.isCurrentTokenExchange(generation)) {
         return;
       }
 
-      this.accessToken = tokenExchange.value.accessToken;
-      this.scheduleRefresh(tokenExchange.value.expiresIn);
+      if (tokenExchange.kind === "failure") {
+        this.state = failedListenerState(providerFailure("malformed-response"));
+        logSpotifyMalformedTokenResponse("spotify-access-token-refresh");
+        return;
+      }
+
+      this.setAccessToken(
+        tokenExchange.value.accessToken,
+        tokenExchange.value.expiresInSeconds,
+        generation,
+      );
     } catch (error: unknown) {
-      logSpotifyError("spotify-access-token-refresh", error);
+      if (!this.isCurrentTokenExchange(generation)) {
+        return;
+      }
+
+      this.applyTokenExchangeFailure("spotify-access-token-refresh", error);
     }
   }
 
-  private scheduleRefresh(delayMilliseconds: number): void {
+  private setAccessToken(
+    accessToken: AccessToken,
+    expiresIn: AccessTokenExpiresInSeconds,
+    generation: number,
+  ): void {
+    this.state = readyListenerState(accessToken);
+    this.scheduleRefresh(expiresIn, generation);
+  }
+
+  private scheduleRefresh(
+    expiresIn: AccessTokenExpiresInSeconds,
+    generation: number,
+  ): void {
     this.stopRefreshSchedule();
-    this.refreshInterval = setInterval((): void => {
-      void this.getNewAccessToken();
-    }, delayMilliseconds);
+    const delay = refreshDelayForTokenLifetime(expiresIn);
+    this.refreshSchedule = this.refreshScheduler.schedule(delay, (): void => {
+      void this.refreshAccessToken(generation);
+    });
   }
 
   private stopRefreshSchedule(): void {
-    if (this.refreshInterval !== undefined) {
-      clearInterval(this.refreshInterval);
+    this.refreshSchedule?.cancel();
+    this.refreshSchedule = undefined;
+  }
+
+  private isCurrentTokenExchange(generation: number): boolean {
+    return generation === this.tokenExchangeGeneration;
+  }
+
+  private applyTokenExchangeFailure(
+    operation: SpotifyTokenExchangeOperation,
+    error: unknown,
+  ): void {
+    const failure = tokenExchangeFailureFromUnknown(operation, error);
+    switch (failure.kind) {
+      case "authorization-required":
+        this.state = authorizationRequiredListenerState(failure.reason);
+        break;
+      case "failure":
+        this.state = failedListenerState(failure.error);
+        break;
     }
 
-    this.refreshInterval = undefined;
+    logSpotifyTokenExchangeFailure(operation, error);
   }
 }
 
-function logSpotifyError(
-  operation: "spotify-access-token-refresh" | "spotify-auth-code-exchange",
+function refreshDelayForTokenLifetime(
+  expiresIn: AccessTokenExpiresInSeconds,
+): AccessTokenRefreshDelayMilliseconds {
+  return AccessTokenRefreshDelayMilliseconds.fromExpiresInSeconds(expiresIn);
+}
+
+function lifecyclePlaybackStreamOutcome(
+  state: ListenerLifecycleWireState,
+): PlaybackStreamOutcome {
+  return Object.freeze({ kind: "changed", state });
+}
+
+function initializingListenerState(): SpotifyTrackListenerState {
+  return Object.freeze({ kind: "initializing" });
+}
+
+function authorizationRequiredListenerState(
+  reason: AuthorizationRequiredReason,
+): SpotifyTrackListenerState {
+  return Object.freeze({ kind: "authorization-required", reason });
+}
+
+function authorizingListenerState(): SpotifyTrackListenerState {
+  return Object.freeze({ kind: "authorizing" });
+}
+
+function reconnectingListenerState(): SpotifyTrackListenerState {
+  return Object.freeze({ kind: "reconnecting" });
+}
+
+function readyListenerState(
+  accessToken: AccessToken,
+): SpotifyTrackListenerState {
+  return Object.freeze({ kind: "ready", accessToken });
+}
+
+function failedListenerState(
+  error: PlaybackFailure,
+): SpotifyTrackListenerState {
+  return Object.freeze({ kind: "failure", error });
+}
+
+function tokenExchangeFailureFromUnknown(
+  operation: SpotifyTokenExchangeOperation,
+  error: unknown,
+): TokenExchangeFailure {
+  if (!axios.isAxiosError(error)) {
+    return Object.freeze({
+      kind: "failure",
+      error: providerFailure("network"),
+    });
+  }
+
+  const providerStatus = error.response?.status;
+  if (
+    providerStatus === 400 ||
+    providerStatus === 401 ||
+    providerStatus === 403
+  ) {
+    return Object.freeze({
+      kind: "authorization-required",
+      reason:
+        operation === "spotify-auth-code-exchange"
+          ? "not-authorized"
+          : "authorization-revoked",
+    });
+  }
+
+  if (providerStatus === 429) {
+    return Object.freeze({
+      kind: "failure",
+      error: providerFailure("rate-limited"),
+    });
+  }
+
+  if (providerStatus !== undefined && providerStatus >= 500) {
+    return Object.freeze({
+      kind: "failure",
+      error: providerFailure("server-error"),
+    });
+  }
+
+  return Object.freeze({ kind: "failure", error: providerFailure("network") });
+}
+
+function logSpotifyTokenExchangeFailure(
+  operation: SpotifyTokenExchangeOperation,
   error: unknown,
 ): void {
   if (!axios.isAxiosError(error)) {
@@ -138,4 +427,14 @@ function logSpotifyError(
   }
 
   console.error({ operation });
+}
+
+function logSpotifyMalformedTokenResponse(
+  operation: SpotifyTokenExchangeOperation,
+): void {
+  console.error({ operation });
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unexpected Spotify track listener state: ${String(value)}`);
 }

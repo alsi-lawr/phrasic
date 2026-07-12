@@ -11,6 +11,9 @@ export type Result<Value, Failure> =
 export type ValueValidationError = {
   readonly kind: "invalid-value";
   readonly value:
+    | "access-token"
+    | "access-token-expires-in-seconds"
+    | "access-token-refresh-delay-milliseconds"
     | "authorization-code"
     | "display-text"
     | "original-artwork-url"
@@ -24,6 +27,7 @@ export type ValueValidationError = {
   readonly reason:
     | "empty-string"
     | "expected-non-negative-integer"
+    | "expected-positive-integer"
     | "expected-string"
     | "invalid-url";
 };
@@ -266,6 +270,106 @@ export class AuthorizationCode {
     }
 
     return succeeded(new AuthorizationCode(result.value));
+  }
+}
+
+export class AccessToken {
+  private readonly rawValue: string;
+
+  private constructor(value: string) {
+    this.rawValue = value;
+    Object.freeze(this);
+  }
+
+  public get value(): string {
+    return this.rawValue;
+  }
+
+  public static create(
+    input: unknown,
+  ): Result<AccessToken, ValueValidationError> {
+    const result = validateNonEmptyString("access-token", input);
+    if (result.kind === "failure") {
+      return result;
+    }
+
+    return succeeded(new AccessToken(result.value));
+  }
+}
+
+const millisecondsPerSecond = 1_000;
+const maximumAccessTokenExpiresInSeconds = Math.floor(
+  Number.MAX_SAFE_INTEGER / millisecondsPerSecond,
+);
+
+export class AccessTokenExpiresInSeconds {
+  private readonly rawValue: number;
+
+  private constructor(value: number) {
+    this.rawValue = value;
+    Object.freeze(this);
+  }
+
+  public get value(): number {
+    return this.rawValue;
+  }
+
+  public static create(
+    input: unknown,
+  ): Result<AccessTokenExpiresInSeconds, ValueValidationError> {
+    const result = validatePositiveInteger(
+      "access-token-expires-in-seconds",
+      input,
+    );
+    if (result.kind === "failure") {
+      return result;
+    }
+
+    if (result.value > maximumAccessTokenExpiresInSeconds) {
+      return failed(
+        invalidValue(
+          "access-token-expires-in-seconds",
+          "expected-positive-integer",
+        ),
+      );
+    }
+
+    return succeeded(new AccessTokenExpiresInSeconds(result.value));
+  }
+}
+
+export class AccessTokenRefreshDelayMilliseconds {
+  private readonly rawValue: number;
+
+  private constructor(value: number) {
+    this.rawValue = value;
+    Object.freeze(this);
+  }
+
+  public get value(): number {
+    return this.rawValue;
+  }
+
+  public static create(
+    input: unknown,
+  ): Result<AccessTokenRefreshDelayMilliseconds, ValueValidationError> {
+    const result = validatePositiveInteger(
+      "access-token-refresh-delay-milliseconds",
+      input,
+    );
+    if (result.kind === "failure") {
+      return result;
+    }
+
+    return succeeded(new AccessTokenRefreshDelayMilliseconds(result.value));
+  }
+
+  public static fromExpiresInSeconds(
+    expiresIn: AccessTokenExpiresInSeconds,
+  ): AccessTokenRefreshDelayMilliseconds {
+    return new AccessTokenRefreshDelayMilliseconds(
+      expiresIn.value * millisecondsPerSecond,
+    );
   }
 }
 
@@ -795,6 +899,17 @@ function validateNonNegativeInteger(
   return succeeded(input);
 }
 
+function validatePositiveInteger(
+  value: ValueValidationError["value"],
+  input: unknown,
+): Result<number, ValueValidationError> {
+  if (typeof input !== "number" || !Number.isSafeInteger(input) || input <= 0) {
+    return failed(invalidValue(value, "expected-positive-integer"));
+  }
+
+  return succeeded(input);
+}
+
 function validateHttpUrl(
   value: ValueValidationError["value"],
   input: unknown,
@@ -865,7 +980,7 @@ function transitionAuthorizationAvailable(
 ): Result<PlaybackState, PlaybackTransitionError> {
   switch (state.kind) {
     case "initializing":
-      return succeeded(reconnectingState(unavailableLastItem()));
+      return succeeded(reconnectingState(unavailableLastPlaybackItem()));
     case "authorization-required":
     case "authorizing":
     case "empty":
@@ -886,7 +1001,7 @@ function transitionAuthorizationComplete(
 ): Result<PlaybackState, PlaybackTransitionError> {
   switch (state.kind) {
     case "authorizing":
-      return succeeded(reconnectingState(unavailableLastItem()));
+      return succeeded(reconnectingState(unavailableLastPlaybackItem()));
     case "initializing":
     case "authorization-required":
     case "empty":
@@ -929,7 +1044,7 @@ function transitionConnectionLost(
   switch (state.kind) {
     case "empty":
     case "unsupported":
-      return succeeded(reconnectingState(unavailableLastItem()));
+      return succeeded(reconnectingState(unavailableLastPlaybackItem()));
     case "playing":
     case "paused":
       return succeeded(
@@ -1015,7 +1130,7 @@ function availableLastItem(item: NowPlayingItem): LastPlaybackItem {
   return Object.freeze(lastItem);
 }
 
-function unavailableLastItem(): LastPlaybackItem {
+export function unavailableLastPlaybackItem(): LastPlaybackItem {
   const lastItem: LastPlaybackItem = {
     kind: "unavailable",
   };

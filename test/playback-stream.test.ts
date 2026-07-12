@@ -11,7 +11,13 @@ import {
   type PlaybackWireParseFailure,
   type PlaybackWireState,
 } from "../domain/playback-stream.ts";
-import { providerFailure, type Result } from "../domain/playback.ts";
+import {
+  initialPlaybackState,
+  providerFailure,
+  transitionPlaybackState,
+  type PlaybackState,
+  type Result,
+} from "../domain/playback.ts";
 import { parseSpotifyPlaybackPayload } from "../providers/spotify/playback.ts";
 import {
   advertisementPayload,
@@ -41,6 +47,63 @@ test("the stream wire serializes and validates every emitted playback state", ()
   for (const scenario of cases) {
     const parsed = expectSuccess(parsePlaybackWireState(scenario.state));
     assert.equal(parsed.kind, scenario.kind);
+  }
+});
+
+test("the stream wire preserves every lifecycle state without relabeling it as malformed", () => {
+  const initializing = initialPlaybackState();
+  const authorizationRequired = expectSuccess(
+    transitionPlaybackState(initializing, {
+      kind: "authorization-required",
+      reason: "not-authorized",
+    }),
+  );
+  const authorizing = expectSuccess(
+    transitionPlaybackState(authorizationRequired, {
+      kind: "begin-authorization",
+    }),
+  );
+  const reconnecting = expectSuccess(
+    transitionPlaybackState(authorizing, {
+      kind: "authorization-complete",
+    }),
+  );
+
+  const cases: ReadonlyArray<{
+    readonly state: PlaybackState;
+    readonly expected: PlaybackWireState;
+  }> = [
+    {
+      state: initializing,
+      expected: { kind: "initializing" },
+    },
+    {
+      state: authorizationRequired,
+      expected: {
+        kind: "authorization-required",
+        reason: "not-authorized",
+      },
+    },
+    {
+      state: authorizing,
+      expected: { kind: "authorizing" },
+    },
+    {
+      state: reconnecting,
+      expected: {
+        kind: "reconnecting",
+        lastItem: { kind: "unavailable" },
+      },
+    },
+  ];
+
+  for (const scenario of cases) {
+    const serialized = serializePlaybackState(scenario.state);
+    assert.deepEqual(serialized, scenario.expected);
+    assert.deepEqual(
+      expectSuccess(parsePlaybackWireState(serialized)),
+      serialized,
+    );
   }
 });
 

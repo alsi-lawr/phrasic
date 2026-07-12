@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  AccessToken,
+  AccessTokenExpiresInSeconds,
+  AccessTokenRefreshDelayMilliseconds,
   AuthorizationCode,
   availableOriginalArtwork,
   Creator,
@@ -31,6 +34,7 @@ test("validated values reject invalid boundaries and preserve distinct values", 
   const provider = expectSuccess(ProviderId.create("spotify"));
   const item = expectSuccess(ProviderItemId.create("track-1"));
   const collection = expectSuccess(ProviderCollectionId.create("album-1"));
+  const accessToken = expectSuccess(AccessToken.create("access-1"));
   const authorizationCode = expectSuccess(AuthorizationCode.create("code-1"));
   const refreshToken = expectSuccess(RefreshToken.create("refresh-1"));
   const position = expectSuccess(PlaybackPositionMilliseconds.create(1_250));
@@ -39,6 +43,7 @@ test("validated values reject invalid boundaries and preserve distinct values", 
   assert.equal(provider.value, "spotify");
   assert.equal(item.value, "track-1");
   assert.equal(collection.value, "album-1");
+  assert.equal(accessToken.value, "access-1");
   assert.equal(authorizationCode.value, "code-1");
   assert.equal(refreshToken.value, "refresh-1");
   assert.equal(position.value, 1_250);
@@ -58,6 +63,28 @@ test("validated values reject invalid boundaries and preserve distinct values", 
     value: "original-artwork-url",
     reason: "invalid-url",
   });
+});
+
+test("access token lifetimes convert to scheduler delays without changing units", () => {
+  const expiresIn = expectSuccess(AccessTokenExpiresInSeconds.create(3_600));
+  const delay =
+    AccessTokenRefreshDelayMilliseconds.fromExpiresInSeconds(expiresIn);
+
+  assert.equal(expiresIn.value, 3_600);
+  assert.equal(delay.value, 3_600_000);
+  assert.deepEqual(expectFailure(AccessTokenExpiresInSeconds.create(0)), {
+    kind: "invalid-value",
+    value: "access-token-expires-in-seconds",
+    reason: "expected-positive-integer",
+  });
+  assert.deepEqual(
+    expectFailure(AccessTokenRefreshDelayMilliseconds.create(0)),
+    {
+      kind: "invalid-value",
+      value: "access-token-refresh-delay-milliseconds",
+      reason: "expected-positive-integer",
+    },
+  );
 });
 
 test("track and episode items retain their distinct metadata", () => {

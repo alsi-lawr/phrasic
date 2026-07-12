@@ -11,6 +11,7 @@
     "test/spotify-playback.test.ts",
     "test/spotify-authorization-request.test.ts",
     "test/spotify-service-configuration.test.ts",
+    "test/spotify-track-listener.test.ts",
     "test/spotify-token-response.test.ts",
     "test/types/**/*.ts"
   ],
