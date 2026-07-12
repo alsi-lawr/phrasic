@@ -15,22 +15,22 @@ Spotify Now Playing is a small NextJS/React app designed to display the currentl
 
 1. Clone the repository:
 
-    ```bash
-    git clone https://github.com/alsi-lawr/obs-nowplaying.git
-    cd obs-nowplaying
-    ```
+   ```bash
+   git clone https://github.com/alsi-lawr/obs-nowplaying.git
+   cd obs-nowplaying
+   ```
 
 2. Install the necessary dependencies:
 
-    ```bash
-    npm install
-    ```
+   ```bash
+   npm install
+   ```
 
 3. Run Prisma to generate the database client:
 
-    ```bash
-    npx prisma generate
-    ```
+   ```bash
+   npx prisma generate
+   ```
 
 ## Configuration
 
@@ -38,9 +38,9 @@ The configuration is managed through the `appconfig.json` file. A sample file `e
 
 1. Copy `example.appconfig.json` to `appconfig.json`:
 
-    ```bash
-    cp example.appconfig.json appconfig.json
-    ```
+   ```bash
+   cp example.appconfig.json appconfig.json
+   ```
 
 2. Edit the `appconfig.json` file to add your Spotify Client ID and Client Secret under the `authorization` section:
 
