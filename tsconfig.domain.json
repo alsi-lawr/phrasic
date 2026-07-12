@@ -5,7 +5,9 @@
   },
   "include": [
     "domain/**/*.ts",
+    "providers/spotify/**/*.ts",
     "test/playback-domain.test.ts",
+    "test/spotify-playback.test.ts",
     "test/types/**/*.ts"
   ],
   "exclude": ["node_modules", ".next"]
