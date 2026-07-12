@@ -7,6 +7,7 @@
     "domain/**/*.ts",
     "providers/spotify/**/*.ts",
     "test/playback-domain.test.ts",
+    "test/playback-stream.test.ts",
     "test/spotify-playback.test.ts",
     "test/types/**/*.ts"
   ],

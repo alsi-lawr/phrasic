@@ -1,31 +1,26 @@
-import {
+import axios from "axios";
+import type { PlaybackStreamOutcome } from "@/domain/playback-stream";
+import type { AuthCode, RefreshToken } from "@/types/Auth";
+import type {
   RefreshProperties,
   TrackAgentProperties,
 } from "@/types/SpotifyProperties";
 import { RefreshTokenService } from "./SpotifyRefreshService";
 import { SpotifyTrackAgent } from "./SpotifyTrackAgent";
-import { AuthCode } from "@/types/Auth";
-import { RefreshToken } from "@prisma/client";
-import axios from "axios";
-import { SpotifyData, SpotifyDataType } from "@/types/Hook";
 
 export class SpotifyTrackListener {
   private accessToken: string | null = null;
   private authCode: string | null = null;
   private refreshInterval: NodeJS.Timeout | null = null;
-  private refreshTokenService: RefreshTokenService;
-  private trackPollInterval: NodeJS.Timeout | null = null;
-  private trackPollService: SpotifyTrackAgent;
-  private agentConfig: TrackAgentProperties;
+  private readonly refreshTokenService: RefreshTokenService;
+  private readonly trackPollService: SpotifyTrackAgent;
 
-  constructor(
+  public constructor(
     refreshConfig: RefreshProperties,
     agentConfig: TrackAgentProperties,
     callbackAddress: string,
     spotifyAuthKey: string,
   ) {
-    console.log("SpotifyTrackListener initialized");
-    this.agentConfig = agentConfig;
     this.refreshTokenService = new RefreshTokenService(
       refreshConfig,
       callbackAddress,
@@ -34,30 +29,32 @@ export class SpotifyTrackListener {
     this.trackPollService = new SpotifyTrackAgent(agentConfig);
   }
 
-  setAuthCode(authCode: AuthCode) {
-    console.log("Using auth code");
+  public setAuthCode(authCode: AuthCode): void {
     this.authCode = authCode.code;
-    if (this.refreshInterval) clearInterval(this.refreshInterval);
-    this.getFirstAccessToken();
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+    }
+
+    void this.getFirstAccessToken();
   }
 
-  setRefreshToken(refreshToken: RefreshToken) {
-    console.log("Found existing refresh token");
+  public setRefreshToken(refreshToken: RefreshToken): void {
     this.refreshTokenService.setRefreshToken(refreshToken.token);
-    if (this.refreshInterval) clearInterval(this.refreshInterval);
-    this.refreshInterval = setInterval(() => this.getNewAccessToken(), 1000);
-    this.trackPollInterval = setInterval(
-      () => this.processTrackChanges(),
-      this.agentConfig.spotifyTrackRefreshIntervalMs,
-    );
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+    }
+
+    this.refreshInterval = setInterval((): void => {
+      void this.getNewAccessToken();
+    }, 1_000);
   }
 
-  resetUsingRefreshToken(refreshToken: RefreshToken) {
+  public resetUsingRefreshToken(refreshToken: RefreshToken): void {
     this.authCode = null;
     this.setRefreshToken(refreshToken);
   }
 
-  static createWithAuthCode(
+  public static createWithAuthCode(
     authCode: AuthCode,
     refreshConfig: RefreshProperties,
     agentConfig: TrackAgentProperties,
@@ -75,7 +72,7 @@ export class SpotifyTrackListener {
     return trackListener;
   }
 
-  static createWithRefreshToken(
+  public static createWithRefreshToken(
     refreshToken: RefreshToken,
     refreshConfig: RefreshProperties,
     agentConfig: TrackAgentProperties,
@@ -93,72 +90,77 @@ export class SpotifyTrackListener {
     return trackListener;
   }
 
-  async processTrackChanges() {
-    if (!this.accessToken) return;
-    await this.trackPollService.processUpdate(this.accessToken);
+  public async pollPlayback(): Promise<PlaybackStreamOutcome> {
+    if (this.accessToken === null) {
+      return this.trackPollService.reportEmptyPlayback();
+    }
+
+    return this.trackPollService.pollPlayback(this.accessToken);
   }
 
-  async getLatest(
-    dataType: SpotifyDataType,
-    id: string | null,
-  ): Promise<SpotifyData | null> {
-    return await this.trackPollService.getTrackDiff(dataType, id);
-  }
+  public async getFirstAccessToken(): Promise<void> {
+    const authCode = this.authCode;
+    if (authCode === null) {
+      console.error({ operation: "spotify-auth-code-exchange" });
+      return;
+    }
 
-  async getFirstAccessToken() {
     try {
-      const refreshResult = await this.refreshTokenService.getNewRefreshToken(
-        this.authCode ?? "",
-      );
-      this.accessToken = refreshResult.access_token;
-      this.resetUsingRefreshToken({ token: refreshResult.refresh_token ?? "" });
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        const providerStatus = error.response?.status;
-        if (typeof providerStatus === "number") {
-          console.error({
-            operation: "spotify-auth-code-exchange",
-            providerStatus,
-          });
-        } else {
-          console.error({ operation: "spotify-auth-code-exchange" });
-        }
-      } else {
+      const refreshResult =
+        await this.refreshTokenService.getNewRefreshToken(authCode);
+      if (refreshResult.refresh_token === null) {
         console.error({ operation: "spotify-auth-code-exchange" });
+        return;
       }
+
+      this.accessToken = refreshResult.access_token;
+      this.resetUsingRefreshToken({ token: refreshResult.refresh_token });
+    } catch (error: unknown) {
+      logSpotifyError("spotify-auth-code-exchange", error);
     }
   }
 
-  async getNewAccessToken() {
-    this.refreshTokenService
-      .getNewAccessToken()
-      .then((refreshResult) => {
-        this.accessToken = refreshResult.access_token;
-        if (this.refreshInterval) clearInterval(this.refreshInterval);
-        this.refreshInterval = setInterval(
-          () => this.getNewAccessToken(),
-          refreshResult.expires_in,
-        );
-      })
-      .catch((error) => {
-        if (axios.isAxiosError(error)) {
-          const providerStatus = error.response?.status;
-          if (typeof providerStatus === "number") {
-            console.error({
-              operation: "spotify-access-token-refresh",
-              providerStatus,
-            });
-          } else {
-            console.error({ operation: "spotify-access-token-refresh" });
-          }
-        } else {
-          console.error({ operation: "spotify-access-token-refresh" });
-        }
-      });
+  public async getNewAccessToken(): Promise<void> {
+    try {
+      const refreshResult = await this.refreshTokenService.getNewAccessToken();
+      this.accessToken = refreshResult.access_token;
+      if (this.refreshInterval) {
+        clearInterval(this.refreshInterval);
+      }
+
+      this.refreshInterval = setInterval((): void => {
+        void this.getNewAccessToken();
+      }, refreshResult.expires_in);
+    } catch (error: unknown) {
+      logSpotifyError("spotify-access-token-refresh", error);
+    }
   }
 
-  dispose() {
-    if (this.refreshInterval) clearInterval(this.refreshInterval);
-    if (this.trackPollInterval) clearInterval(this.trackPollInterval);
+  public dispose(): void {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+    }
+
+    this.refreshInterval = null;
+    this.accessToken = null;
+    this.authCode = null;
   }
+}
+
+function logSpotifyError(
+  operation: "spotify-access-token-refresh" | "spotify-auth-code-exchange",
+  error: unknown,
+): void {
+  if (!axios.isAxiosError(error)) {
+    console.error({ operation });
+    return;
+  }
+
+  const providerStatus = error.response?.status;
+  if (typeof providerStatus === "number") {
+    console.error({ operation, providerStatus });
+    return;
+  }
+
+  console.error({ operation });
 }

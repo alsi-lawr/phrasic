@@ -1,67 +1,56 @@
-import { SpotifyDataMap } from "@/types/Hook";
+"use client";
+
 import {
-  useState,
-  useEffect,
+  emptyPlaybackWireState,
+  failurePlaybackWireState,
+  parsePlaybackWireEvent,
+  type PlaybackWireState,
+} from "@/domain/playback-stream";
+import { providerFailure } from "@/domain/playback";
+import {
   createContext,
-  ReactNode,
-  ReactElement,
+  useEffect,
+  useState,
+  type ReactElement,
+  type ReactNode,
 } from "react";
 
-interface FetchDataContextType {
-  data: SpotifyDataMap | null;
-}
+export type FetchDataContextValue = {
+  readonly state: PlaybackWireState;
+};
 
-interface FetchDataProviderProps {
-  children: ReactNode;
-}
+type FetchDataProviderProps = {
+  readonly children: ReactNode;
+};
 
-export const FetchDataContext = createContext<FetchDataContextType | undefined>(
-  undefined,
-);
+export const FetchDataContext = createContext<
+  FetchDataContextValue | undefined
+>(undefined);
 
-export const FetchDataProvider = ({
+export function FetchDataProvider({
   children,
-}: FetchDataProviderProps): ReactElement => {
-  const [data, setData] = useState<SpotifyDataMap | null>(null);
+}: FetchDataProviderProps): ReactElement {
+  const [state, setState] = useState<PlaybackWireState>(emptyPlaybackWireState);
 
-  useEffect(() => {
-    const watchEventSource = new EventSource(`/api/spotify/hook`);
+  useEffect((): (() => void) => {
+    const eventSource = new EventSource("/api/spotify/hook");
 
-    watchEventSource.onmessage = (event: MessageEvent) => {
-      try {
-        const eventData = JSON.parse(event.data) as SpotifyDataMap | null;
-        setData(eventData);
-      } catch (error) {
-        console.error("Failed to parse event data:", error);
-      }
+    eventSource.onmessage = (event: MessageEvent<unknown>): void => {
+      setState(parsePlaybackWireEvent(event.data));
     };
 
-    watchEventSource.onerror = (e: Event) => {
-      const eventSource = e.target as EventSource;
-      if (eventSource.readyState === EventSource.CLOSED) {
-        console.log("Connection closed");
-        setTimeout(() => {
-          window.location.reload();
-        }, 5000);
-      } else if (eventSource.readyState === EventSource.CONNECTING) {
-        console.log("Attempting to reconnect...");
-      } else {
-        console.error("Error occurred:", e);
-        setTimeout(() => {
-          window.location.reload();
-        }, 5000);
-      }
+    eventSource.onerror = (): void => {
+      setState(failurePlaybackWireState(providerFailure("network")));
     };
 
-    // Cleanup function to close the EventSource when the component unmounts
-    return () => {
-      watchEventSource.close();
+    return (): void => {
+      eventSource.close();
     };
   }, []);
 
   return (
-    <FetchDataContext.Provider value={{ data }}>
+    <FetchDataContext.Provider value={{ state }}>
       {children}
     </FetchDataContext.Provider>
   );
-};
+}

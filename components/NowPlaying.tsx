@@ -1,14 +1,14 @@
 "use client";
 
-import React from "react";
+import type { ReactElement } from "react";
 import AlbumArtwork from "./artwork/AlbumArtwork";
+import { FetchDataProvider } from "./hookintoupdates/FetchDataProvider";
 import SongDetails from "./songdetails/SongDetails";
 import "./NowPlaying.css";
-import { FetchDataProvider } from "./hookintoupdates/FetchDataProvider";
 
-export default function NowPlaying() {
+export default function NowPlaying(): ReactElement {
   return (
-    <div className={`container`}>
+    <div className="container">
       <FetchDataProvider>
         <AlbumArtwork />
         <SongDetails />
