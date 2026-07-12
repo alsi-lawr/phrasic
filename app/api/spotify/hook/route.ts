@@ -76,7 +76,14 @@ export async function GET(req: Request): Promise<Response> {
             }
           } catch {
             if (!pollAbortController.signal.aborted) {
-              send(failurePlaybackWireState(providerFailure("network")));
+              const emission = playbackStreamEmission(
+                subscription.evaluate(
+                  failurePlaybackWireState(providerFailure("network")),
+                ),
+              );
+              if (emission.kind === "emit") {
+                send(emission.state);
+              }
             }
           }
 

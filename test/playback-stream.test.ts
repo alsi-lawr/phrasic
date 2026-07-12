@@ -468,6 +468,22 @@ test("each SSE subscriber emits its own initial playback state", () => {
   assert.equal(secondSubscriber.evaluate(state).kind, "unchanged");
 });
 
+test("an SSE subscriber emits recovery after a repeated network failure", () => {
+  const playing = wireState(playingTrackPayload);
+  const networkFailure = failurePlaybackWireState(providerFailure("network"));
+  const subscription = createPlaybackStreamSubscription();
+
+  assert.equal(subscription.evaluate(playing).kind, "changed");
+
+  const firstFailure = subscription.evaluate(networkFailure);
+  assert.deepEqual(firstFailure, { kind: "failure", state: networkFailure });
+
+  assert.equal(subscription.evaluate(networkFailure).kind, "unchanged");
+
+  const recovery = subscription.evaluate(playing);
+  assert.deepEqual(recovery, { kind: "changed", state: playing });
+});
+
 test("wire validation rejects malformed and extra keys", () => {
   const playing = wireState(playingTrackPayload);
   if (playing.kind !== "playing") {
