@@ -5,7 +5,6 @@ export const sqlClient: PrismaClient = new PrismaClient({
 });
 
 export async function storeToken(token: string) {
-  console.log(`Storing token: ${token}`);
   await sqlClient.refreshToken.deleteMany();
   await sqlClient.refreshToken.create({
     data: {

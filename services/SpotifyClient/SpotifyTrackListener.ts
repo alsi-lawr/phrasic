@@ -6,6 +6,7 @@ import { RefreshTokenService } from "./SpotifyRefreshService";
 import { SpotifyTrackAgent } from "./SpotifyTrackAgent";
 import { AuthCode } from "@/types/Auth";
 import { RefreshToken } from "@prisma/client";
+import axios from "axios";
 import { SpotifyData, SpotifyDataType } from "@/types/Hook";
 
 export class SpotifyTrackListener {
@@ -112,7 +113,19 @@ export class SpotifyTrackListener {
       this.accessToken = refreshResult.access_token;
       this.resetUsingRefreshToken({ token: refreshResult.refresh_token ?? "" });
     } catch (error) {
-      console.log(error);
+      if (axios.isAxiosError(error)) {
+        const providerStatus = error.response?.status;
+        if (typeof providerStatus === "number") {
+          console.error({
+            operation: "spotify-auth-code-exchange",
+            providerStatus,
+          });
+        } else {
+          console.error({ operation: "spotify-auth-code-exchange" });
+        }
+      } else {
+        console.error({ operation: "spotify-auth-code-exchange" });
+      }
     }
   }
 
@@ -128,7 +141,19 @@ export class SpotifyTrackListener {
         );
       })
       .catch((error) => {
-        console.log(error);
+        if (axios.isAxiosError(error)) {
+          const providerStatus = error.response?.status;
+          if (typeof providerStatus === "number") {
+            console.error({
+              operation: "spotify-access-token-refresh",
+              providerStatus,
+            });
+          } else {
+            console.error({ operation: "spotify-access-token-refresh" });
+          }
+        } else {
+          console.error({ operation: "spotify-access-token-refresh" });
+        }
       });
   }
 
