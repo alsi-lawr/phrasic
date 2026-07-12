@@ -9,7 +9,10 @@
     "migrate": "npx prisma migrate dev --name init && npx prisma generate && mkdir dist",
     "build": "next build && cp -R .next/standalone/** dist && cp -R .next/standalone/.next dist && cp -R .next/static dist/.next && cp -R public dist && cp -R prisma dist",
     "start": "node dist/server.js",
-    "lint": "next lint"
+    "lint": "next lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
   },
   "dependencies": {
     "@prisma/client": "^5.19.1",
@@ -27,6 +30,8 @@
     "cross-env": "^7.0.3",
     "eslint": "^8",
     "eslint-config-next": "14.2.8",
+    "husky": "9.1.7",
+    "prettier": "3.9.5",
     "prisma": "^5.19.1",
     "typescript": "^5"
   }

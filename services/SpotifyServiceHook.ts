@@ -12,8 +12,20 @@ export async function startSpotifyService(
       },
     });
     return response.data;
-  } catch (e) {
-    console.log(e);
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const providerStatus = error.response?.status;
+      if (typeof providerStatus === "number") {
+        console.error({
+          operation: "spotify-service-start",
+          providerStatus,
+        });
+      } else {
+        console.error({ operation: "spotify-service-start" });
+      }
+    } else {
+      console.error({ operation: "spotify-service-start" });
+    }
     return { result: null, status: 500 };
   }
 }
