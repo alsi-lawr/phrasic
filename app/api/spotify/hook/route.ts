@@ -1,64 +1,109 @@
+import {
+  createPlaybackStreamSubscription,
+  emptyPlaybackWireState,
+  failurePlaybackWireState,
+} from "@/domain/playback-stream";
+import type {
+  PlaybackStreamOutcome,
+  PlaybackWireState,
+} from "@/domain/playback-stream";
+import {
+  providerFailure,
+  type PlaybackPollDelayMilliseconds,
+} from "@/domain/playback";
 import { spotifyTrackService } from "@/services/SpotifyClient/SpotifyTrackServiceController";
-import { SpotifyDataMap, SpotifyDataType } from "@/types/Hook";
 
-export async function GET(req: Request) {
-  let lastResponse: SpotifyDataMap = {
-    [SpotifyDataType.Track]: null,
-    [SpotifyDataType.Artist]: null,
-    [SpotifyDataType.Artwork]: null,
-  };
-  let continuePolling: boolean = true;
+type PlaybackStreamEmission =
+  | {
+      readonly kind: "emit";
+      readonly state: PlaybackWireState;
+    }
+  | {
+      readonly kind: "suppress";
+    };
+
+export async function GET(req: Request): Promise<Response> {
   if (!spotifyTrackService.getIsRunning()) {
     return new Response("Not running", { status: 500 });
   }
-  const responseStream = new ReadableStream({
-    async start(controller) {
-      const sendDataToClient = (data: SpotifyDataMap | null) => {
-        controller.enqueue(`data: ${JSON.stringify(data ?? "")}\n\n`);
+
+  let cancelPolling: (() => void) | undefined;
+  const responseStream = new ReadableStream<Uint8Array>({
+    start(controller): void {
+      const encoder = new TextEncoder();
+      const pollAbortController = new AbortController();
+      const subscription = createPlaybackStreamSubscription();
+      let closed = false;
+
+      const stopPolling = (): void => {
+        if (closed) {
+          return;
+        }
+
+        closed = true;
+        req.signal.removeEventListener("abort", close);
+        pollAbortController.abort();
       };
 
-      const pollForUpdates = async () => {
-        while (continuePolling) {
+      const close = (): void => {
+        stopPolling();
+        controller.close();
+      };
+
+      const send = (state: PlaybackWireState): void => {
+        if (closed) {
+          return;
+        }
+
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify(state)}\n\n`),
+        );
+      };
+
+      const pollForUpdates = async (): Promise<void> => {
+        while (!pollAbortController.signal.aborted) {
           try {
-            const latestData = await updateLastResponse(lastResponse);
-            const hasValidData = Object.values(latestData).some(
-              (item) => item?.id && item?.data,
-            );
-            const isNotPlaying = Object.entries(latestData).every(
-              (key) =>
-                !key[1]?.id && lastResponse[key[0] as SpotifyDataType]?.id,
-            );
-
-            if (hasValidData) {
-              sendDataToClient(latestData);
+            const state = await spotifyTrackService.pollPlayback();
+            if (pollAbortController.signal.aborted) {
+              break;
             }
 
-            if (isNotPlaying) {
-              sendDataToClient(null);
+            const emission = playbackStreamEmission(
+              subscription.evaluate(state),
+            );
+            if (emission.kind === "emit") {
+              send(emission.state);
             }
+          } catch {
+            if (!pollAbortController.signal.aborted) {
+              const emission = playbackStreamEmission(
+                subscription.evaluate(
+                  failurePlaybackWireState(providerFailure("network")),
+                ),
+              );
+              if (emission.kind === "emit") {
+                send(emission.state);
+              }
+            }
+          }
 
-            lastResponse = latestData;
-          } catch (error) {
-            console.error(error);
-            controller.error(error);
+          if (pollAbortController.signal.aborted) {
             break;
           }
-          await new Promise((resolve) =>
-            setTimeout(resolve, spotifyTrackService.getTimeoutMs() ?? 1000),
+
+          await waitForNextPoll(
+            spotifyTrackService.getPlaybackPollDelay(),
+            pollAbortController.signal,
           );
         }
       };
 
-      pollForUpdates();
-      const abortSignal = () => {
-        console.log("Aborted");
-        controller.close();
-        continuePolling = false;
-      };
-      req.signal.addEventListener("abort", abortSignal);
-      // cleanup on application shutdown
-      process.on("SIGINT", abortSignal);
-      process.on("SIGTERM", abortSignal);
+      cancelPolling = stopPolling;
+      req.signal.addEventListener("abort", close, { once: true });
+      void pollForUpdates();
+    },
+    cancel(): void {
+      cancelPolling?.();
     },
   });
 
@@ -71,25 +116,41 @@ export async function GET(req: Request) {
   });
 }
 
-async function updateLastResponse(
-  lastResponse: SpotifyDataMap,
-): Promise<SpotifyDataMap> {
-  await spotifyTrackService.getLatest(
-    SpotifyDataType.Track,
-    lastResponse[SpotifyDataType.Track]?.id ?? null,
-  );
-  return {
-    [SpotifyDataType.Track]: await spotifyTrackService.getLatest(
-      SpotifyDataType.Track,
-      lastResponse[SpotifyDataType.Track]?.id ?? null,
-    ),
-    [SpotifyDataType.Artist]: await spotifyTrackService.getLatest(
-      SpotifyDataType.Artist,
-      lastResponse[SpotifyDataType.Artist]?.id ?? null,
-    ),
-    [SpotifyDataType.Artwork]: await spotifyTrackService.getLatest(
-      SpotifyDataType.Artwork,
-      lastResponse[SpotifyDataType.Artwork]?.id ?? null,
-    ),
-  };
+function playbackStreamEmission(
+  outcome: PlaybackStreamOutcome,
+): PlaybackStreamEmission {
+  switch (outcome.kind) {
+    case "changed":
+    case "unsupported":
+    case "failure":
+      return Object.freeze({ kind: "emit", state: outcome.state });
+    case "empty":
+      return Object.freeze({ kind: "emit", state: emptyPlaybackWireState() });
+    case "unchanged":
+      return Object.freeze({ kind: "suppress" });
+  }
+
+  return assertNever(outcome);
+}
+
+function waitForNextPoll(
+  delay: PlaybackPollDelayMilliseconds,
+  signal: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve): void => {
+    const onAbort = (): void => {
+      clearTimeout(timeout);
+      resolve();
+    };
+    const timeout = setTimeout((): void => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, delay.value);
+
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unexpected playback stream outcome: ${String(value)}`);
 }

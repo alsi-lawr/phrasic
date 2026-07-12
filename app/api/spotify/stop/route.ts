@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { spotifyTrackService } from "@/services/SpotifyClient/SpotifyTrackServiceController";
-import { OK } from "@/types/API";
 
-export async function POST() {
+const stopResponse = Object.freeze({
+  kind: "success",
+  result: "OK",
+  status: 200,
+});
+
+export async function POST(): Promise<Response> {
   spotifyTrackService.stopService();
-  return NextResponse.json(OK);
+  return NextResponse.json(stopResponse);
 }

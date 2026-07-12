@@ -50,7 +50,7 @@ The configuration is managed through the `appconfig.json` file. A sample file `e
     "authorizationAddress": "https://accounts.spotify.com/authorize",
     "scopes": "user-read-playback-state user-read-currently-playing user-modify-playback-state",
     "responseType": "code",
-    "callbackAddress": "http://localhost:45000/nowplaying",
+    "callbackAddress": "http://127.0.0.1:45000/nowplaying",
     "spotifyClientId": "your-client-id",
     "spotifyClientSecret": "your-client-secret"
   },
@@ -60,15 +60,13 @@ The configuration is managed through the `appconfig.json` file. A sample file `e
     "artworkSize": "large"
   },
   "refresh": {
-    "authTokenRefreshAddress": "https://accounts.spotify.com/api/token",
-    "authTokenRefreshIntervalMs": 30000
+    "authTokenRefreshAddress": "https://accounts.spotify.com/api/token"
   }
 }
 ```
 
 > [!CAUTION]
 > The spotify API addresses are exposed in case spotify change their API locations, although this is unlikely. Do not change these unless you know they have changed.
-> Change the auth token refresh interval at your own risk.
 
 > [!TIP]
 > If you need a less responsive client, just lower the `spotifyTrackRefreshIntervalMs` in the `trackAgent` section.
@@ -79,7 +77,7 @@ The configuration is managed through the `appconfig.json` file. A sample file `e
 1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/applications).
 2. Log in with your Spotify account and create a new application.
 3. After creating the app, you'll see your **Client ID** and **Client Secret** on the app page.
-4. Set the **Redirect URI** in the app to: `http://localhost:45000/nowplaying`.
+4. Set the **Redirect URI** in the app to: `http://127.0.0.1:45000/nowplaying`.
 5. Enter the **Client ID** and **Client Secret** into the `appconfig.json`.
 
 ## Running the Application

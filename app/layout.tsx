@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import type { ReactNode } from "react";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -18,11 +19,11 @@ export const metadata: Metadata = {
   description: "For displaying your currently playing track on Spotify",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+type RootLayoutProps = {
+  readonly children: ReactNode;
+};
+
+export default function RootLayout({ children }: RootLayoutProps): ReactNode {
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>

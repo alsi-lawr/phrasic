@@ -1,32 +1,20 @@
-import React, { useState, useEffect } from "react";
+import { currentPlaybackItem } from "@/domain/playback-stream";
+import type { ReactElement } from "react";
 import Artist from "../artist/Artist";
+import { useFetchData } from "../hookintoupdates/FetchDataHook";
 import Title from "../title/Title";
 import "./SongDetails.css";
 
-export type SongDetailsProperties = {
-  setHasData: React.Dispatch<React.SetStateAction<boolean>>;
-};
-
-export default function SongDetails() {
-  const [hasArtistData, setHasArtistData] = useState(false);
-  const [hasTitleData, setHasTitleData] = useState(false);
-  const [hasData, setHasData] = useState(false);
-
-  // Scroll out and back in for changes
-  useEffect(() => {
-    setHasData(hasArtistData && hasTitleData);
-    // setHasData(false);
-    // if(!hasArtistData || !hasTitleData){
-    //   return;
-    // }
-    // setTimeout(() => {
-    // }, 1000);
-  }, [hasArtistData, hasTitleData, setHasData]);
+export default function SongDetails(): ReactElement {
+  const { state } = useFetchData();
+  const item = currentPlaybackItem(state);
+  const className =
+    item.kind === "available" ? "song-details" : "song-details no-data";
 
   return (
-    <div className={`song-details${hasData ? "" : " no-data"}`}>
-      <Artist setHasData={setHasArtistData} />
-      <Title setHasData={setHasTitleData} />
+    <div className={className}>
+      <Artist item={item} />
+      <Title item={item} />
     </div>
   );
 }

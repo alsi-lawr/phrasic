@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false
+  },
+  "include": [
+    "domain/**/*.ts",
+    "components/**/*.tsx",
+    "providers/spotify/**/*.ts",
+    "services/SpotifyClient/SpotifyTrackAgent.ts",
+    "services/SpotifyClient/SpotifyTrackListener.ts",
+    "test/playback-domain.test.ts",
+    "test/playback-stream.test.ts",
+    "test/spotify-playback.test.ts",
+    "test/spotify-authorization-request.test.ts",
+    "test/spotify-service-configuration.test.ts",
+    "test/spotify-track-service-controller.test.ts",
+    "test/spotify-track-listener.test.ts",
+    "test/spotify-track-agent.test.ts",
+    "test/spotify-token-response.test.ts",
+    "test/types/**/*.ts"
+  ],
+  "exclude": ["node_modules", ".next"]
+}

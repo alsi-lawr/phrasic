@@ -3,7 +3,7 @@
     "authorizationAddress": "https://accounts.spotify.com/authorize",
     "scopes": "user-read-playback-state user-read-currently-playing user-modify-playback-state",
     "responseType": "code",
-    "callbackAddress": "http://localhost:3000/nowplaying",
+    "callbackAddress": "http://127.0.0.1:3000/nowplaying",
     "spotifyClientId": "",
     "spotifyClientSecret": ""
   },
@@ -13,7 +13,6 @@
     "artworkSize": "large"
   },
   "refresh": {
-    "authTokenRefreshAddress": "https://accounts.spotify.com/api/token",
-    "authTokenRefreshIntervalMs": 30000
+    "authTokenRefreshAddress": "https://accounts.spotify.com/api/token"
   }
 }

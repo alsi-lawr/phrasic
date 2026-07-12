@@ -1,19 +1,43 @@
 import { PrismaClient } from "@prisma/client";
+import { RefreshToken } from "../domain/playback";
 
-export const sqlClient: PrismaClient = new PrismaClient({
+const sqlClient = new PrismaClient({
   // log: ["query", "info", "warn", "error"],
 });
 
-export async function storeToken(token: string) {
+export type StoredRefreshTokenLookup =
+  | {
+      readonly kind: "found";
+      readonly refreshToken: RefreshToken;
+    }
+  | {
+      readonly kind: "invalid";
+    }
+  | {
+      readonly kind: "not-found";
+    };
+
+export async function storeRefreshToken(
+  refreshToken: RefreshToken,
+): Promise<void> {
   await sqlClient.refreshToken.deleteMany();
   await sqlClient.refreshToken.create({
     data: {
-      token: token,
+      token: refreshToken.value,
     },
   });
 }
 
-export async function queryRefreshToken(): Promise<string | null> {
-  const token = await sqlClient.refreshToken.findFirst();
-  return token?.token ?? null;
+export async function findStoredRefreshToken(): Promise<StoredRefreshTokenLookup> {
+  const storedToken = await sqlClient.refreshToken.findFirst();
+  if (storedToken === null) {
+    return Object.freeze({ kind: "not-found" });
+  }
+
+  const refreshToken = RefreshToken.create(storedToken.token);
+  if (refreshToken.kind === "failure") {
+    return Object.freeze({ kind: "invalid" });
+  }
+
+  return Object.freeze({ kind: "found", refreshToken: refreshToken.value });
 }

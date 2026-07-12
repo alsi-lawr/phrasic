@@ -1,46 +1,63 @@
-import { useEffect, useState } from "react";
-import "./Artwork.css";
-import { SpotifyDataType } from "@/types/Hook";
+import type { LastPlaybackItem } from "@/domain/playback";
+import { currentPlaybackItem } from "@/domain/playback-stream";
+import type { ReactElement } from "react";
 import { useFetchData } from "../hookintoupdates/FetchDataHook";
-import Image from "next/image";
+import "./Artwork.css";
 
-export default function AlbumArtworkClient() {
-  const [fadeClass, setFadeClass] = useState("fade-in");
-  const [hasData, setHasData] = useState(false);
-  const { data } = useFetchData();
-  const [artworkContents, setArtworkContents] = useState("");
-
-  useEffect(() => {
-    const artworkData = data?.[SpotifyDataType.Artwork];
-    if (artworkData?.data || !artworkData?.id) {
-      // only fade out if changed album or no artwork
-      setFadeClass("fade-out");
+type ArtworkPresentation =
+  | {
+      readonly kind: "available";
+      readonly source: string;
     }
-    setTimeout(() => {
-      setFadeClass("fade-in");
-      if (!artworkData?.id) {
-        setHasData(false);
-      } else {
-        setHasData(true);
-      }
-      if (artworkData?.data) {
-        // Album has changed. If no data sent, don't update the album artwork as it's the same album.
-        setArtworkContents(`data:image/jpeg;base64,${artworkData.data}`);
-      }
-    }, 1000);
-  }, [data]);
+  | {
+      readonly kind: "fallback";
+      readonly source: string;
+    };
+
+export default function AlbumArtworkClient(): ReactElement {
+  const { state } = useFetchData();
+  const artwork = artworkPresentation(currentPlaybackItem(state));
+  const imageClassName = artwork.kind === "fallback" ? "spinning-image" : "";
 
   return (
-    <div className={`image-container ${fadeClass}`}>
-      <Image
-        src={hasData ? (artworkContents ?? vinylBase64) : vinylBase64}
+    <div className="image-container fade-in">
+      <img
+        src={artwork.source}
         alt="Album Artwork"
-        className={hasData ? "" : "spinning-image"}
+        className={imageClassName}
         width={1080}
         height={1080}
       />
     </div>
   );
+}
+
+function artworkPresentation(item: LastPlaybackItem): ArtworkPresentation {
+  if (item.kind === "unavailable") {
+    return {
+      kind: "fallback",
+      source: vinylBase64,
+    };
+  }
+
+  switch (item.item.artwork.kind) {
+    case "available":
+      return {
+        kind: "available",
+        source: item.item.artwork.url.value,
+      };
+    case "unavailable":
+      return {
+        kind: "fallback",
+        source: vinylBase64,
+      };
+  }
+
+  return assertNever(item.item.artwork);
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unexpected artwork variant: ${String(value)}`);
 }
 
 const vinylBase64: string =
