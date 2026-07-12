@@ -19,6 +19,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
+    "typecheck:browser": "tsc --project tsconfig.browser.json",
     "typecheck:domain": "tsc --project tsconfig.domain.json",
     "test": "node --test \"test/**/*.test.ts\"",
     "prepare": "husky"

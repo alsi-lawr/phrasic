@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "target": "esnext"
+  },
+  "include": [
+    "browser/**/*.ts",
+    "test/browser/**/*.test.ts",
+    "test/types/browser-auth.type-test.ts"
+  ],
+  "exclude": ["node_modules", ".next"]
+}
