@@ -1,12 +1,12 @@
 "use client";
 
+import { parsePlaybackEvent } from "@/domain/playback-stream";
 import {
-  emptyPlaybackWireState,
-  failurePlaybackWireState,
-  parsePlaybackWireEvent,
-} from "@/domain/playback-stream";
-import type { PlaybackWireState } from "@/domain/playback-stream";
-import { providerFailure } from "@/domain/playback";
+  initialPlaybackState,
+  providerFailure,
+  transitionPlaybackState,
+  type PlaybackState,
+} from "@/domain/playback";
 import {
   createContext,
   useEffect,
@@ -16,7 +16,7 @@ import {
 } from "react";
 
 export type FetchDataContextValue = {
-  readonly state: PlaybackWireState;
+  readonly state: PlaybackState;
 };
 
 type FetchDataProviderProps = {
@@ -30,18 +30,18 @@ export const FetchDataContext = createContext<
 export function FetchDataProvider({
   children,
 }: FetchDataProviderProps): ReactElement {
-  const [state, setState] = useState<PlaybackWireState>(emptyPlaybackWireState);
+  const [state, setState] = useState<PlaybackState>(initialPlaybackState);
   const value: FetchDataContextValue = Object.freeze({ state });
 
   useEffect((): (() => void) => {
     const eventSource = new EventSource("/api/spotify/hook");
 
     eventSource.onmessage = (event: MessageEvent<unknown>): void => {
-      setState(parsePlaybackWireEvent(event.data));
+      setState(parsePlaybackEvent(event.data));
     };
 
     eventSource.onerror = (): void => {
-      setState(failurePlaybackWireState(providerFailure("network")));
+      setState(networkFailureState);
     };
 
     return (): void => {
@@ -54,4 +54,16 @@ export function FetchDataProvider({
       {children}
     </FetchDataContext.Provider>
   );
+}
+
+function networkFailureState(state: PlaybackState): PlaybackState {
+  const transition = transitionPlaybackState(state, {
+    kind: "failure",
+    failure: providerFailure("network"),
+  });
+  if (transition.kind === "success") {
+    return transition.value;
+  }
+
+  throw new Error("Expected playback failure transition to succeed");
 }

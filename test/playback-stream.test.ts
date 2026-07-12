@@ -2,17 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createPlaybackStreamSubscription,
+  currentPlaybackItem,
+  deserializePlaybackWireState,
   emptyPlaybackWireState,
   evaluatePlaybackStream,
   failurePlaybackWireState,
   initialPlaybackStreamCursor,
-  parsePlaybackWireEvent,
+  parsePlaybackEvent,
   parsePlaybackWireState,
   serializePlaybackState,
-  type PlaybackWireParseFailure,
   type PlaybackWireState,
 } from "../domain/playback-stream.ts";
 import {
+  authorizationFailure,
   initialPlaybackState,
   providerFailure,
   transitionPlaybackState,
@@ -105,6 +107,101 @@ test("the stream wire preserves every lifecycle state without relabeling it as m
       expectSuccess(parsePlaybackWireState(serialized)),
       serialized,
     );
+  }
+});
+
+test("validated wire states deserialize to trusted playback states", () => {
+  const initializing = initialPlaybackState();
+  const authorizationRequired = expectSuccess(
+    transitionPlaybackState(initializing, {
+      kind: "authorization-required",
+      reason: "not-authorized",
+    }),
+  );
+  const authorizing = expectSuccess(
+    transitionPlaybackState(authorizationRequired, {
+      kind: "begin-authorization",
+    }),
+  );
+  const reconnecting = expectSuccess(
+    transitionPlaybackState(authorizing, {
+      kind: "authorization-complete",
+    }),
+  );
+  const playing = expectSuccess(
+    parseSpotifyPlaybackPayload(playingTrackPayload),
+  );
+  const paused = expectSuccess(
+    parseSpotifyPlaybackPayload(pausedEpisodePayload),
+  );
+  const empty = expectSuccess(parseSpotifyPlaybackPayload(emptyTrackPayload));
+  const unsupported = expectSuccess(
+    parseSpotifyPlaybackPayload(advertisementPayload),
+  );
+  const reconnectingWithItem = expectSuccess(
+    transitionPlaybackState(playing, { kind: "connection-lost" }),
+  );
+  const failure = expectSuccess(
+    transitionPlaybackState(initializing, {
+      kind: "failure",
+      failure: providerFailure("network"),
+    }),
+  );
+  const authorizationFailureState = expectSuccess(
+    transitionPlaybackState(initializing, {
+      kind: "failure",
+      failure: authorizationFailure("authorization-denied"),
+    }),
+  );
+  const states: ReadonlyArray<PlaybackState> = [
+    initializing,
+    authorizationRequired,
+    authorizing,
+    reconnecting,
+    playing,
+    paused,
+    empty,
+    unsupported,
+    reconnectingWithItem,
+    failure,
+    authorizationFailureState,
+  ];
+
+  for (const state of states) {
+    const wire = serializePlaybackState(state);
+    const deserialized = expectSuccess(deserializePlaybackWireState(wire));
+
+    assert.equal(deserialized.kind, state.kind);
+    assert.deepEqual(serializePlaybackState(deserialized), wire);
+  }
+});
+
+test("trusted playback item views preserve playing and paused items", () => {
+  const playing = expectSuccess(
+    parseSpotifyPlaybackPayload(playingTrackPayload),
+  );
+  const paused = expectSuccess(
+    parseSpotifyPlaybackPayload(pausedEpisodePayload),
+  );
+  const reconnecting = expectSuccess(
+    transitionPlaybackState(playing, { kind: "connection-lost" }),
+  );
+  const cases: ReadonlyArray<{
+    readonly state: PlaybackState;
+    readonly itemKind: "episode" | "track";
+  }> = [
+    { state: playing, itemKind: "track" },
+    { state: paused, itemKind: "episode" },
+    { state: reconnecting, itemKind: "track" },
+  ];
+
+  for (const scenario of cases) {
+    const item = currentPlaybackItem(scenario.state);
+
+    assert.equal(item.kind, "available");
+    if (item.kind === "available") {
+      assert.equal(item.item.kind, scenario.itemKind);
+    }
   }
 });
 
@@ -416,29 +513,75 @@ test("wire validation rejects malformed and extra keys", () => {
   });
 });
 
+test("wire deserialization rejects values that cannot construct trusted items", () => {
+  const playing = wireState(playingTrackPayload);
+  if (playing.kind !== "playing" || playing.snapshot.item.kind !== "track") {
+    throw new Error("Expected a playing track wire state");
+  }
+
+  const uncommittable: PlaybackWireState = {
+    ...playing,
+    snapshot: {
+      ...playing.snapshot,
+      item: {
+        ...playing.snapshot.item,
+        artists: [],
+      },
+    },
+  };
+
+  assert.deepEqual(expectFailure(deserializePlaybackWireState(uncommittable)), {
+    kind: "invalid-playback-wire-domain",
+  });
+});
+
 test("client-facing EventSource parsing uses safe failure states", () => {
   const playing = wireState(playingTrackPayload);
+  if (playing.kind !== "playing" || playing.snapshot.item.kind !== "track") {
+    throw new Error("Expected a playing track wire state");
+  }
+
   const extraKeyEvent = JSON.stringify({
     ...emptyPlaybackWireState(),
     extra: "unexpected",
   });
+  const malformedItemEvent = JSON.stringify({
+    ...playing,
+    snapshot: {
+      ...playing.snapshot,
+      item: {
+        ...playing.snapshot.item,
+        artists: [],
+      },
+    },
+  });
 
-  assert.equal(parsePlaybackWireEvent(JSON.stringify(playing)).kind, "playing");
-  assert.deepEqual(parsePlaybackWireEvent("{"), {
+  assert.deepEqual(
+    serializePlaybackState(parsePlaybackEvent(JSON.stringify(playing))),
+    playing,
+  );
+  assert.deepEqual(parsePlaybackEvent("{"), {
     kind: "failure",
     error: {
       kind: "provider-failed",
       reason: "malformed-response",
     },
   });
-  assert.deepEqual(parsePlaybackWireEvent(extraKeyEvent), {
+  assert.deepEqual(parsePlaybackEvent(extraKeyEvent), {
     kind: "failure",
     error: {
       kind: "provider-failed",
       reason: "malformed-response",
     },
   });
-  assert.deepEqual(parsePlaybackWireEvent(42), {
+  assert.deepEqual(parsePlaybackEvent(malformedItemEvent), {
+    kind: "failure",
+    error: {
+      kind: "provider-failed",
+      reason: "malformed-response",
+    },
+  });
+  assert.deepEqual(parsePlaybackEvent(42), {
     kind: "failure",
     error: {
       kind: "provider-failed",
@@ -465,9 +608,9 @@ function expectSuccess<Value, Failure>(result: Result<Value, Failure>): Value {
   throw new Error("Expected a successful result");
 }
 
-function expectFailure<Value>(
-  result: Result<Value, PlaybackWireParseFailure>,
-): PlaybackWireParseFailure {
+function expectFailure<Value, Failure>(
+  result: Result<Value, Failure>,
+): Failure {
   if (result.kind === "failure") {
     return result.error;
   }

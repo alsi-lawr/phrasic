@@ -5,6 +5,7 @@
   },
   "include": [
     "domain/**/*.ts",
+    "components/**/*.tsx",
     "providers/spotify/**/*.ts",
     "services/SpotifyClient/SpotifyTrackAgent.ts",
     "services/SpotifyClient/SpotifyTrackListener.ts",

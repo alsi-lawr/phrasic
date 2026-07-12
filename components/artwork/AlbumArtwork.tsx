@@ -1,5 +1,5 @@
-import { currentPlaybackWireItem } from "@/domain/playback-stream";
-import type { PlaybackWireItemAvailability } from "@/domain/playback-stream";
+import type { LastPlaybackItem } from "@/domain/playback";
+import { currentPlaybackItem } from "@/domain/playback-stream";
 import type { ReactElement } from "react";
 import { useFetchData } from "../hookintoupdates/FetchDataHook";
 import "./Artwork.css";
@@ -16,7 +16,7 @@ type ArtworkPresentation =
 
 export default function AlbumArtworkClient(): ReactElement {
   const { state } = useFetchData();
-  const artwork = artworkPresentation(currentPlaybackWireItem(state));
+  const artwork = artworkPresentation(currentPlaybackItem(state));
   const imageClassName = artwork.kind === "fallback" ? "spinning-image" : "";
 
   return (
@@ -32,9 +32,7 @@ export default function AlbumArtworkClient(): ReactElement {
   );
 }
 
-function artworkPresentation(
-  item: PlaybackWireItemAvailability,
-): ArtworkPresentation {
+function artworkPresentation(item: LastPlaybackItem): ArtworkPresentation {
   if (item.kind === "unavailable") {
     return {
       kind: "fallback",
@@ -46,7 +44,7 @@ function artworkPresentation(
     case "available":
       return {
         kind: "available",
-        source: item.item.artwork.url,
+        source: item.item.artwork.url.value,
       };
     case "unavailable":
       return {

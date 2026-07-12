@@ -1,14 +1,33 @@
 import {
+  authorizationFailure,
+  availableOriginalArtwork,
+  Collection,
+  Creator,
+  DisplayText,
+  EpisodeItem,
+  initialPlaybackState,
+  OriginalArtworkUrl,
+  PlaybackDurationMilliseconds,
+  PlaybackPositionMilliseconds,
+  PlaybackSnapshot,
   providerFailure,
+  ProviderCollectionId,
+  ProviderId,
+  ProviderItemId,
+  ProviderLink,
+  Show,
+  TrackItem,
+  transitionPlaybackState,
+  unavailableLastPlaybackItem,
+  unavailableOriginalArtwork,
   type AuthorizationRequiredReason,
   type ArtworkUnavailableReason,
-  type Creator,
   type LastPlaybackItem,
   type NowPlayingItem,
   type OriginalArtwork,
+  type PlaybackEvent,
   type PlaybackFailure,
   type PlaybackState,
-  type ProviderLink,
   type Result,
   type UnsupportedPlaybackReason,
 } from "./playback.ts";
@@ -156,6 +175,10 @@ export type PlaybackWireParseFailure = {
     | "invalid-value"
     | "missing-value"
     | "unexpected-key";
+};
+
+export type PlaybackWireDeserializationFailure = {
+  readonly kind: "invalid-playback-wire-domain";
 };
 
 export type PlaybackStreamCursor =
@@ -353,49 +376,590 @@ export function parsePlaybackWireState(
 }
 
 /**
- * Converts untrusted EventSource data to a safe render state. The raw parse
- * error is intentionally not sent to React because it may contain transport data.
+ * Converts untrusted EventSource data to a safe trusted render state. The raw
+ * parse error is intentionally not sent to React because it may contain
+ * transport data.
  */
-export function parsePlaybackWireEvent(input: unknown): PlaybackWireState {
+export function parsePlaybackEvent(input: unknown): PlaybackState {
   if (typeof input !== "string") {
-    return failurePlaybackWireState(providerFailure("malformed-response"));
+    return malformedPlaybackState();
   }
 
   try {
     const parsed: unknown = JSON.parse(input);
-    const state = parsePlaybackWireState(parsed);
-    if (state.kind === "success") {
-      return state.value;
+    const wireState = parsePlaybackWireState(parsed);
+    if (wireState.kind === "failure") {
+      return malformedPlaybackState();
     }
 
-    return failurePlaybackWireState(providerFailure("malformed-response"));
+    const state = deserializePlaybackWireState(wireState.value);
+    if (state.kind === "failure") {
+      return malformedPlaybackState();
+    }
+
+    return state.value;
   } catch {
-    return failurePlaybackWireState(providerFailure("malformed-response"));
+    return malformedPlaybackState();
   }
 }
 
-export function currentPlaybackWireItem(
+export function deserializePlaybackWireState(
   state: PlaybackWireState,
-): PlaybackWireItemAvailability {
+): Result<PlaybackState, PlaybackWireDeserializationFailure> {
   switch (state.kind) {
-    case "playing":
-      return Object.freeze({
-        kind: "available",
-        item: state.snapshot.item,
-      });
-    case "empty":
     case "initializing":
+      return succeeded(initialPlaybackState());
     case "authorization-required":
+      return deserializeTransition(initialPlaybackState(), {
+        kind: "authorization-required",
+        reason: state.reason,
+      });
     case "authorizing":
+      return deserializeAuthorizingPlaybackState();
+    case "empty":
+      return deserializeEmptyPlaybackState();
+    case "playing":
+      return deserializePlayingPlaybackState(state);
     case "paused":
+      return deserializePausedPlaybackState(state);
     case "unsupported":
-    case "failure":
-      return Object.freeze({ kind: "unavailable" });
+      return deserializeUnsupportedPlaybackState(state);
     case "reconnecting":
-      return state.lastItem;
+      return deserializeReconnectingPlaybackState(state);
+    case "failure":
+      return deserializeFailurePlaybackState(state);
   }
 
   return assertNever(state);
+}
+
+export function currentPlaybackItem(state: PlaybackState): LastPlaybackItem {
+  switch (state.kind) {
+    case "playing":
+    case "paused":
+      return availableCurrentPlaybackItem(state.snapshot.item);
+    case "reconnecting":
+      return state.lastItem;
+    case "initializing":
+    case "authorization-required":
+    case "authorizing":
+    case "empty":
+    case "unsupported":
+    case "failure":
+      return unavailableLastPlaybackItem();
+  }
+
+  return assertNever(state);
+}
+
+function malformedPlaybackState(): PlaybackState {
+  const transition = transitionPlaybackState(initialPlaybackState(), {
+    kind: "failure",
+    failure: providerFailure("malformed-response"),
+  });
+  if (transition.kind === "success") {
+    return transition.value;
+  }
+
+  throw new Error("Expected malformed playback state transition to succeed");
+}
+
+function deserializeAuthorizingPlaybackState(): Result<
+  PlaybackState,
+  PlaybackWireDeserializationFailure
+> {
+  const authorizationRequired = deserializeTransition(initialPlaybackState(), {
+    kind: "authorization-required",
+    reason: "not-authorized",
+  });
+  if (authorizationRequired.kind === "failure") {
+    return authorizationRequired;
+  }
+
+  return deserializeTransition(authorizationRequired.value, {
+    kind: "begin-authorization",
+  });
+}
+
+function deserializeEmptyPlaybackState(): Result<
+  PlaybackState,
+  PlaybackWireDeserializationFailure
+> {
+  const connected = deserializeConnectedPlaybackState();
+  if (connected.kind === "failure") {
+    return connected;
+  }
+
+  return deserializeTransition(connected.value, { kind: "playback-empty" });
+}
+
+function deserializePlayingPlaybackState(
+  state: PlayingPlaybackWireState,
+): Result<PlaybackState, PlaybackWireDeserializationFailure> {
+  const snapshot = deserializePlaybackWireSnapshot(state.snapshot);
+  if (snapshot.kind === "failure") {
+    return snapshot;
+  }
+
+  const connected = deserializeConnectedPlaybackState();
+  if (connected.kind === "failure") {
+    return connected;
+  }
+
+  return deserializeTransition(connected.value, {
+    kind: "playback-playing",
+    snapshot: snapshot.value,
+  });
+}
+
+function deserializePausedPlaybackState(
+  state: PausedPlaybackWireState,
+): Result<PlaybackState, PlaybackWireDeserializationFailure> {
+  const snapshot = deserializePlaybackWireSnapshot(state.snapshot);
+  if (snapshot.kind === "failure") {
+    return snapshot;
+  }
+
+  const connected = deserializeConnectedPlaybackState();
+  if (connected.kind === "failure") {
+    return connected;
+  }
+
+  return deserializeTransition(connected.value, {
+    kind: "playback-paused",
+    snapshot: snapshot.value,
+  });
+}
+
+function deserializeUnsupportedPlaybackState(
+  state: UnsupportedPlaybackWireState,
+): Result<PlaybackState, PlaybackWireDeserializationFailure> {
+  const connected = deserializeConnectedPlaybackState();
+  if (connected.kind === "failure") {
+    return connected;
+  }
+
+  return deserializeTransition(connected.value, {
+    kind: "playback-unsupported",
+    reason: state.reason,
+  });
+}
+
+function deserializeReconnectingPlaybackState(
+  state: ReconnectingPlaybackWireState,
+): Result<PlaybackState, PlaybackWireDeserializationFailure> {
+  const connected = deserializeConnectedPlaybackState();
+  if (connected.kind === "failure") {
+    return connected;
+  }
+
+  switch (state.lastItem.kind) {
+    case "unavailable":
+      return connected;
+    case "available": {
+      const item = deserializePlaybackWireItem(state.lastItem.item);
+      if (item.kind === "failure") {
+        return item;
+      }
+
+      const snapshot = zeroPlaybackSnapshot(item.value);
+      if (snapshot.kind === "failure") {
+        return snapshot;
+      }
+
+      const activePlayback = deserializeTransition(connected.value, {
+        kind: "playback-playing",
+        snapshot: snapshot.value,
+      });
+      if (activePlayback.kind === "failure") {
+        return activePlayback;
+      }
+
+      return deserializeTransition(activePlayback.value, {
+        kind: "connection-lost",
+      });
+    }
+  }
+
+  return assertNever(state.lastItem);
+}
+
+function deserializeFailurePlaybackState(
+  state: FailurePlaybackWireState,
+): Result<PlaybackState, PlaybackWireDeserializationFailure> {
+  return deserializeTransition(initialPlaybackState(), {
+    kind: "failure",
+    failure: deserializePlaybackFailure(state.error),
+  });
+}
+
+function deserializeConnectedPlaybackState(): Result<
+  PlaybackState,
+  PlaybackWireDeserializationFailure
+> {
+  return deserializeTransition(initialPlaybackState(), {
+    kind: "authorization-available",
+  });
+}
+
+function deserializeTransition(
+  state: PlaybackState,
+  event: PlaybackEvent,
+): Result<PlaybackState, PlaybackWireDeserializationFailure> {
+  return deserializeDomainResult(transitionPlaybackState(state, event));
+}
+
+function deserializePlaybackWireSnapshot(
+  snapshot: PlaybackWireSnapshot,
+): Result<PlaybackSnapshot, PlaybackWireDeserializationFailure> {
+  const item = deserializePlaybackWireItem(snapshot.item);
+  if (item.kind === "failure") {
+    return item;
+  }
+
+  const position = deserializeDomainResult(
+    PlaybackPositionMilliseconds.create(snapshot.positionMilliseconds),
+  );
+  if (position.kind === "failure") {
+    return position;
+  }
+
+  const duration = deserializeDomainResult(
+    PlaybackDurationMilliseconds.create(snapshot.durationMilliseconds),
+  );
+  if (duration.kind === "failure") {
+    return duration;
+  }
+
+  return deserializeDomainResult(
+    PlaybackSnapshot.create({
+      item: item.value,
+      position: position.value,
+      duration: duration.value,
+    }),
+  );
+}
+
+function zeroPlaybackSnapshot(
+  item: NowPlayingItem,
+): Result<PlaybackSnapshot, PlaybackWireDeserializationFailure> {
+  const position = deserializeDomainResult(
+    PlaybackPositionMilliseconds.create(0),
+  );
+  if (position.kind === "failure") {
+    return position;
+  }
+
+  const duration = deserializeDomainResult(
+    PlaybackDurationMilliseconds.create(0),
+  );
+  if (duration.kind === "failure") {
+    return duration;
+  }
+
+  return deserializeDomainResult(
+    PlaybackSnapshot.create({
+      item,
+      position: position.value,
+      duration: duration.value,
+    }),
+  );
+}
+
+function deserializePlaybackWireItem(
+  item: PlaybackWireItem,
+): Result<NowPlayingItem, PlaybackWireDeserializationFailure> {
+  switch (item.kind) {
+    case "track":
+      return deserializePlaybackWireTrackItem(item);
+    case "episode":
+      return deserializePlaybackWireEpisodeItem(item);
+  }
+
+  return assertNever(item);
+}
+
+function deserializePlaybackWireTrackItem(
+  item: PlaybackWireTrackItem,
+): Result<NowPlayingItem, PlaybackWireDeserializationFailure> {
+  const providerId = deserializeDomainResult(
+    ProviderId.create(item.providerId),
+  );
+  if (providerId.kind === "failure") {
+    return providerId;
+  }
+
+  const itemId = deserializeDomainResult(ProviderItemId.create(item.itemId));
+  if (itemId.kind === "failure") {
+    return itemId;
+  }
+
+  const title = deserializeDomainResult(DisplayText.create(item.title));
+  if (title.kind === "failure") {
+    return title;
+  }
+
+  const artists = deserializePlaybackWireCreators(item.artists);
+  if (artists.kind === "failure") {
+    return artists;
+  }
+
+  const collection = deserializePlaybackWireCollection(item.collection);
+  if (collection.kind === "failure") {
+    return collection;
+  }
+
+  const artwork = deserializePlaybackWireArtwork(item.artwork);
+  if (artwork.kind === "failure") {
+    return artwork;
+  }
+
+  const links = deserializePlaybackWireLinks(item.links);
+  if (links.kind === "failure") {
+    return links;
+  }
+
+  return deserializeDomainResult(
+    TrackItem.create({
+      providerId: providerId.value,
+      itemId: itemId.value,
+      title: title.value,
+      artists: artists.value,
+      collection: collection.value,
+      artwork: artwork.value,
+      links: links.value,
+    }),
+  );
+}
+
+function deserializePlaybackWireEpisodeItem(
+  item: PlaybackWireEpisodeItem,
+): Result<NowPlayingItem, PlaybackWireDeserializationFailure> {
+  const providerId = deserializeDomainResult(
+    ProviderId.create(item.providerId),
+  );
+  if (providerId.kind === "failure") {
+    return providerId;
+  }
+
+  const itemId = deserializeDomainResult(ProviderItemId.create(item.itemId));
+  if (itemId.kind === "failure") {
+    return itemId;
+  }
+
+  const title = deserializeDomainResult(DisplayText.create(item.title));
+  if (title.kind === "failure") {
+    return title;
+  }
+
+  const show = deserializePlaybackWireShow(item.show);
+  if (show.kind === "failure") {
+    return show;
+  }
+
+  const artwork = deserializePlaybackWireArtwork(item.artwork);
+  if (artwork.kind === "failure") {
+    return artwork;
+  }
+
+  const links = deserializePlaybackWireLinks(item.links);
+  if (links.kind === "failure") {
+    return links;
+  }
+
+  return deserializeDomainResult(
+    EpisodeItem.create({
+      providerId: providerId.value,
+      itemId: itemId.value,
+      title: title.value,
+      show: show.value,
+      artwork: artwork.value,
+      links: links.value,
+    }),
+  );
+}
+
+function deserializePlaybackWireCreators(
+  creators: ReadonlyArray<PlaybackWireCreator>,
+): Result<ReadonlyArray<Creator>, PlaybackWireDeserializationFailure> {
+  const deserialized: Creator[] = [];
+  for (const creator of creators) {
+    const value = deserializePlaybackWireCreator(creator);
+    if (value.kind === "failure") {
+      return value;
+    }
+
+    deserialized.push(value.value);
+  }
+
+  return succeeded(freezeArray(deserialized));
+}
+
+function deserializePlaybackWireCreator(
+  creator: PlaybackWireCreator,
+): Result<Creator, PlaybackWireDeserializationFailure> {
+  const name = deserializeDomainResult(DisplayText.create(creator.name));
+  if (name.kind === "failure") {
+    return name;
+  }
+
+  const links = deserializePlaybackWireLinks(creator.links);
+  if (links.kind === "failure") {
+    return links;
+  }
+
+  return succeeded(
+    Creator.create({
+      name: name.value,
+      links: links.value,
+    }),
+  );
+}
+
+function deserializePlaybackWireCollection(
+  collection: PlaybackWireCollection,
+): Result<Collection, PlaybackWireDeserializationFailure> {
+  const id = deserializeDomainResult(
+    ProviderCollectionId.create(collection.id),
+  );
+  if (id.kind === "failure") {
+    return id;
+  }
+
+  const title = deserializeDomainResult(DisplayText.create(collection.title));
+  if (title.kind === "failure") {
+    return title;
+  }
+
+  const links = deserializePlaybackWireLinks(collection.links);
+  if (links.kind === "failure") {
+    return links;
+  }
+
+  return succeeded(
+    Collection.create({
+      id: id.value,
+      title: title.value,
+      links: links.value,
+    }),
+  );
+}
+
+function deserializePlaybackWireShow(
+  show: PlaybackWireShow,
+): Result<Show, PlaybackWireDeserializationFailure> {
+  const id = deserializeDomainResult(ProviderCollectionId.create(show.id));
+  if (id.kind === "failure") {
+    return id;
+  }
+
+  const title = deserializeDomainResult(DisplayText.create(show.title));
+  if (title.kind === "failure") {
+    return title;
+  }
+
+  const publisher = deserializeDomainResult(DisplayText.create(show.publisher));
+  if (publisher.kind === "failure") {
+    return publisher;
+  }
+
+  const links = deserializePlaybackWireLinks(show.links);
+  if (links.kind === "failure") {
+    return links;
+  }
+
+  return succeeded(
+    Show.create({
+      id: id.value,
+      title: title.value,
+      publisher: publisher.value,
+      links: links.value,
+    }),
+  );
+}
+
+function deserializePlaybackWireArtwork(
+  artwork: PlaybackWireArtwork,
+): Result<OriginalArtwork, PlaybackWireDeserializationFailure> {
+  switch (artwork.kind) {
+    case "available": {
+      const url = deserializeDomainResult(
+        OriginalArtworkUrl.create(artwork.url),
+      );
+      if (url.kind === "failure") {
+        return url;
+      }
+
+      return succeeded(availableOriginalArtwork(url.value));
+    }
+    case "unavailable":
+      return succeeded(unavailableOriginalArtwork(artwork.reason));
+  }
+
+  return assertNever(artwork);
+}
+
+function deserializePlaybackWireLinks(
+  links: ReadonlyArray<PlaybackWireLink>,
+): Result<ReadonlyArray<ProviderLink>, PlaybackWireDeserializationFailure> {
+  const deserialized: ProviderLink[] = [];
+  for (const link of links) {
+    const providerId = deserializeDomainResult(
+      ProviderId.create(link.providerId),
+    );
+    if (providerId.kind === "failure") {
+      return providerId;
+    }
+
+    const value = deserializeDomainResult(
+      ProviderLink.create({
+        providerId: providerId.value,
+        href: link.href,
+      }),
+    );
+    if (value.kind === "failure") {
+      return value;
+    }
+
+    deserialized.push(value.value);
+  }
+
+  return succeeded(freezeArray(deserialized));
+}
+
+function deserializePlaybackFailure(
+  error: PlaybackWireFailure,
+): PlaybackFailure {
+  switch (error.kind) {
+    case "authorization-failed":
+      return authorizationFailure(error.reason);
+    case "provider-failed":
+      return providerFailure(error.reason);
+  }
+
+  return assertNever(error);
+}
+
+function deserializeDomainResult<Value, Failure>(
+  result: Result<Value, Failure>,
+): Result<Value, PlaybackWireDeserializationFailure> {
+  if (result.kind === "success") {
+    return succeeded(result.value);
+  }
+
+  return failed(playbackWireDeserializationFailure());
+}
+
+function playbackWireDeserializationFailure(): PlaybackWireDeserializationFailure {
+  return Object.freeze({ kind: "invalid-playback-wire-domain" });
+}
+
+function availableCurrentPlaybackItem(item: NowPlayingItem): LastPlaybackItem {
+  const availability: LastPlaybackItem = {
+    kind: "available",
+    item,
+  };
+  return Object.freeze(availability);
 }
 
 function serializePlaybackSnapshot(

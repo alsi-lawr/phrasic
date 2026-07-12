@@ -1,9 +1,9 @@
-import type { PlaybackWireItemAvailability } from "@/domain/playback-stream";
+import type { LastPlaybackItem } from "@/domain/playback";
 import type { ReactElement } from "react";
 import "./Title.css";
 
 type TitleProps = {
-  readonly item: PlaybackWireItemAvailability;
+  readonly item: LastPlaybackItem;
 };
 
 export default function Title({ item }: TitleProps): ReactElement {
@@ -11,7 +11,8 @@ export default function Title({ item }: TitleProps): ReactElement {
     return <div className="title" />;
   }
 
+  const title = item.item.title.value;
   const className =
-    item.item.title.length > 23 ? "title scroll-text fade-in" : "title fade-in";
-  return <div className={className}>{item.item.title}</div>;
+    title.length > 23 ? "title scroll-text fade-in" : "title fade-in";
+  return <div className={className}>{title}</div>;
 }

@@ -1,12 +1,9 @@
-import type {
-  PlaybackWireItem,
-  PlaybackWireItemAvailability,
-} from "@/domain/playback-stream";
+import type { LastPlaybackItem, NowPlayingItem } from "@/domain/playback";
 import type { ReactElement } from "react";
 import "./Artist.css";
 
 type ArtistProps = {
-  readonly item: PlaybackWireItemAvailability;
+  readonly item: LastPlaybackItem;
 };
 
 export default function Artist({ item }: ArtistProps): ReactElement {
@@ -18,12 +15,12 @@ export default function Artist({ item }: ArtistProps): ReactElement {
   return <div className="artist fade-in">{artist}</div>;
 }
 
-function artistText(item: PlaybackWireItem): string {
+function artistText(item: NowPlayingItem): string {
   switch (item.kind) {
     case "track":
-      return item.artists.map((artist): string => artist.name).join(", ");
+      return item.artists.map((artist): string => artist.name.value).join(", ");
     case "episode":
-      return item.show.publisher;
+      return item.show.publisher.value;
   }
 
   return assertNever(item);
