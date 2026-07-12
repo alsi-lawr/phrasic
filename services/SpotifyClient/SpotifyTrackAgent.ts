@@ -43,7 +43,10 @@ export class SpotifyTrackAgent {
       }
 
       const payload: unknown = response.data;
-      const playback = parseSpotifyPlaybackPayload(payload);
+      const playback = parseSpotifyPlaybackPayload(
+        payload,
+        this.config.artworkSize,
+      );
       if (playback.kind === "failure") {
         return failurePlaybackWireState(providerFailure("malformed-response"));
       }

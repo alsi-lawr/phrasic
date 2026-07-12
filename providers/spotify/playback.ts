@@ -24,6 +24,7 @@ import {
   type Result,
   type ValueValidationError,
 } from "../../domain/playback.ts";
+import type { SpotifyArtworkSize } from "../../services/SpotifyClient/SpotifyServiceConfiguration.ts";
 
 type UnknownJsonObject = {
   readonly [key: string]: unknown;
@@ -81,6 +82,7 @@ export type SpotifyPlaybackParseFailure = {
 
 export function parseSpotifyPlaybackPayload(
   input: unknown,
+  artworkSize: SpotifyArtworkSize = "large",
 ): Result<PlaybackState, SpotifyPlaybackParseFailure> {
   const payload = parseObject(input, "$");
   if (payload.kind === "failure") {
@@ -132,16 +134,27 @@ export function parseSpotifyPlaybackPayload(
   }
 
   if (playbackType.value === "track") {
-    return parseTrackPlayback(item.value, isPlaying.value, payload.value);
+    return parseTrackPlayback(
+      item.value,
+      isPlaying.value,
+      payload.value,
+      artworkSize,
+    );
   }
 
-  return parseEpisodePlayback(item.value, isPlaying.value, payload.value);
+  return parseEpisodePlayback(
+    item.value,
+    isPlaying.value,
+    payload.value,
+    artworkSize,
+  );
 }
 
 function parseTrackPlayback(
   itemValue: unknown,
   isPlaying: boolean,
   payload: UnknownJsonObject,
+  artworkSize: SpotifyArtworkSize,
 ): Result<PlaybackState, SpotifyPlaybackParseFailure> {
   if (itemValue === null) {
     return succeeded(emptyPlaybackState());
@@ -171,7 +184,7 @@ function parseTrackPlayback(
     return providerId;
   }
 
-  const itemResult = parseTrackItem(item.value, providerId.value);
+  const itemResult = parseTrackItem(item.value, providerId.value, artworkSize);
   if (itemResult.kind === "failure") {
     return itemResult;
   }
@@ -198,6 +211,7 @@ function parseEpisodePlayback(
   itemValue: unknown,
   isPlaying: boolean,
   payload: UnknownJsonObject,
+  artworkSize: SpotifyArtworkSize,
 ): Result<PlaybackState, SpotifyPlaybackParseFailure> {
   if (itemValue === null) {
     return succeeded(emptyPlaybackState());
@@ -213,7 +227,11 @@ function parseEpisodePlayback(
     return providerId;
   }
 
-  const itemResult = parseEpisodeItem(item.value, providerId.value);
+  const itemResult = parseEpisodeItem(
+    item.value,
+    providerId.value,
+    artworkSize,
+  );
   if (itemResult.kind === "failure") {
     return itemResult;
   }
@@ -239,6 +257,7 @@ function parseEpisodePlayback(
 function parseTrackItem(
   item: UnknownJsonObject,
   providerId: ProviderId,
+  artworkSize: SpotifyArtworkSize,
 ): Result<TrackItem, SpotifyPlaybackParseFailure> {
   const itemIdValue = readRequired(item, "id", "$.item.id");
   if (itemIdValue.kind === "failure") {
@@ -291,7 +310,7 @@ function parseTrackItem(
     return collection;
   }
 
-  const artwork = parseArtwork(album.value, "$.item.album.images");
+  const artwork = parseArtwork(album.value, "$.item.album.images", artworkSize);
   if (artwork.kind === "failure") {
     return artwork;
   }
@@ -323,6 +342,7 @@ function parseTrackItem(
 function parseEpisodeItem(
   item: UnknownJsonObject,
   providerId: ProviderId,
+  artworkSize: SpotifyArtworkSize,
 ): Result<EpisodeItem, SpotifyPlaybackParseFailure> {
   const itemIdValue = readRequired(item, "id", "$.item.id");
   if (itemIdValue.kind === "failure") {
@@ -360,7 +380,7 @@ function parseEpisodeItem(
     return show;
   }
 
-  const artwork = parseArtwork(item, "$.item.images");
+  const artwork = parseArtwork(item, "$.item.images", artworkSize);
   if (artwork.kind === "failure") {
     return artwork;
   }
@@ -570,6 +590,7 @@ function parseShow(
 function parseArtwork(
   source: UnknownJsonObject,
   imagesPath: SpotifyPlaybackPayloadPath,
+  artworkSize: SpotifyArtworkSize,
 ): Result<OriginalArtwork, SpotifyPlaybackParseFailure> {
   const imagesValue = readRequired(source, "images", imagesPath);
   if (imagesValue.kind === "failure") {
@@ -587,14 +608,48 @@ function parseArtwork(
     );
   }
 
+  const preferredImagePosition = artworkPosition(artworkSize);
+  let firstValidArtworkUrl: OriginalArtworkUrl | undefined;
+  let preferredArtworkUrl: OriginalArtworkUrl | undefined;
+  let validImagePosition = 0;
+
   for (const image of images.value) {
     const artworkUrl = parseArtworkUrl(image);
     if (artworkUrl.kind === "success") {
-      return succeeded(availableOriginalArtwork(artworkUrl.value));
+      if (firstValidArtworkUrl === undefined) {
+        firstValidArtworkUrl = artworkUrl.value;
+      }
+
+      if (validImagePosition === preferredImagePosition) {
+        preferredArtworkUrl = artworkUrl.value;
+      }
+
+      validImagePosition += 1;
     }
   }
 
-  return succeeded(unavailableOriginalArtwork("provider-artwork-is-invalid"));
+  if (firstValidArtworkUrl === undefined) {
+    return succeeded(unavailableOriginalArtwork("provider-artwork-is-invalid"));
+  }
+
+  // Spotify orders images from large to small. If the requested ordinal is absent,
+  // retain the first valid provider URL as the deterministic original-artwork fallback.
+  return succeeded(
+    availableOriginalArtwork(preferredArtworkUrl ?? firstValidArtworkUrl),
+  );
+}
+
+function artworkPosition(artworkSize: SpotifyArtworkSize): 0 | 1 | 2 {
+  switch (artworkSize) {
+    case "large":
+      return 0;
+    case "medium":
+      return 1;
+    case "small":
+      return 2;
+  }
+
+  return assertNever(artworkSize);
 }
 
 function parseArtworkUrl(

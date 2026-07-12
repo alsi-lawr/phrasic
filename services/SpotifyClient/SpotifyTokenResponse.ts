@@ -155,7 +155,7 @@ function readRequired(
   exchange: SpotifyTokenResponseParseFailure["exchange"],
 ): Result<unknown, SpotifyTokenResponseParseFailure> {
   const path = tokenPathForKey(key);
-  if (!(key in source)) {
+  if (!Object.hasOwn(source, key)) {
     return failed(tokenFailure(exchange, path, "missing-value"));
   }
 

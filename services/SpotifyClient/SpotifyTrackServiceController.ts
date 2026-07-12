@@ -11,7 +11,10 @@ import {
   type SpotifyTrackListenerPlaybackPoller,
   type SpotifyTrackListenerRefreshScheduler,
 } from "./SpotifyTrackListener";
-import { parseSpotifyServiceConfiguration } from "./SpotifyServiceConfiguration";
+import {
+  buildSpotifyAuthorizationUrl,
+  parseSpotifyServiceConfiguration,
+} from "./SpotifyServiceConfiguration";
 import type { SpotifyServiceConfiguration } from "./SpotifyServiceConfiguration";
 import { SpotifyTrackAgent } from "./SpotifyTrackAgent";
 
@@ -63,10 +66,7 @@ class SpotifyTrackServiceController {
   }
 
   public getAuthUrl(): string {
-    const authorization = this.configuration.authorization;
-    const scopes = authorization.scopes.join(" ");
-
-    return `${authorization.authorizationAddress}?client_id=${authorization.spotifyClientId}&response_type=${authorization.responseType}&redirect_uri=${authorization.callbackAddress}&scope=${scopes}`;
+    return buildSpotifyAuthorizationUrl(this.configuration.authorization);
   }
 
   public getTimeoutMs(): number {

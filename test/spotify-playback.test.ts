@@ -4,6 +4,7 @@ import {
   parseSpotifyPlaybackPayload,
   type SpotifyPlaybackParseFailure,
 } from "../providers/spotify/playback.ts";
+import type { SpotifyArtworkSize } from "../services/SpotifyClient/SpotifyServiceConfiguration.ts";
 import {
   advertisementPayload,
   emptyTrackPayload,
@@ -129,45 +130,44 @@ test("Spotify empty and unsupported playback variants remain explicit", () => {
   }
 });
 
-test("Spotify artwork cardinality and malformed entries retain explicit artwork states", () => {
-  const zeroArtwork = expectPlayingTrack(
-    expectSuccess(parseSpotifyPlaybackPayload(zeroArtworkPayload)),
-  );
-  const oneArtwork = expectPlayingTrack(
-    expectSuccess(parseSpotifyPlaybackPayload(oneArtworkPayload)),
-  );
-  const manyArtwork = expectPlayingTrack(
-    expectSuccess(parseSpotifyPlaybackPayload(manyArtworkPayload)),
-  );
-  const malformedArtwork = expectPlayingTrack(
-    expectSuccess(parseSpotifyPlaybackPayload(malformedArtworkEntriesPayload)),
-  );
+test("Spotify artwork preferences safely select zero, one, and many valid images", () => {
+  const preferences: ReadonlyArray<{
+    readonly artworkSize: SpotifyArtworkSize;
+    readonly expectedManyArtworkUrl: string;
+  }> = [
+    {
+      artworkSize: "large",
+      expectedManyArtworkUrl: "https://i.scdn.co/image/track-artwork-first",
+    },
+    {
+      artworkSize: "medium",
+      expectedManyArtworkUrl: "https://i.scdn.co/image/track-artwork-second",
+    },
+    {
+      artworkSize: "small",
+      expectedManyArtworkUrl: "https://i.scdn.co/image/track-artwork-third",
+    },
+  ];
 
-  assert.equal(zeroArtwork.artwork.kind, "unavailable");
-  if (zeroArtwork.artwork.kind === "unavailable") {
-    assert.equal(zeroArtwork.artwork.reason, "provider-did-not-supply-artwork");
-  }
-  assert.equal(oneArtwork.artwork.kind, "available");
-  if (oneArtwork.artwork.kind === "available") {
+  for (const preference of preferences) {
     assert.equal(
-      oneArtwork.artwork.url.value,
+      unavailableArtworkReason(zeroArtworkPayload, preference.artworkSize),
+      "provider-did-not-supply-artwork",
+    );
+    assert.equal(
+      selectedArtworkUrl(oneArtworkPayload, preference.artworkSize),
       "https://i.scdn.co/image/track-artwork-one",
     );
-  }
-  assert.equal(manyArtwork.artwork.kind, "available");
-  if (manyArtwork.artwork.kind === "available") {
     assert.equal(
-      manyArtwork.artwork.url.value,
-      "https://i.scdn.co/image/track-artwork-first",
+      selectedArtworkUrl(manyArtworkPayload, preference.artworkSize),
+      preference.expectedManyArtworkUrl,
     );
   }
-  assert.equal(malformedArtwork.artwork.kind, "unavailable");
-  if (malformedArtwork.artwork.kind === "unavailable") {
-    assert.equal(
-      malformedArtwork.artwork.reason,
-      "provider-artwork-is-invalid",
-    );
-  }
+
+  assert.equal(
+    unavailableArtworkReason(malformedArtworkEntriesPayload, "large"),
+    "provider-artwork-is-invalid",
+  );
 });
 
 test("Spotify payload parse failures retain only safe path and code detail", () => {
@@ -247,6 +247,34 @@ function expectPlayingTrack(state: PlaybackState): TrackItem {
   }
 
   return state.snapshot.item;
+}
+
+function selectedArtworkUrl(
+  payload: unknown,
+  artworkSize: SpotifyArtworkSize,
+): string {
+  const track = expectPlayingTrack(
+    expectSuccess(parseSpotifyPlaybackPayload(payload, artworkSize)),
+  );
+  if (track.artwork.kind === "available") {
+    return track.artwork.url.value;
+  }
+
+  throw new Error("Expected available Spotify artwork");
+}
+
+function unavailableArtworkReason(
+  payload: unknown,
+  artworkSize: SpotifyArtworkSize,
+): "provider-artwork-is-invalid" | "provider-did-not-supply-artwork" {
+  const track = expectPlayingTrack(
+    expectSuccess(parseSpotifyPlaybackPayload(payload, artworkSize)),
+  );
+  if (track.artwork.kind === "unavailable") {
+    return track.artwork.reason;
+  }
+
+  throw new Error("Expected unavailable Spotify artwork");
 }
 
 function expectSuccess<Value>(

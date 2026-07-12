@@ -95,6 +95,34 @@ test("Spotify service configuration rejects malformed objects and values", () =>
   }
 });
 
+test("Spotify service configuration rejects inherited required fields", () => {
+  const inheritedTopLevelConfiguration: unknown =
+    Object.create(validConfiguration);
+  const inheritedAuthorizationConfiguration: object = Object.create(
+    validConfiguration.authorization,
+  );
+  const inheritedAuthorizationField: unknown = {
+    ...validConfiguration,
+    authorization: inheritedAuthorizationConfiguration,
+  };
+
+  assert.deepEqual(
+    expectFailure(
+      parseSpotifyServiceConfiguration(inheritedTopLevelConfiguration),
+    ),
+    configurationFailure("$.authorization", "missing-value"),
+  );
+  assert.deepEqual(
+    expectFailure(
+      parseSpotifyServiceConfiguration(inheritedAuthorizationField),
+    ),
+    configurationFailure(
+      "$.authorization.authorizationAddress",
+      "missing-value",
+    ),
+  );
+});
+
 function configurationFailure(
   path: string,
   code: SpotifyServiceConfigurationParseFailure["code"],

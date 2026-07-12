@@ -54,6 +54,20 @@ export type SpotifyServiceConfigurationParseFailure = {
     | "unexpected-key";
 };
 
+export function buildSpotifyAuthorizationUrl(
+  authorization: SpotifyAuthorizationConfiguration,
+): string {
+  const authorizationUrl = new URL(authorization.authorizationAddress);
+  const parameters = authorizationUrl.searchParams;
+
+  parameters.set("client_id", authorization.spotifyClientId);
+  parameters.set("response_type", authorization.responseType);
+  parameters.set("redirect_uri", authorization.callbackAddress);
+  parameters.set("scope", authorization.scopes.join(" "));
+
+  return authorizationUrl.toString();
+}
+
 export function parseSpotifyServiceConfiguration(
   input: unknown,
 ): Result<
@@ -354,7 +368,7 @@ function readRequired(
   key: string,
   path: string,
 ): Result<unknown, SpotifyServiceConfigurationParseFailure> {
-  if (!(key in source)) {
+  if (!Object.hasOwn(source, key)) {
     return failed(configurationFailure(path, "missing-value"));
   }
 
