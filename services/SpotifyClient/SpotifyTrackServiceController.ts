@@ -1,33 +1,32 @@
 import fs from "node:fs";
 import path from "node:path";
-import {
-  failurePlaybackWireState,
-  type PlaybackStreamOutcome,
-} from "@/domain/playback-stream";
+import { failurePlaybackWireState } from "@/domain/playback-stream";
+import type { PlaybackStreamOutcome } from "@/domain/playback-stream";
 import { providerFailure } from "@/domain/playback";
-import type { AuthCode, RefreshToken } from "@/types/Auth";
-import type { SpotifyProperties } from "@/types/SpotifyProperties";
+import type { AuthorizationCode, RefreshToken } from "@/domain/playback";
 import { SpotifyTrackListener } from "./SpotifyTrackListener";
+import { parseSpotifyServiceConfiguration } from "./SpotifyServiceConfiguration";
+import type { SpotifyServiceConfiguration } from "./SpotifyServiceConfiguration";
 
 class SpotifyTrackServiceController {
   private isRunning = false;
   private spotifyTrackListener: SpotifyTrackListener | undefined;
-  private readonly config: SpotifyProperties;
+  private readonly configuration: SpotifyServiceConfiguration;
 
-  public constructor(config: SpotifyProperties) {
-    this.config = config;
+  public constructor(configuration: SpotifyServiceConfiguration) {
+    this.configuration = configuration;
   }
 
-  public startServiceFromAuthCode(authCode: AuthCode): void {
+  public startServiceFromAuthorizationCode(
+    authorizationCode: AuthorizationCode,
+  ): void {
     this.stopExistingListener();
     this.isRunning = true;
-    this.spotifyTrackListener = SpotifyTrackListener.createWithAuthCode(
-      authCode,
-      this.config.refresh,
-      this.config.trackAgent,
-      this.config.authorization.callbackAddress,
-      `${this.config.authorization.spotifyClientId}:${this.config.authorization.spotifyClientSecret}`,
-    );
+    this.spotifyTrackListener =
+      SpotifyTrackListener.createWithAuthorizationCode(
+        authorizationCode,
+        this.configuration,
+      );
   }
 
   public startServiceFromRefreshToken(refreshToken: RefreshToken): void {
@@ -35,10 +34,7 @@ class SpotifyTrackServiceController {
     this.isRunning = true;
     this.spotifyTrackListener = SpotifyTrackListener.createWithRefreshToken(
       refreshToken,
-      this.config.refresh,
-      this.config.trackAgent,
-      this.config.authorization.callbackAddress,
-      `${this.config.authorization.spotifyClientId}:${this.config.authorization.spotifyClientSecret}`,
+      this.configuration,
     );
   }
 
@@ -63,11 +59,14 @@ class SpotifyTrackServiceController {
   }
 
   public getAuthUrl(): string {
-    return `${this.config.authorization.authorizationAddress}?client_id=${this.config.authorization.spotifyClientId}&response_type=${this.config.authorization.responseType}&redirect_uri=${this.config.authorization.callbackAddress}&scope=${this.config.authorization.scopes}`;
+    const authorization = this.configuration.authorization;
+    const scopes = authorization.scopes.join(" ");
+
+    return `${authorization.authorizationAddress}?client_id=${authorization.spotifyClientId}&response_type=${authorization.responseType}&redirect_uri=${authorization.callbackAddress}&scope=${scopes}`;
   }
 
   public getTimeoutMs(): number {
-    return this.config.trackAgent.spotifyTrackRefreshIntervalMs;
+    return this.configuration.trackAgent.spotifyTrackRefreshIntervalMs;
   }
 
   private stopExistingListener(): void {
@@ -81,11 +80,8 @@ class SingletonWrapper {
 
   public static getInstance(): SpotifyTrackServiceController {
     if (SingletonWrapper.instance === undefined) {
-      const source: unknown = JSON.parse(
-        fs.readFileSync(path.join(process.cwd(), "appconfig.json"), "utf8"),
-      );
       SingletonWrapper.instance = new SpotifyTrackServiceController(
-        parseSpotifyProperties(source),
+        loadSpotifyServiceConfiguration(),
       );
     }
 
@@ -93,68 +89,35 @@ class SingletonWrapper {
   }
 }
 
-export const spotifyTrackService = SingletonWrapper.getInstance();
+export const spotifyTrackService: SpotifyTrackServiceController =
+  SingletonWrapper.getInstance();
 
-function parseSpotifyProperties(input: unknown): SpotifyProperties {
-  if (!isSpotifyProperties(input)) {
-    throw new Error("Invalid Spotify service configuration");
+function loadSpotifyServiceConfiguration(): SpotifyServiceConfiguration {
+  let source: unknown;
+  try {
+    source = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "appconfig.json"), "utf8"),
+    );
+  } catch (error: unknown) {
+    throw configurationLoadError(error);
   }
 
-  return input;
-}
-
-function isSpotifyProperties(input: unknown): input is SpotifyProperties {
-  if (!isUnknownJsonObject(input)) {
-    return false;
+  const configuration = parseSpotifyServiceConfiguration(source);
+  if (configuration.kind === "failure") {
+    throw new Error(
+      `Invalid Spotify service configuration at ${configuration.error.path}`,
+    );
   }
 
-  return (
-    isAuthorizationProperties(input["authorization"]) &&
-    isTrackAgentProperties(input["trackAgent"]) &&
-    isRefreshProperties(input["refresh"])
-  );
+  return configuration.value;
 }
 
-function isAuthorizationProperties(input: unknown): boolean {
-  if (!isUnknownJsonObject(input)) {
-    return false;
+function configurationLoadError(error: unknown): Error {
+  if (error instanceof Error) {
+    return new Error("Unable to load Spotify service configuration", {
+      cause: error,
+    });
   }
 
-  return (
-    typeof input["authorizationAddress"] === "string" &&
-    typeof input["scopes"] === "string" &&
-    typeof input["responseType"] === "string" &&
-    typeof input["callbackAddress"] === "string" &&
-    typeof input["spotifyClientId"] === "string" &&
-    typeof input["spotifyClientSecret"] === "string"
-  );
-}
-
-function isTrackAgentProperties(input: unknown): boolean {
-  if (!isUnknownJsonObject(input)) {
-    return false;
-  }
-
-  return (
-    typeof input["currentlyPlayingAddress"] === "string" &&
-    typeof input["spotifyTrackRefreshIntervalMs"] === "number" &&
-    (typeof input["artworkSize"] === "string" || input["artworkSize"] === null)
-  );
-}
-
-function isRefreshProperties(input: unknown): boolean {
-  if (!isUnknownJsonObject(input)) {
-    return false;
-  }
-
-  return (
-    typeof input["authTokenRefreshAddress"] === "string" &&
-    typeof input["authTokenRefreshIntervalMs"] === "number"
-  );
-}
-
-function isUnknownJsonObject(input: unknown): input is {
-  readonly [key: string]: unknown;
-} {
-  return typeof input === "object" && input !== null && !Array.isArray(input);
+  return new Error("Unable to load Spotify service configuration");
 }

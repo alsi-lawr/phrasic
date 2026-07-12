@@ -1,8 +1,10 @@
 import {
   emptyPlaybackWireState,
   failurePlaybackWireState,
-  type PlaybackStreamOutcome,
-  type PlaybackWireState,
+} from "@/domain/playback-stream";
+import type {
+  PlaybackStreamOutcome,
+  PlaybackWireState,
 } from "@/domain/playback-stream";
 import { providerFailure } from "@/domain/playback";
 import { spotifyTrackService } from "@/services/SpotifyClient/SpotifyTrackServiceController";

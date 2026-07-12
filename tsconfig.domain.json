@@ -9,6 +9,9 @@
     "test/playback-domain.test.ts",
     "test/playback-stream.test.ts",
     "test/spotify-playback.test.ts",
+    "test/spotify-authorization-request.test.ts",
+    "test/spotify-service-configuration.test.ts",
+    "test/spotify-token-response.test.ts",
     "test/types/**/*.ts"
   ],
   "exclude": ["node_modules", ".next"]

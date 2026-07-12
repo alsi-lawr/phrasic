@@ -5,19 +5,22 @@ import {
   failurePlaybackWireState,
   initialPlaybackStreamCursor,
   serializePlaybackState,
-  type PlaybackStreamCursor,
-  type PlaybackStreamOutcome,
-  type PlaybackWireState,
 } from "@/domain/playback-stream";
-import { providerFailure, type PlaybackFailure } from "@/domain/playback";
+import type {
+  PlaybackStreamCursor,
+  PlaybackStreamOutcome,
+  PlaybackWireState,
+} from "@/domain/playback-stream";
+import { providerFailure } from "@/domain/playback";
+import type { PlaybackFailure } from "@/domain/playback";
 import { parseSpotifyPlaybackPayload } from "@/providers/spotify/playback";
-import type { TrackAgentProperties } from "@/types/SpotifyProperties";
+import type { SpotifyTrackAgentConfiguration } from "./SpotifyServiceConfiguration";
 
 export class SpotifyTrackAgent {
-  private readonly config: TrackAgentProperties;
+  private readonly config: SpotifyTrackAgentConfiguration;
   private cursor: PlaybackStreamCursor;
 
-  public constructor(config: TrackAgentProperties) {
+  public constructor(config: SpotifyTrackAgentConfiguration) {
     this.config = config;
     this.cursor = initialPlaybackStreamCursor();
   }

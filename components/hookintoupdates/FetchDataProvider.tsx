@@ -4,8 +4,8 @@ import {
   emptyPlaybackWireState,
   failurePlaybackWireState,
   parsePlaybackWireEvent,
-  type PlaybackWireState,
 } from "@/domain/playback-stream";
+import type { PlaybackWireState } from "@/domain/playback-stream";
 import { providerFailure } from "@/domain/playback";
 import {
   createContext,
@@ -31,6 +31,7 @@ export function FetchDataProvider({
   children,
 }: FetchDataProviderProps): ReactElement {
   const [state, setState] = useState<PlaybackWireState>(emptyPlaybackWireState);
+  const value: FetchDataContextValue = Object.freeze({ state });
 
   useEffect((): (() => void) => {
     const eventSource = new EventSource("/api/spotify/hook");
@@ -49,7 +50,7 @@ export function FetchDataProvider({
   }, []);
 
   return (
-    <FetchDataContext.Provider value={{ state }}>
+    <FetchDataContext.Provider value={value}>
       {children}
     </FetchDataContext.Provider>
   );

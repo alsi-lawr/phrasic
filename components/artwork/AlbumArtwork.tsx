@@ -1,7 +1,5 @@
-import {
-  currentPlaybackWireItem,
-  type PlaybackWireItemAvailability,
-} from "@/domain/playback-stream";
+import { currentPlaybackWireItem } from "@/domain/playback-stream";
+import type { PlaybackWireItemAvailability } from "@/domain/playback-stream";
 import type { ReactElement } from "react";
 import { useFetchData } from "../hookintoupdates/FetchDataHook";
 import "./Artwork.css";

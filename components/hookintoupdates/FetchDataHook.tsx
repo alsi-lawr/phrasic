@@ -1,8 +1,6 @@
 import { useContext } from "react";
-import {
-  FetchDataContext,
-  type FetchDataContextValue,
-} from "./FetchDataProvider";
+import { FetchDataContext } from "./FetchDataProvider";
+import type { FetchDataContextValue } from "./FetchDataProvider";
 
 export function useFetchData(): FetchDataContextValue {
   const context = useContext(FetchDataContext);

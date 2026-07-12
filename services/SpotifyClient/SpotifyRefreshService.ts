@@ -1,87 +1,95 @@
-import { RefreshProperties } from "@/types/SpotifyProperties";
-import { storeToken } from "../SpotifyAuthHook";
-import axios, { AxiosRequestConfig } from "axios";
+import axios from "axios";
+import type { AxiosRequestConfig } from "axios";
+import type {
+  AuthorizationCode,
+  RefreshToken,
+  Result,
+} from "../../domain/playback";
+import { storeRefreshToken } from "../SpotifyAuthHook";
+import {
+  parseSpotifyAccessTokenRefreshResponse,
+  parseSpotifyAuthorizationCodeTokenResponse,
+} from "./SpotifyTokenResponse";
+import type {
+  SpotifyAccessTokenRefreshResponse,
+  SpotifyAuthorizationCodeTokenResponse,
+  SpotifyTokenResponseParseFailure,
+} from "./SpotifyTokenResponse";
+import type {
+  SpotifyAuthorizationConfiguration,
+  SpotifyRefreshConfiguration,
+} from "./SpotifyServiceConfiguration";
 
 export class RefreshTokenService {
-  private refreshConfig: RefreshProperties;
-  private refreshToken: string | null = null;
-  private callbackAddress: string;
-  private spotifyAuthKey: string;
+  private readonly refreshConfiguration: SpotifyRefreshConfiguration;
+  private readonly callbackAddress: string;
+  private readonly spotifyAuthKey: string;
 
-  constructor(
-    refreshConfig: RefreshProperties,
-    callbackAddress: string,
-    spotifyAuthKey: string,
+  public constructor(
+    refreshConfiguration: SpotifyRefreshConfiguration,
+    authorizationConfiguration: SpotifyAuthorizationConfiguration,
   ) {
-    this.refreshConfig = refreshConfig;
-    this.callbackAddress = callbackAddress;
-    this.spotifyAuthKey = spotifyAuthKey;
+    this.refreshConfiguration = refreshConfiguration;
+    this.callbackAddress = authorizationConfiguration.callbackAddress;
+    this.spotifyAuthKey = `${authorizationConfiguration.spotifyClientId}:${authorizationConfiguration.spotifyClientSecret}`;
   }
 
-  setRefreshToken(refreshToken: string) {
-    this.refreshToken = refreshToken;
-  }
-
-  async getNewRefreshToken(authCode: string): Promise<RefreshTokenResult> {
-    const refreshUrl = this.refreshConfig.authTokenRefreshAddress;
-    const response = await axios.post(
-      refreshUrl,
-      this.getURLParams(authCode),
-      this.getRequestHeaders(),
+  public async exchangeAuthorizationCode(
+    authorizationCode: AuthorizationCode,
+  ): Promise<
+    Result<
+      SpotifyAuthorizationCodeTokenResponse,
+      SpotifyTokenResponseParseFailure
+    >
+  > {
+    const response = await axios.post<unknown>(
+      this.refreshConfiguration.authTokenRefreshAddress,
+      this.authorizationCodeParameters(authorizationCode),
+      this.requestHeaders(),
     );
-    const result = await response.data;
-    if (result.access_token && result.expires_in && result.refresh_token) {
-      await storeToken(result.refresh_token);
-      this.setRefreshToken(result.refresh_token);
-      return {
-        refresh_token: result.refresh_token,
-        access_token: result.access_token,
-        expires_in: result.expires_in,
-      };
-    }
-
-    throw new Error("Failed to get refresh token");
-  }
-
-  async getNewAccessToken(): Promise<RefreshTokenResult> {
-    const refreshUrl = this.refreshConfig.authTokenRefreshAddress;
-    const response = await axios.post(
-      refreshUrl,
-      this.getURLParams(),
-      this.getRequestHeaders(),
+    const tokenResponse = parseSpotifyAuthorizationCodeTokenResponse(
+      response.data,
     );
-    const result = await response.data;
-    if (result.access_token && result.expires_in) {
-      return {
-        refresh_token: null,
-        access_token: result.access_token,
-        expires_in: result.expires_in,
-      };
+    if (tokenResponse.kind === "failure") {
+      return tokenResponse;
     }
 
-    throw new Error("Failed to refresh access token");
+    await storeRefreshToken(tokenResponse.value.refreshToken);
+    return tokenResponse;
   }
 
-  private getURLParams(authCode?: string | null): URLSearchParams {
-    if (this.refreshToken) {
-      return new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: this.refreshToken,
-      });
-    }
+  public async refreshAccessToken(
+    refreshToken: RefreshToken,
+  ): Promise<
+    Result<SpotifyAccessTokenRefreshResponse, SpotifyTokenResponseParseFailure>
+  > {
+    const response = await axios.post<unknown>(
+      this.refreshConfiguration.authTokenRefreshAddress,
+      this.refreshTokenParameters(refreshToken),
+      this.requestHeaders(),
+    );
 
-    if (!authCode) {
-      throw new Error("No auth code provided");
-    }
+    return parseSpotifyAccessTokenRefreshResponse(response.data);
+  }
 
+  private authorizationCodeParameters(
+    authorizationCode: AuthorizationCode,
+  ): URLSearchParams {
     return new URLSearchParams({
       grant_type: "authorization_code",
-      code: authCode,
+      code: authorizationCode.value,
       redirect_uri: this.callbackAddress,
     });
   }
 
-  private getRequestHeaders(): AxiosRequestConfig<URLSearchParams> | undefined {
+  private refreshTokenParameters(refreshToken: RefreshToken): URLSearchParams {
+    return new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken.value,
+    });
+  }
+
+  private requestHeaders(): AxiosRequestConfig<URLSearchParams> {
     return {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -91,9 +99,3 @@ export class RefreshTokenService {
     };
   }
 }
-
-type RefreshTokenResult = {
-  refresh_token: string | null;
-  access_token: string;
-  expires_in: number;
-};
