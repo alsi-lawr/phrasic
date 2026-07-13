@@ -13,7 +13,25 @@ export type OverlaySetupMode =
       readonly kind: "setup";
     };
 
+type InvalidOverlayDisplayQueryDiagnostic = {
+  readonly kind: "invalid-display-query";
+  readonly reason:
+    | "fractional-display-width"
+    | "malformed-display-width"
+    | "out-of-range-display-width"
+    | "repeated-display-query-parameter"
+    | "unsafe-display-width"
+    | "unsupported-display-query";
+};
+
+export type OverlayDisplayDiagnostic =
+  | {
+      readonly kind: "none";
+    }
+  | InvalidOverlayDisplayQueryDiagnostic;
+
 export type OverlayGeometry = {
+  readonly diagnostic: OverlayDisplayDiagnostic;
   readonly height: OverlayDisplayHeight;
   readonly setupMode: OverlaySetupMode;
   readonly viewBox: typeof overlayViewBox;
@@ -23,6 +41,7 @@ export type OverlayGeometry = {
 type OverlayDisplayQuery =
   | {
       readonly kind: "invalid";
+      readonly diagnostic: InvalidOverlayDisplayQueryDiagnostic;
     }
   | {
       readonly kind: "none";
@@ -41,6 +60,9 @@ type OverlayDisplayQuery =
 
 const overlayMode: OverlaySetupMode = Object.freeze({ kind: "overlay" });
 const setupMode: OverlaySetupMode = Object.freeze({ kind: "setup" });
+const noDisplayDiagnostic: OverlayDisplayDiagnostic = Object.freeze({
+  kind: "none",
+});
 
 export class OverlayDisplayWidth {
   private readonly pixels: number;
@@ -86,6 +108,7 @@ export function resolveOverlayGeometry(
   const display = parseDisplayQuery(parameters);
   const width = OverlayDisplayWidth.fromDisplayQuery(display);
   const geometry: OverlayGeometry = {
+    diagnostic: displayDiagnostic(display),
     height: OverlayDisplayHeight.fromWidth(width),
     setupMode: displaySetupMode(display),
     viewBox: overlayViewBox,
@@ -98,19 +121,19 @@ export function resolveOverlayGeometry(
 function parseDisplayQuery(parameters: URLSearchParams): OverlayDisplayQuery {
   for (const name of parameters.keys()) {
     if (name !== "setup" && name !== "width") {
-      return frozenInvalidDisplayQuery();
+      return frozenInvalidDisplayQuery("unsupported-display-query");
     }
   }
 
   const widthValues = parameters.getAll("width");
   const setupValues = parameters.getAll("setup");
   if (widthValues.length > 1 || setupValues.length > 1) {
-    return frozenInvalidDisplayQuery();
+    return frozenInvalidDisplayQuery("repeated-display-query-parameter");
   }
 
   const hasSetup = setupValues.length === 1;
   if (hasSetup && setupValues[0] !== "1") {
-    return frozenInvalidDisplayQuery();
+    return frozenInvalidDisplayQuery("unsupported-display-query");
   }
 
   if (widthValues.length === 0) {
@@ -118,22 +141,49 @@ function parseDisplayQuery(parameters: URLSearchParams): OverlayDisplayQuery {
   }
 
   const widthValue = widthValues[0];
-  if (widthValue === undefined || !/^\d+$/.test(widthValue)) {
-    return frozenInvalidDisplayQuery();
+  if (widthValue === undefined) {
+    return frozenInvalidDisplayQuery("malformed-display-width");
+  }
+
+  if (/^\d+\.\d+$/.test(widthValue)) {
+    return frozenInvalidDisplayQuery("fractional-display-width");
+  }
+
+  if (!/^\d+$/.test(widthValue)) {
+    return frozenInvalidDisplayQuery("malformed-display-width");
   }
 
   const width = Number(widthValue);
+  if (!Number.isSafeInteger(width)) {
+    return frozenInvalidDisplayQuery("unsafe-display-width");
+  }
+
   if (
-    !Number.isSafeInteger(width) ||
     width < minimumOverlayDisplayWidth ||
     width > maximumOverlayDisplayWidth
   ) {
-    return frozenInvalidDisplayQuery();
+    return frozenInvalidDisplayQuery("out-of-range-display-width");
   }
 
   return hasSetup
     ? frozenWidthAndSetupDisplayQuery(width)
     : frozenWidthDisplayQuery(width);
+}
+
+function displayDiagnostic(
+  display: OverlayDisplayQuery,
+): OverlayDisplayDiagnostic {
+  switch (display.kind) {
+    case "invalid":
+      return display.diagnostic;
+    case "none":
+    case "setup":
+    case "width":
+    case "width-and-setup":
+      return noDisplayDiagnostic;
+  }
+
+  return unreachable(display);
 }
 
 function displayWidth(display: OverlayDisplayQuery): number {
@@ -164,8 +214,15 @@ function displaySetupMode(display: OverlayDisplayQuery): OverlaySetupMode {
   return unreachable(display);
 }
 
-function frozenInvalidDisplayQuery(): OverlayDisplayQuery {
-  return Object.freeze({ kind: "invalid" });
+function frozenInvalidDisplayQuery(
+  reason: InvalidOverlayDisplayQueryDiagnostic["reason"],
+): OverlayDisplayQuery {
+  const diagnostic: InvalidOverlayDisplayQueryDiagnostic = Object.freeze({
+    kind: "invalid-display-query",
+    reason,
+  });
+
+  return Object.freeze({ kind: "invalid", diagnostic });
 }
 
 function frozenNoDisplayQuery(): OverlayDisplayQuery {

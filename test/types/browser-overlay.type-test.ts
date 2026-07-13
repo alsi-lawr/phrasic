@@ -3,8 +3,10 @@ import type { BrowserPlaybackApplication } from "../../browser/application.ts";
 import SpotifyNowPlayingOverlay from "../../components/overlay/SpotifyNowPlayingOverlay.tsx";
 import {
   resolveOverlayGeometry,
+  type OverlayDisplayDiagnostic,
   type OverlaySetupMode,
 } from "../../components/overlay/overlay-geometry.ts";
+import { OverlaySetupDiagnostic } from "../../components/overlay/OverlaySetupDiagnostic.tsx";
 import type {
   OverlayControlPlan,
   OverlayUiState,
@@ -19,6 +21,16 @@ const geometry = resolveOverlayGeometry(new URLSearchParams("width=1920"));
 declare const overlayState: OverlayUiState;
 declare const controlPlan: OverlayControlPlan;
 declare const setupMode: OverlaySetupMode;
+declare const displayDiagnostic: OverlayDisplayDiagnostic;
+const noDisplayDiagnostic: OverlayDisplayDiagnostic = Object.freeze({
+  kind: "none",
+});
+const invalidDisplayDiagnostic: OverlayDisplayDiagnostic = Object.freeze({
+  kind: "invalid-display-query",
+  reason: "fractional-display-width",
+});
+const setupDiagnosticProps: ComponentProps<typeof OverlaySetupDiagnostic> =
+  Object.freeze({ diagnostic: displayDiagnostic });
 
 // @ts-expect-error The overlay application prop remains readonly.
 props.application = application;
@@ -30,6 +42,20 @@ geometry.height.value = 200;
 const invalidReconnectingState: OverlayUiState = { kind: "reconnecting" };
 // @ts-expect-error Setup mode is discriminated instead of a boolean behavior flag.
 const invalidSetupMode: OverlaySetupMode = { kind: "setup", enabled: true };
+const invalidDisplayDiagnosticReason: OverlayDisplayDiagnostic = {
+  kind: "invalid-display-query",
+  // @ts-expect-error Display diagnostics only expose declared safe query failure reasons.
+  reason: "user-provided-query",
+};
+// @ts-expect-error Diagnostic presence is a discriminated union, not a nullable flag.
+const nullableDisplayDiagnostic: OverlayDisplayDiagnostic = null;
+// @ts-expect-error Diagnostic presence is a discriminated union, not a string flag.
+const stringDisplayDiagnostic: OverlayDisplayDiagnostic =
+  "invalid-display-query";
+// @ts-expect-error Geometry diagnostics remain readonly.
+geometry.diagnostic = noDisplayDiagnostic;
+// @ts-expect-error Setup diagnostic props remain readonly.
+setupDiagnosticProps.diagnostic = noDisplayDiagnostic;
 // @ts-expect-error Retry controls are only available together with disconnect controls.
 const invalidControlPlan: OverlayControlPlan = { kind: "retry" };
 
@@ -68,11 +94,31 @@ function overlayControlPlanKind(
   return unhandledPlan;
 }
 
+function overlayDisplayDiagnosticKind(
+  diagnostic: OverlayDisplayDiagnostic,
+): OverlayDisplayDiagnostic["kind"] {
+  switch (diagnostic.kind) {
+    case "none":
+    case "invalid-display-query":
+      return diagnostic.kind;
+  }
+
+  const unhandledDiagnostic: never = diagnostic;
+  return unhandledDiagnostic;
+}
+
 void props;
 void geometry;
 void invalidReconnectingState;
 void invalidSetupMode;
+void invalidDisplayDiagnosticReason;
+void nullableDisplayDiagnostic;
+void stringDisplayDiagnostic;
 void invalidControlPlan;
 void overlayStateKind(overlayState);
 void overlayControlPlanKind(controlPlan);
+void overlayDisplayDiagnosticKind(displayDiagnostic);
+void noDisplayDiagnostic;
+void invalidDisplayDiagnostic;
+void setupDiagnosticProps;
 void setupMode;

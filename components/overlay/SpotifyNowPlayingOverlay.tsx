@@ -9,6 +9,7 @@ import {
   OverlaySemanticCompanion,
   overlaySemanticHeadingId,
 } from "./OverlaySemanticCompanion.tsx";
+import { OverlaySetupDiagnostic } from "./OverlaySetupDiagnostic.tsx";
 import { semanticViewForOverlayState } from "./overlay-semantics.ts";
 import {
   controlPlanForOverlayState,
@@ -55,6 +56,7 @@ function SpotifyNowPlayingOverlayContent(): ReactElement {
         spotifyLinks={semantic.spotifyLinks}
         state={state}
       />
+      <OverlaySetupDiagnostic diagnostic={geometry.diagnostic} />
       <OverlayControls
         actions={{ beginAuthorization, logout, retry }}
         plan={controls}
