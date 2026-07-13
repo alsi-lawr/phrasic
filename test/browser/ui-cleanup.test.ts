@@ -26,7 +26,10 @@ const retiredUiPaths: ReadonlyArray<string> = Object.freeze([
   "components/overlay/overlay-artwork.ts",
   "public/fonts/GeistMonoVF.woff",
 ]);
-const expectedGlobals = `@import "tailwindcss";
+const expectedGlobals = `@import "tailwindcss" source(none);
+@source "../browser";
+@source "../components";
+@source "../spotify/index.html";
 
 @font-face {
   font-family: "Geist";
@@ -64,12 +67,19 @@ const expectedGlobals = `@import "tailwindcss";
 }
 `;
 
-test("the browser overlay ships only the active Tailwind UI contract", () => {
+test("the sole stylesheet contains only the authorized Tailwind source contract", () => {
   assert.deepEqual([...projectPathsWithExtension(projectRoot, ".css")].sort(), [
     "browser/globals.css",
   ]);
   assert.equal(readProjectText("browser/globals.css"), expectedGlobals);
+  assert.deepEqual(
+    [...expectedGlobals.matchAll(/^@([a-z-]+)/gm)].map((match) => match[1]),
+    ["import", "source", "source", "source", "font-face", "theme"],
+  );
+  assert.equal((expectedGlobals.match(/@font-face\b/g) ?? []).length, 1);
+});
 
+test("the browser overlay ships only the active Tailwind UI contract", () => {
   for (const retiredPath of retiredUiPaths) {
     assert.equal(existsSync(join(projectRoot, retiredPath)), false);
   }

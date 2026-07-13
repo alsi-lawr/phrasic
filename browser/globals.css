@@ -1,4 +1,7 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source "../browser";
+@source "../components";
+@source "../spotify/index.html";
 
 @font-face {
   font-family: "Geist";
