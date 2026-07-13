@@ -8,12 +8,14 @@ export type MarqueeOverflowDecision =
       readonly kind: "contained";
     }
   | {
+      readonly endX: number;
       readonly kind: "overflowing";
       readonly measuredWidth: number;
+      readonly startX: number;
       readonly travelDistance: number;
     };
 
-const marqueeGap = 160;
+export const marqueeAnimationDurationSeconds = 20;
 const containedDecision: MarqueeOverflowDecision = Object.freeze({
   kind: "contained",
 });
@@ -26,9 +28,11 @@ export function marqueeDecisionForTextBounds(
   }
 
   const decision: MarqueeOverflowDecision = {
+    endX: -bounds.measuredWidth,
     kind: "overflowing",
     measuredWidth: bounds.measuredWidth,
-    travelDistance: bounds.measuredWidth + marqueeGap,
+    startX: bounds.availableWidth,
+    travelDistance: bounds.availableWidth + bounds.measuredWidth,
   };
 
   return Object.freeze(decision);

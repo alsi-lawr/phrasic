@@ -1,5 +1,9 @@
 import type { ReactElement } from "react";
-import type { OverlayMotionDecision } from "./overlay-motion.ts";
+import {
+  fallbackVinylRotationDurationSeconds,
+  type OverlayMotionDecision,
+} from "./overlay-motion.ts";
+import { fallbackVinylClasses } from "./overlay-presentation.ts";
 
 type FallbackVinylProps = {
   readonly motion: OverlayMotionDecision;
@@ -9,33 +13,34 @@ export function FallbackVinyl({ motion }: FallbackVinylProps): ReactElement {
   return (
     <g>
       <FallbackVinylRotation motion={motion} />
-      <circle cx={540} cy={540} r={412} className="fill-overlay-vinyl-base" />
+      <circle cx={540} cy={540} r={430} className={fallbackVinylClasses.disc} />
+      <circle cx={540} cy={540} r={404} className={fallbackVinylClasses.rim} />
       <circle
         cx={540}
         cy={540}
-        r={364}
-        className="fill-none stroke-overlay-vinyl-groove stroke-22"
+        r={338}
+        className={fallbackVinylClasses.groove}
       />
       <circle
         cx={540}
         cy={540}
-        r={292}
-        className="fill-none stroke-overlay-vinyl-groove-inner stroke-18"
+        r={258}
+        className={fallbackVinylClasses.groove}
       />
       <circle
         cx={540}
         cy={540}
-        r={220}
-        className="fill-none stroke-overlay-vinyl-groove stroke-14"
+        r={178}
+        className={fallbackVinylClasses.groove}
       />
       <circle
         cx={540}
         cy={540}
-        r={130}
-        className="fill-overlay-status-active"
+        r={128}
+        className={fallbackVinylClasses.label}
       />
-      <circle cx={540} cy={540} r={42} className="fill-overlay-vinyl-label" />
-      <circle cx={540} cy={540} r={12} className="fill-overlay-vinyl-base" />
+      <circle cx={540} cy={540} r={42} className={fallbackVinylClasses.hub} />
+      <circle cx={540} cy={540} r={12} className={fallbackVinylClasses.disc} />
     </g>
   );
 }
@@ -55,7 +60,8 @@ function FallbackVinylRotation({
           type="rotate"
           from="0 540 540"
           to="360 540 540"
-          dur="18s"
+          dur={`${fallbackVinylRotationDurationSeconds}s`}
+          calcMode="linear"
           repeatCount="indefinite"
         />
       );

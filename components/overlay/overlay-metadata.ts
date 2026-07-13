@@ -135,6 +135,20 @@ export function overlayItemIdentityKey(identity: OverlayItemIdentity): string {
   return `${providerId.length}:${providerId}${itemId.length}:${itemId}`;
 }
 
+export function overlayMetadataAnimationIdentityKey(
+  metadata: OverlayMetadataView,
+): string {
+  switch (metadata.kind) {
+    case "track":
+    case "episode":
+      return overlayItemIdentityKey(metadata.itemIdentity);
+    case "status":
+      return statusMetadataAnimationIdentityKey(metadata);
+  }
+
+  return unreachable(metadata);
+}
+
 function itemMetadataView(
   item: NowPlayingItem,
   presentation: OverlayItemMetadataPresentation,
@@ -206,6 +220,17 @@ function statusMetadataView(
   };
 
   return Object.freeze(metadata);
+}
+
+function statusMetadataAnimationIdentityKey(
+  metadata: OverlayStatusMetadataView,
+): string {
+  const category = metadata.category;
+  const title = metadata.title;
+  const subtitle = metadata.subtitle;
+  const context = metadata.context;
+
+  return `${category.length}:${category}${title.length}:${title}${subtitle.length}:${subtitle}${context.length}:${context}`;
 }
 
 function reconnectingMetadataView(

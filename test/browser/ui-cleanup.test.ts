@@ -22,6 +22,8 @@ const retiredUiPaths: ReadonlyArray<string> = Object.freeze([
   "components/songdetails/SongDetails.tsx",
   "components/title/Title.css",
   "components/title/Title.tsx",
+  "components/overlay/OverlayStatus.tsx",
+  "components/overlay/overlay-artwork.ts",
   "public/fonts/GeistMonoVF.woff",
 ]);
 const expectedGlobals = `@import "tailwindcss";
@@ -36,34 +38,29 @@ const expectedGlobals = `@import "tailwindcss";
 
 @theme {
   --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
-  --font-overlay-display: Arial, Helvetica, sans-serif;
+  --font-overlay-display: "Geist", ui-sans-serif, system-ui, sans-serif;
 
-  --color-overlay-artwork-surface: #05070a;
-  --color-overlay-border: #313b47;
-  --color-overlay-content-muted: #8f9baa;
-  --color-overlay-content-secondary: #d7dfe8;
-  --color-overlay-content-title: #f7fafc;
-  --color-overlay-rule: #35404d;
-  --color-overlay-shell: #0b0e12;
-  --color-overlay-status-active: #06ab4f;
-  --color-overlay-status-failure: #f2777a;
-  --color-overlay-status-neutral: #c9d2dc;
-  --color-overlay-status-warning: #f2b75d;
-  --color-overlay-surface: #151a20;
-  --color-overlay-vinyl-base: #030405;
-  --color-overlay-vinyl-groove: #202832;
-  --color-overlay-vinyl-groove-inner: #182029;
-  --color-overlay-vinyl-label: #d5e2d9;
+  --color-overlay-context: #737373;
+  --color-overlay-creator: #808080;
+  --color-overlay-detail: #a3a3a3;
+  --color-overlay-shell: #1e1e1e;
+  --color-overlay-status: #a3a3a3;
+  --color-overlay-title: #06ab4f;
+  --color-overlay-vinyl-disc: #36548e;
+  --color-overlay-vinyl-groove: #a5b9de;
+  --color-overlay-vinyl-hub: #1b2a59;
+  --color-overlay-vinyl-label: #87a7da;
+  --color-overlay-vinyl-rim: #7188bd;
 
-  --text-overlay-category: 82px;
-  --text-overlay-detail: 88px;
-  --text-overlay-subtitle: 126px;
-  --text-overlay-title: 258px;
+  --text-overlay-context-size: 54px;
+  --text-overlay-creator-size: 200px;
+  --text-overlay-detail-size: 72px;
+  --text-overlay-status-size: 112px;
+  --text-overlay-title-size: 300px;
 
-  --tracking-overlay-category: 12px;
   --tracking-overlay-context: 4px;
+  --tracking-overlay-detail: 2px;
   --tracking-overlay-normal: 0px;
-  --tracking-overlay-status: 10px;
 }
 `;
 
@@ -142,24 +139,24 @@ test("the active overlay SVG uses complete Tailwind presentation contracts", () 
   );
   assert.match(
     presentationSource,
-    /"font-overlay-display fill-overlay-content-title text-overlay-title font-bold tracking-overlay-normal"/,
+    /"font-overlay-display fill-overlay-title text-overlay-title-size font-normal tracking-overlay-normal"/,
   );
   assert.match(
     presentationSource,
-    /"font-overlay-display fill-overlay-content-secondary text-overlay-subtitle font-semibold tracking-overlay-normal"/,
+    /"font-overlay-display fill-overlay-creator text-overlay-creator-size font-semibold tracking-overlay-normal uppercase"/,
   );
   assert.match(
     presentationSource,
-    /"font-overlay-display fill-overlay-content-muted text-overlay-detail font-semibold tracking-overlay-context"/,
+    /"font-overlay-display fill-overlay-detail text-overlay-detail-size font-medium tracking-overlay-detail"/,
   );
-  assert.match(presentationSource, /fill-overlay-status-active/);
-  assert.match(presentationSource, /stroke-overlay-status-active/);
-  assert.match(presentationSource, /fill-overlay-status-failure/);
-  assert.match(presentationSource, /stroke-overlay-status-failure/);
-  assert.match(presentationSource, /fill-overlay-status-neutral/);
-  assert.match(presentationSource, /stroke-overlay-status-neutral/);
-  assert.match(presentationSource, /fill-overlay-status-warning/);
-  assert.match(presentationSource, /stroke-overlay-status-warning/);
+  assert.match(presentationSource, /"fill-overlay-shell opacity-90"/);
+  assert.match(presentationSource, /fill-overlay-vinyl-disc/);
+  assert.match(presentationSource, /stroke-overlay-vinyl-groove/);
+  assert.doesNotMatch(overlaySource, /fill-overlay-(?:border|surface|rule)/);
+  assert.doesNotMatch(
+    overlaySource,
+    /overlay-status-(?:active|failure|neutral|warning)/,
+  );
 });
 
 function fontFileNames(): ReadonlyArray<string> {

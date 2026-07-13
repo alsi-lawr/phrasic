@@ -1,35 +1,31 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  fallbackVinylClasses,
   overlayMetadataTextClasses,
-  statusColorClassesForTone,
+  overlayShellClass,
 } from "../../components/overlay/overlay-presentation.ts";
 
-test("overlay presentation variants preserve the approved complete Tailwind classes", () => {
+test("overlay presentation variants preserve the baseline hierarchy and vinyl treatment", () => {
   assert.deepEqual(overlayMetadataTextClasses, {
     context:
-      "font-overlay-display fill-overlay-content-muted text-overlay-detail font-semibold tracking-overlay-context",
-    subtitle:
-      "font-overlay-display fill-overlay-content-secondary text-overlay-subtitle font-semibold tracking-overlay-normal",
+      "font-overlay-display fill-overlay-context text-overlay-context-size font-medium tracking-overlay-context",
+    creator:
+      "font-overlay-display fill-overlay-creator text-overlay-creator-size font-semibold tracking-overlay-normal uppercase",
+    detail:
+      "font-overlay-display fill-overlay-detail text-overlay-detail-size font-medium tracking-overlay-detail",
+    status:
+      "font-overlay-display fill-overlay-status text-overlay-status-size font-semibold tracking-overlay-normal",
     title:
-      "font-overlay-display fill-overlay-content-title text-overlay-title font-bold tracking-overlay-normal",
+      "font-overlay-display fill-overlay-title text-overlay-title-size font-normal tracking-overlay-normal",
   });
   assert.equal(Object.isFrozen(overlayMetadataTextClasses), true);
-
-  assert.deepEqual(statusColorClassesForTone("active"), {
-    fill: "fill-overlay-status-active",
-    stroke: "stroke-overlay-status-active",
-  });
-  assert.deepEqual(statusColorClassesForTone("failure"), {
-    fill: "fill-overlay-status-failure",
-    stroke: "stroke-overlay-status-failure",
-  });
-  assert.deepEqual(statusColorClassesForTone("neutral"), {
-    fill: "fill-overlay-status-neutral",
-    stroke: "stroke-overlay-status-neutral",
-  });
-  assert.deepEqual(statusColorClassesForTone("warning"), {
-    fill: "fill-overlay-status-warning",
-    stroke: "stroke-overlay-status-warning",
+  assert.equal(overlayShellClass, "fill-overlay-shell opacity-90");
+  assert.deepEqual(fallbackVinylClasses, {
+    disc: "fill-overlay-vinyl-disc",
+    groove: "fill-none stroke-overlay-vinyl-groove stroke-8",
+    hub: "fill-overlay-vinyl-hub",
+    label: "fill-overlay-vinyl-label",
+    rim: "fill-none stroke-overlay-vinyl-rim stroke-8",
   });
 });

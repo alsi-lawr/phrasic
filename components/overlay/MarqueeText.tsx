@@ -6,21 +6,25 @@ import {
   useState,
 } from "react";
 import {
-  overlayItemIdentityKey,
-  type OverlayItemIdentity,
-} from "./overlay-metadata.ts";
-import {
+  marqueeAnimationDurationSeconds,
   marqueeDecisionForTextBounds,
   type MarqueeOverflowDecision,
 } from "./overlay-marquee.ts";
 import { type OverlayMotionDecision } from "./overlay-motion.ts";
+import {
+  type OverlayContentLine,
+  type OverlayTextMeasurementReporter,
+} from "./overlay-layout.ts";
 import { type OverlayMetadataTextClass } from "./overlay-presentation.ts";
 
 type MarqueeTextProps = {
-  readonly animationIdentity: OverlayItemIdentity;
+  readonly animationIdentityKey: string;
   readonly availableWidth: number;
   readonly clipPathId: string;
+  readonly measurementIdentity: string;
+  readonly measurementLine: OverlayContentLine;
   readonly motion: OverlayMotionDecision;
+  readonly onTextMeasurement: OverlayTextMeasurementReporter;
   readonly text: string;
   readonly textClass: OverlayMetadataTextClass;
   readonly x: number;
@@ -33,19 +37,24 @@ type MeasuredSvgTextOverflow = {
 };
 
 export function MarqueeText({
-  animationIdentity,
+  animationIdentityKey,
   availableWidth,
   clipPathId,
+  measurementIdentity,
+  measurementLine,
   motion,
+  onTextMeasurement,
   text,
   textClass,
   x,
   y,
 }: MarqueeTextProps): ReactElement {
-  const animationIdentityKey = overlayItemIdentityKey(animationIdentity);
   const { decision, textReference } = useMeasuredSvgTextOverflow({
     animationIdentityKey,
     availableWidth,
+    measurementIdentity,
+    measurementLine,
+    onTextMeasurement,
     text,
   });
 
@@ -186,15 +195,13 @@ function AnimatedMarqueeText({
         <animateTransform
           attributeName="transform"
           type="translate"
-          from="0 0"
-          to={`${-decision.travelDistance} 0`}
-          dur="12s"
+          from={`${decision.startX} 0`}
+          to={`${decision.endX} 0`}
+          dur={`${marqueeAnimationDurationSeconds}s`}
+          calcMode="linear"
           repeatCount="indefinite"
         />
         <text ref={textReference} x={x} y={y} className={textClass}>
-          {text}
-        </text>
-        <text x={x + decision.travelDistance} y={y} className={textClass}>
           {text}
         </text>
       </g>
@@ -205,16 +212,27 @@ function AnimatedMarqueeText({
 type MeasuredSvgTextOverflowOptions = {
   readonly animationIdentityKey: string;
   readonly availableWidth: number;
+  readonly measurementIdentity: string;
+  readonly measurementLine: OverlayContentLine;
+  readonly onTextMeasurement: OverlayTextMeasurementReporter;
   readonly text: string;
 };
 
 function useMeasuredSvgTextOverflow(
   options: MeasuredSvgTextOverflowOptions,
 ): MeasuredSvgTextOverflow {
+  const {
+    animationIdentityKey,
+    availableWidth,
+    measurementIdentity,
+    measurementLine,
+    onTextMeasurement,
+    text,
+  } = options;
   const textReference = useRef<SVGTextElement | null>(null);
   const [decision, setDecision] = useState<MarqueeOverflowDecision>(() =>
     marqueeDecisionForTextBounds({
-      availableWidth: options.availableWidth,
+      availableWidth,
       measuredWidth: 0,
     }),
   );
@@ -227,8 +245,14 @@ function useMeasuredSvgTextOverflow(
 
     const bounds = textElement.getBBox();
     const nextDecision = marqueeDecisionForTextBounds({
-      availableWidth: options.availableWidth,
+      availableWidth,
       measuredWidth: bounds.width,
+    });
+
+    onTextMeasurement({
+      identity: measurementIdentity,
+      line: measurementLine,
+      width: bounds.width,
     });
 
     setDecision((currentDecision) =>
@@ -236,7 +260,14 @@ function useMeasuredSvgTextOverflow(
         ? currentDecision
         : nextDecision,
     );
-  }, [options.animationIdentityKey, options.availableWidth, options.text]);
+  }, [
+    animationIdentityKey,
+    availableWidth,
+    measurementIdentity,
+    measurementLine,
+    onTextMeasurement,
+    text,
+  ]);
 
   return { decision, textReference };
 }
@@ -255,6 +286,8 @@ function sameMarqueeOverflowDecision(
 
   return (
     left.measuredWidth === right.measuredWidth &&
+    left.startX === right.startX &&
+    left.endX === right.endX &&
     left.travelDistance === right.travelDistance
   );
 }

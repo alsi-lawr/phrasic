@@ -2,6 +2,7 @@ import {
   overlayViewBoxWidth,
   type OverlayDisplayWidth,
 } from "./overlay-geometry.ts";
+import { overlayMetadataLayout } from "./overlay-layout.ts";
 
 export const spotifyFullLogoAsset = Object.freeze({
   archiveMember: "Full_Logo_White_RGB.svg",
@@ -21,13 +22,52 @@ export const spotifyFullLogoMinimumCssWidth = 70;
 export const spotifyFullLogoLayout = Object.freeze({
   height: 66,
   width: 240,
-  x: 1_360,
   y: 86,
+});
+
+export type SpotifyFullLogoPlacement =
+  | {
+      readonly kind: "hidden";
+    }
+  | {
+      readonly height: number;
+      readonly kind: "visible";
+      readonly width: number;
+      readonly x: number;
+      readonly y: number;
+    };
+
+const hiddenSpotifyFullLogoPlacement: SpotifyFullLogoPlacement = Object.freeze({
+  kind: "hidden",
 });
 
 export const spotifyFullLogoExclusionZone =
   ((spotifyFullLogoSourceViewBox.height / 2) * spotifyFullLogoLayout.width) /
   spotifyFullLogoSourceViewBox.width;
+
+export function spotifyFullLogoPlacementForShellWidth(
+  shellWidth: number,
+): SpotifyFullLogoPlacement {
+  const minimumShellWidth =
+    overlayMetadataLayout.x +
+    spotifyFullLogoLayout.width +
+    overlayMetadataLayout.rightPadding;
+
+  if (shellWidth < minimumShellWidth) {
+    return hiddenSpotifyFullLogoPlacement;
+  }
+
+  return Object.freeze({
+    height: spotifyFullLogoLayout.height,
+    kind: "visible",
+    width: spotifyFullLogoLayout.width,
+    x:
+      shellWidth -
+      overlayMetadataLayout.rightPadding -
+      spotifyFullLogoLayout.width,
+    y: spotifyFullLogoLayout.y,
+  });
+}
 
 export function spotifyFullLogoCssWidth(
   displayWidth: OverlayDisplayWidth,

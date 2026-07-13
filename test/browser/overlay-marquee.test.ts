@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { marqueeDecisionForTextBounds } from "../../components/overlay/overlay-marquee.ts";
+import {
+  marqueeAnimationDurationSeconds,
+  marqueeDecisionForTextBounds,
+} from "../../components/overlay/overlay-marquee.ts";
 
 test("SVG marquee activates only when measured text exceeds its available width", () => {
   const equalWidth = marqueeDecisionForTextBounds({
@@ -18,5 +21,8 @@ test("SVG marquee activates only when measured text exceeds its available width"
     throw new Error("Expected a marquee overflow decision.");
   }
   assert.equal(greaterWidth.measuredWidth, 3_097);
-  assert.equal(greaterWidth.travelDistance, 3_257);
+  assert.equal(greaterWidth.startX, 3_096);
+  assert.equal(greaterWidth.endX, -3_097);
+  assert.equal(greaterWidth.travelDistance, 6_193);
+  assert.equal(marqueeAnimationDurationSeconds, 20);
 });

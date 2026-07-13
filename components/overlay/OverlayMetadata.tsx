@@ -6,277 +6,373 @@ import {
   type OverlayMetadataView,
   type OverlayStatusMetadataView,
   type OverlayTrackMetadataView,
+  overlayMetadataAnimationIdentityKey,
 } from "./overlay-metadata.ts";
 import { type OverlayMotionDecision } from "./overlay-motion.ts";
 import {
-  overlayMetadataCategoryTextClass,
+  overlayMetadataLayout,
+  type OverlayTextLineLayout,
+  type OverlayTextMeasurementReporter,
+} from "./overlay-layout.ts";
+import {
   overlayMetadataTextClasses,
   type OverlayMetadataTextClass,
 } from "./overlay-presentation.ts";
 
-const metadataTextX = 1_344;
-const metadataTextAvailableWidth = 3_096;
-
-type OverlayTextLineLayout = {
-  readonly clipHeight: number;
-  readonly clipPathId: string;
-  readonly clipY: number;
-  readonly textClass: OverlayMetadataTextClass;
-  readonly x: number;
-  readonly y: number;
-};
-
-const titleLine: OverlayTextLineLayout = Object.freeze({
-  clipHeight: 302,
-  clipPathId: "overlay-metadata-title-clip",
-  clipY: 348,
-  textClass: overlayMetadataTextClasses.title,
-  x: metadataTextX,
-  y: 596,
-});
-const subtitleLine: OverlayTextLineLayout = Object.freeze({
-  clipHeight: 168,
-  clipPathId: "overlay-metadata-subtitle-clip",
-  clipY: 650,
-  textClass: overlayMetadataTextClasses.subtitle,
-  x: metadataTextX,
-  y: 748,
-});
-const contextLine: OverlayTextLineLayout = Object.freeze({
-  clipHeight: 126,
-  clipPathId: "overlay-metadata-context-clip",
-  clipY: 858,
-  textClass: overlayMetadataTextClasses.context,
-  x: metadataTextX,
-  y: 938,
-});
-
 type OverlayMetadataProps = {
+  readonly availableWidth: number;
   readonly metadata: OverlayMetadataView;
   readonly motion: OverlayMotionDecision;
+  readonly onTextMeasurement: OverlayTextMeasurementReporter;
 };
 
 export function OverlayMetadata({
+  availableWidth,
   metadata,
   motion,
+  onTextMeasurement,
 }: OverlayMetadataProps): ReactElement {
+  const animationIdentityKey = overlayMetadataAnimationIdentityKey(metadata);
+
   return (
     <g>
-      <MetadataClipPaths />
-      <MetadataView metadata={metadata} motion={motion} />
+      <MetadataClipPaths availableWidth={availableWidth} />
+      <MetadataView
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        metadata={metadata}
+        motion={motion}
+        onTextMeasurement={onTextMeasurement}
+      />
     </g>
   );
 }
 
 type MetadataViewProps = {
+  readonly animationIdentityKey: string;
+  readonly availableWidth: number;
   readonly metadata: OverlayMetadataView;
   readonly motion: OverlayMotionDecision;
+  readonly onTextMeasurement: OverlayTextMeasurementReporter;
 };
 
-function MetadataView({ metadata, motion }: MetadataViewProps): ReactElement {
+function MetadataView({
+  animationIdentityKey,
+  availableWidth,
+  metadata,
+  motion,
+  onTextMeasurement,
+}: MetadataViewProps): ReactElement {
   switch (metadata.kind) {
     case "status":
-      return <StatusMetadata metadata={metadata} />;
+      return (
+        <StatusMetadata
+          animationIdentityKey={animationIdentityKey}
+          availableWidth={availableWidth}
+          metadata={metadata}
+          motion={motion}
+          onTextMeasurement={onTextMeasurement}
+        />
+      );
     case "track":
-      return <TrackMetadata metadata={metadata} motion={motion} />;
+      return (
+        <TrackMetadata
+          animationIdentityKey={animationIdentityKey}
+          availableWidth={availableWidth}
+          metadata={metadata}
+          motion={motion}
+          onTextMeasurement={onTextMeasurement}
+        />
+      );
     case "episode":
-      return <EpisodeMetadata metadata={metadata} motion={motion} />;
+      return (
+        <EpisodeMetadata
+          animationIdentityKey={animationIdentityKey}
+          availableWidth={availableWidth}
+          metadata={metadata}
+          motion={motion}
+          onTextMeasurement={onTextMeasurement}
+        />
+      );
   }
 
   return unreachable(metadata);
 }
 
 type StatusMetadataProps = {
+  readonly animationIdentityKey: string;
+  readonly availableWidth: number;
   readonly metadata: OverlayStatusMetadataView;
+  readonly motion: OverlayMotionDecision;
+  readonly onTextMeasurement: OverlayTextMeasurementReporter;
 };
 
-function StatusMetadata({ metadata }: StatusMetadataProps): ReactElement {
+function StatusMetadata({
+  animationIdentityKey,
+  availableWidth,
+  metadata,
+  motion,
+  onTextMeasurement,
+}: StatusMetadataProps): ReactElement {
   return (
     <>
-      <MetadataCategory value={metadata.category} />
-      <StaticMetadataLine
-        line={titleLine}
+      <MetadataMarqueeLine
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        line={overlayMetadataLayout.statusLabelLine}
+        motion={motion}
+        onTextMeasurement={onTextMeasurement}
+        text={metadata.category}
+        textClass={overlayMetadataTextClasses.status}
+      />
+      <MetadataMarqueeLine
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        line={overlayMetadataLayout.statusTitleLine}
+        motion={motion}
+        onTextMeasurement={onTextMeasurement}
         text={metadata.title}
-        textLength={titleTextLength(metadata.title)}
+        textClass={overlayMetadataTextClasses.detail}
       />
-      <StaticMetadataLine
-        line={subtitleLine}
+      <MetadataMarqueeLine
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        line={overlayMetadataLayout.statusDetailLine}
+        motion={motion}
+        onTextMeasurement={onTextMeasurement}
         text={metadata.subtitle}
-        textLength={subtitleTextLength(metadata.subtitle)}
+        textClass={overlayMetadataTextClasses.detail}
       />
-      <StaticMetadataLine
-        line={contextLine}
+      <MetadataMarqueeLine
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        line={overlayMetadataLayout.statusContextLine}
+        motion={motion}
+        onTextMeasurement={onTextMeasurement}
         text={metadata.context}
-        textLength={contextTextLength(metadata.context)}
+        textClass={overlayMetadataTextClasses.context}
       />
     </>
   );
 }
 
 type TrackMetadataProps = {
+  readonly animationIdentityKey: string;
+  readonly availableWidth: number;
   readonly metadata: OverlayTrackMetadataView;
   readonly motion: OverlayMotionDecision;
+  readonly onTextMeasurement: OverlayTextMeasurementReporter;
 };
 
-function TrackMetadata({ metadata, motion }: TrackMetadataProps): ReactElement {
+function TrackMetadata({
+  animationIdentityKey,
+  availableWidth,
+  metadata,
+  motion,
+  onTextMeasurement,
+}: TrackMetadataProps): ReactElement {
   return (
     <>
-      <MetadataCategory
-        value={trackCategoryForPresentation(metadata.presentation)}
-      />
       <MetadataMarqueeLine
-        animationIdentity={metadata.itemIdentity}
-        line={titleLine}
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        line={overlayMetadataLayout.creatorLine}
         motion={motion}
-        text={metadata.trackTitle.value}
-      />
-      <MetadataMarqueeLine
-        animationIdentity={metadata.itemIdentity}
-        line={subtitleLine}
-        motion={motion}
+        onTextMeasurement={onTextMeasurement}
         text={artistNames(metadata.artists)}
+        textClass={overlayMetadataTextClasses.creator}
       />
       <MetadataMarqueeLine
-        animationIdentity={metadata.itemIdentity}
-        line={contextLine}
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        line={overlayMetadataLayout.titleLine}
         motion={motion}
-        text={metadata.album.title.value}
+        onTextMeasurement={onTextMeasurement}
+        text={metadata.trackTitle.value}
+        textClass={overlayMetadataTextClasses.title}
+      />
+      <MetadataMarqueeLine
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        line={overlayMetadataLayout.detailLine}
+        motion={motion}
+        onTextMeasurement={onTextMeasurement}
+        text={`ALBUM · ${metadata.album.title.value}`}
+        textClass={overlayMetadataTextClasses.detail}
+      />
+      <MetadataMarqueeLine
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        line={overlayMetadataLayout.contextLine}
+        motion={motion}
+        onTextMeasurement={onTextMeasurement}
+        text={trackContextForPresentation(metadata.presentation)}
+        textClass={overlayMetadataTextClasses.context}
       />
     </>
   );
 }
 
 type EpisodeMetadataProps = {
+  readonly animationIdentityKey: string;
+  readonly availableWidth: number;
   readonly metadata: OverlayEpisodeMetadataView;
   readonly motion: OverlayMotionDecision;
+  readonly onTextMeasurement: OverlayTextMeasurementReporter;
 };
 
 function EpisodeMetadata({
+  animationIdentityKey,
+  availableWidth,
   metadata,
   motion,
+  onTextMeasurement,
 }: EpisodeMetadataProps): ReactElement {
   return (
     <>
-      <MetadataCategory
-        value={episodeCategoryForPresentation(metadata.presentation)}
-      />
       <MetadataMarqueeLine
-        animationIdentity={metadata.itemIdentity}
-        line={titleLine}
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        line={overlayMetadataLayout.creatorLine}
         motion={motion}
-        text={metadata.episodeTitle.value}
-      />
-      <MetadataMarqueeLine
-        animationIdentity={metadata.itemIdentity}
-        line={subtitleLine}
-        motion={motion}
-        text={metadata.show.title.value}
-      />
-      <MetadataMarqueeLine
-        animationIdentity={metadata.itemIdentity}
-        line={contextLine}
-        motion={motion}
+        onTextMeasurement={onTextMeasurement}
         text={metadata.show.publisher.value}
+        textClass={overlayMetadataTextClasses.creator}
+      />
+      <MetadataMarqueeLine
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        line={overlayMetadataLayout.titleLine}
+        motion={motion}
+        onTextMeasurement={onTextMeasurement}
+        text={metadata.episodeTitle.value}
+        textClass={overlayMetadataTextClasses.title}
+      />
+      <MetadataMarqueeLine
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        line={overlayMetadataLayout.detailLine}
+        motion={motion}
+        onTextMeasurement={onTextMeasurement}
+        text={`SHOW · ${metadata.show.title.value}`}
+        textClass={overlayMetadataTextClasses.detail}
+      />
+      <MetadataMarqueeLine
+        animationIdentityKey={animationIdentityKey}
+        availableWidth={availableWidth}
+        line={overlayMetadataLayout.contextLine}
+        motion={motion}
+        onTextMeasurement={onTextMeasurement}
+        text={episodeContextForPresentation(metadata.presentation)}
+        textClass={overlayMetadataTextClasses.context}
       />
     </>
   );
 }
 
-type MetadataCategoryProps = {
-  readonly value: string;
-};
-
-function MetadataCategory({ value }: MetadataCategoryProps): ReactElement {
-  return (
-    <text
-      x={metadataTextX}
-      y={272}
-      className={overlayMetadataCategoryTextClass}
-    >
-      {value}
-    </text>
-  );
-}
-
 type MetadataMarqueeLineProps = {
-  readonly animationIdentity: OverlayTrackMetadataView["itemIdentity"];
+  readonly animationIdentityKey: string;
+  readonly availableWidth: number;
   readonly line: OverlayTextLineLayout;
   readonly motion: OverlayMotionDecision;
+  readonly onTextMeasurement: OverlayTextMeasurementReporter;
   readonly text: string;
+  readonly textClass: OverlayMetadataTextClass;
 };
 
 function MetadataMarqueeLine({
-  animationIdentity,
+  animationIdentityKey,
+  availableWidth,
   line,
   motion,
+  onTextMeasurement,
   text,
+  textClass,
 }: MetadataMarqueeLineProps): ReactElement {
   return (
     <MarqueeText
-      animationIdentity={animationIdentity}
-      availableWidth={metadataTextAvailableWidth}
+      animationIdentityKey={animationIdentityKey}
+      availableWidth={availableWidth}
       clipPathId={line.clipPathId}
+      measurementIdentity={animationIdentityKey}
+      measurementLine={line.line}
       motion={motion}
+      onTextMeasurement={onTextMeasurement}
       text={text}
-      textClass={line.textClass}
-      x={line.x}
+      textClass={textClass}
+      x={overlayMetadataLayout.x}
       y={line.y}
     />
   );
 }
 
-type StaticMetadataLineProps = {
-  readonly line: OverlayTextLineLayout;
-  readonly text: string;
-  readonly textLength: number;
+type MetadataClipPathsProps = {
+  readonly availableWidth: number;
 };
 
-function StaticMetadataLine({
-  line,
-  text,
-  textLength,
-}: StaticMetadataLineProps): ReactElement {
-  return (
-    <text
-      x={line.x}
-      y={line.y}
-      className={line.textClass}
-      textLength={textLength}
-      lengthAdjust="spacingAndGlyphs"
-    >
-      {text}
-    </text>
-  );
-}
-
-function MetadataClipPaths(): ReactElement {
+function MetadataClipPaths({
+  availableWidth,
+}: MetadataClipPathsProps): ReactElement {
   return (
     <defs>
-      <MetadataClipPath line={titleLine} />
-      <MetadataClipPath line={subtitleLine} />
-      <MetadataClipPath line={contextLine} />
+      <MetadataClipPath
+        line={overlayMetadataLayout.creatorLine}
+        width={availableWidth}
+      />
+      <MetadataClipPath
+        line={overlayMetadataLayout.titleLine}
+        width={availableWidth}
+      />
+      <MetadataClipPath
+        line={overlayMetadataLayout.detailLine}
+        width={availableWidth}
+      />
+      <MetadataClipPath
+        line={overlayMetadataLayout.contextLine}
+        width={availableWidth}
+      />
+      <MetadataClipPath
+        line={overlayMetadataLayout.statusLabelLine}
+        width={availableWidth}
+      />
+      <MetadataClipPath
+        line={overlayMetadataLayout.statusTitleLine}
+        width={availableWidth}
+      />
+      <MetadataClipPath
+        line={overlayMetadataLayout.statusDetailLine}
+        width={availableWidth}
+      />
+      <MetadataClipPath
+        line={overlayMetadataLayout.statusContextLine}
+        width={availableWidth}
+      />
     </defs>
   );
 }
 
 type MetadataClipPathProps = {
   readonly line: OverlayTextLineLayout;
+  readonly width: number;
 };
 
-function MetadataClipPath({ line }: MetadataClipPathProps): ReactElement {
+function MetadataClipPath({
+  line,
+  width,
+}: MetadataClipPathProps): ReactElement {
   return (
     <clipPath id={line.clipPathId} clipPathUnits="userSpaceOnUse">
       <rect
-        x={line.x}
+        x={overlayMetadataLayout.x}
         y={line.clipY}
-        width={metadataTextAvailableWidth}
+        width={width}
         height={line.clipHeight}
       />
     </clipPath>
   );
 }
 
-function trackCategoryForPresentation(
+function trackContextForPresentation(
   presentation: OverlayItemMetadataPresentation,
 ): string {
   switch (presentation.kind) {
@@ -291,7 +387,7 @@ function trackCategoryForPresentation(
   return unreachable(presentation);
 }
 
-function episodeCategoryForPresentation(
+function episodeContextForPresentation(
   presentation: OverlayItemMetadataPresentation,
 ): string {
   switch (presentation.kind) {
@@ -308,27 +404,6 @@ function episodeCategoryForPresentation(
 
 function artistNames(artists: OverlayTrackMetadataView["artists"]): string {
   return artists.map((artist): string => artist.name.value).join(", ");
-}
-
-function titleTextLength(value: string): number {
-  return boundedTextLength(value, 720, 2_880, 150);
-}
-
-function subtitleTextLength(value: string): number {
-  return boundedTextLength(value, 520, 2_880, 72);
-}
-
-function contextTextLength(value: string): number {
-  return boundedTextLength(value, 640, 2_880, 52);
-}
-
-function boundedTextLength(
-  value: string,
-  minimum: number,
-  maximum: number,
-  averageGlyphWidth: number,
-): number {
-  return Math.min(maximum, Math.max(minimum, value.length * averageGlyphWidth));
 }
 
 function unreachable(value: never): never {

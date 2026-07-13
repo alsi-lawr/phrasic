@@ -1,100 +1,58 @@
-import type { OverlayVisualTone } from "./overlay-state.ts";
-
 const overlayMetadataContextTextClass =
-  "font-overlay-display fill-overlay-content-muted text-overlay-detail font-semibold tracking-overlay-context";
-const overlayMetadataSubtitleTextClass =
-  "font-overlay-display fill-overlay-content-secondary text-overlay-subtitle font-semibold tracking-overlay-normal";
+  "font-overlay-display fill-overlay-context text-overlay-context-size font-medium tracking-overlay-context";
+const overlayMetadataCreatorTextClass =
+  "font-overlay-display fill-overlay-creator text-overlay-creator-size font-semibold tracking-overlay-normal uppercase";
+const overlayMetadataDetailTextClass =
+  "font-overlay-display fill-overlay-detail text-overlay-detail-size font-medium tracking-overlay-detail";
+const overlayMetadataStatusTextClass =
+  "font-overlay-display fill-overlay-status text-overlay-status-size font-semibold tracking-overlay-normal";
 const overlayMetadataTitleTextClass =
-  "font-overlay-display fill-overlay-content-title text-overlay-title font-bold tracking-overlay-normal";
+  "font-overlay-display fill-overlay-title text-overlay-title-size font-normal tracking-overlay-normal";
 
 type OverlayMetadataContextTextClass = typeof overlayMetadataContextTextClass;
-type OverlayMetadataSubtitleTextClass = typeof overlayMetadataSubtitleTextClass;
+type OverlayMetadataCreatorTextClass = typeof overlayMetadataCreatorTextClass;
+type OverlayMetadataDetailTextClass = typeof overlayMetadataDetailTextClass;
+type OverlayMetadataStatusTextClass = typeof overlayMetadataStatusTextClass;
 type OverlayMetadataTitleTextClass = typeof overlayMetadataTitleTextClass;
 
 export type OverlayMetadataTextClass =
   | OverlayMetadataContextTextClass
-  | OverlayMetadataSubtitleTextClass
+  | OverlayMetadataCreatorTextClass
+  | OverlayMetadataDetailTextClass
+  | OverlayMetadataStatusTextClass
   | OverlayMetadataTitleTextClass;
 
 type OverlayMetadataTextClasses = {
   readonly context: OverlayMetadataContextTextClass;
-  readonly subtitle: OverlayMetadataSubtitleTextClass;
+  readonly creator: OverlayMetadataCreatorTextClass;
+  readonly detail: OverlayMetadataDetailTextClass;
+  readonly status: OverlayMetadataStatusTextClass;
   readonly title: OverlayMetadataTitleTextClass;
 };
 
 export const overlayMetadataTextClasses: OverlayMetadataTextClasses =
   Object.freeze({
     context: overlayMetadataContextTextClass,
-    subtitle: overlayMetadataSubtitleTextClass,
+    creator: overlayMetadataCreatorTextClass,
+    detail: overlayMetadataDetailTextClass,
+    status: overlayMetadataStatusTextClass,
     title: overlayMetadataTitleTextClass,
   } satisfies OverlayMetadataTextClasses);
 
-export const overlayMetadataCategoryTextClass =
-  "font-overlay-display fill-overlay-content-muted text-overlay-category font-bold tracking-overlay-category";
-export const overlayStatusLabelTextClass =
-  "font-overlay-display fill-overlay-status-neutral text-overlay-detail font-bold tracking-overlay-status";
+export const overlayShellClass = "fill-overlay-shell opacity-90";
 
-const statusActiveFillClass = "fill-overlay-status-active";
-const statusFailureFillClass = "fill-overlay-status-failure";
-const statusNeutralFillClass = "fill-overlay-status-neutral";
-const statusWarningFillClass = "fill-overlay-status-warning";
-const statusActiveStrokeClass = "stroke-overlay-status-active";
-const statusFailureStrokeClass = "stroke-overlay-status-failure";
-const statusNeutralStrokeClass = "stroke-overlay-status-neutral";
-const statusWarningStrokeClass = "stroke-overlay-status-warning";
-
-type OverlayActiveStatusColorClasses = {
-  readonly fill: typeof statusActiveFillClass;
-  readonly stroke: typeof statusActiveStrokeClass;
-};
-type OverlayFailureStatusColorClasses = {
-  readonly fill: typeof statusFailureFillClass;
-  readonly stroke: typeof statusFailureStrokeClass;
-};
-type OverlayNeutralStatusColorClasses = {
-  readonly fill: typeof statusNeutralFillClass;
-  readonly stroke: typeof statusNeutralStrokeClass;
-};
-type OverlayWarningStatusColorClasses = {
-  readonly fill: typeof statusWarningFillClass;
-  readonly stroke: typeof statusWarningStrokeClass;
+type FallbackVinylClasses = {
+  readonly disc: "fill-overlay-vinyl-disc";
+  readonly groove: "fill-none stroke-overlay-vinyl-groove stroke-8";
+  readonly hub: "fill-overlay-vinyl-hub";
+  readonly label: "fill-overlay-vinyl-label";
+  readonly rim: "fill-none stroke-overlay-vinyl-rim stroke-8";
 };
 
-export type OverlayStatusColorClasses =
-  | OverlayActiveStatusColorClasses
-  | OverlayFailureStatusColorClasses
-  | OverlayNeutralStatusColorClasses
-  | OverlayWarningStatusColorClasses;
-
-type OverlayStatusColorClassMap = Readonly<{
-  readonly active: OverlayActiveStatusColorClasses;
-  readonly failure: OverlayFailureStatusColorClasses;
-  readonly neutral: OverlayNeutralStatusColorClasses;
-  readonly warning: OverlayWarningStatusColorClasses;
-}>;
-
-const overlayStatusColorClassesByTone: OverlayStatusColorClassMap =
-  Object.freeze({
-    active: Object.freeze({
-      fill: statusActiveFillClass,
-      stroke: statusActiveStrokeClass,
-    } satisfies OverlayStatusColorClasses),
-    failure: Object.freeze({
-      fill: statusFailureFillClass,
-      stroke: statusFailureStrokeClass,
-    } satisfies OverlayStatusColorClasses),
-    neutral: Object.freeze({
-      fill: statusNeutralFillClass,
-      stroke: statusNeutralStrokeClass,
-    } satisfies OverlayStatusColorClasses),
-    warning: Object.freeze({
-      fill: statusWarningFillClass,
-      stroke: statusWarningStrokeClass,
-    } satisfies OverlayStatusColorClasses),
-  } satisfies OverlayStatusColorClassMap);
-
-export function statusColorClassesForTone(
-  tone: OverlayVisualTone,
-): OverlayStatusColorClasses {
-  return overlayStatusColorClassesByTone[tone];
-}
+export const fallbackVinylClasses: FallbackVinylClasses = Object.freeze({
+  disc: "fill-overlay-vinyl-disc",
+  groove: "fill-none stroke-overlay-vinyl-groove stroke-8",
+  hub: "fill-overlay-vinyl-hub",
+  label: "fill-overlay-vinyl-label",
+  rim: "fill-none stroke-overlay-vinyl-rim stroke-8",
+} satisfies FallbackVinylClasses);

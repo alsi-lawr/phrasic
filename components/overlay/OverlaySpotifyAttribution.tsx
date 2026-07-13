@@ -1,17 +1,29 @@
 import type { ReactElement } from "react";
 import {
   spotifyFullLogoAsset,
-  spotifyFullLogoLayout,
+  spotifyFullLogoPlacementForShellWidth,
 } from "./overlay-branding.ts";
 
-export function OverlaySpotifyAttribution(): ReactElement {
+type OverlaySpotifyAttributionProps = {
+  readonly shellWidth: number;
+};
+
+export function OverlaySpotifyAttribution({
+  shellWidth,
+}: OverlaySpotifyAttributionProps): ReactElement | null {
+  const placement = spotifyFullLogoPlacementForShellWidth(shellWidth);
+
+  if (placement.kind === "hidden") {
+    return null;
+  }
+
   return (
     <image
       href={spotifyFullLogoAsset.path}
-      x={spotifyFullLogoLayout.x}
-      y={spotifyFullLogoLayout.y}
-      width={spotifyFullLogoLayout.width}
-      height={spotifyFullLogoLayout.height}
+      x={placement.x}
+      y={placement.y}
+      width={placement.width}
+      height={placement.height}
       preserveAspectRatio="xMidYMid meet"
     />
   );

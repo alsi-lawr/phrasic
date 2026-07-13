@@ -2,9 +2,10 @@ import type { ReactElement } from "react";
 import type { NowPlayingItem } from "../../domain/playback.ts";
 import { FallbackVinyl } from "./FallbackVinyl.tsx";
 import {
+  overlayArtworkLeftCornerClipPathData,
   overlayArtworkClipPathId,
   overlayArtworkRectangle,
-} from "./overlay-artwork.ts";
+} from "./overlay-layout.ts";
 import type { OverlayMotionDecision } from "./overlay-motion.ts";
 import {
   artworkTreatmentForOverlayState,
@@ -26,16 +27,9 @@ export function OverlayArtwork({
   return (
     <g>
       <ArtworkClipPath />
-      <rect
-        x={overlayArtworkRectangle.x}
-        y={overlayArtworkRectangle.y}
-        width={overlayArtworkRectangle.width}
-        height={overlayArtworkRectangle.height}
-        rx={overlayArtworkRectangle.cornerRadius}
-        ry={overlayArtworkRectangle.cornerRadius}
-        className="fill-overlay-artwork-surface stroke-overlay-rule stroke-4"
-      />
-      <ArtworkTreatment motion={motion} treatment={treatment} />
+      <g clipPath={`url(#${overlayArtworkClipPathId})`}>
+        <ArtworkTreatment motion={motion} treatment={treatment} />
+      </g>
     </g>
   );
 }
@@ -44,14 +38,7 @@ function ArtworkClipPath(): ReactElement {
   return (
     <defs>
       <clipPath id={overlayArtworkClipPathId} clipPathUnits="userSpaceOnUse">
-        <rect
-          x={overlayArtworkRectangle.x}
-          y={overlayArtworkRectangle.y}
-          width={overlayArtworkRectangle.width}
-          height={overlayArtworkRectangle.height}
-          rx={overlayArtworkRectangle.cornerRadius}
-          ry={overlayArtworkRectangle.cornerRadius}
-        />
+        <path d={overlayArtworkLeftCornerClipPathData} />
       </clipPath>
     </defs>
   );
@@ -87,16 +74,14 @@ function CurrentArtwork({ item, motion }: CurrentArtworkProps): ReactElement {
   switch (item.artwork.kind) {
     case "available":
       return (
-        <g clipPath={`url(#${overlayArtworkClipPathId})`}>
-          <image
-            href={item.artwork.url.value}
-            x={overlayArtworkRectangle.x}
-            y={overlayArtworkRectangle.y}
-            width={overlayArtworkRectangle.width}
-            height={overlayArtworkRectangle.height}
-            preserveAspectRatio="xMidYMid meet"
-          />
-        </g>
+        <image
+          href={item.artwork.url.value}
+          x={overlayArtworkRectangle.x}
+          y={overlayArtworkRectangle.y}
+          width={overlayArtworkRectangle.width}
+          height={overlayArtworkRectangle.height}
+          preserveAspectRatio="xMidYMid meet"
+        />
       );
     case "unavailable":
       return <FallbackVinyl motion={motion} />;
