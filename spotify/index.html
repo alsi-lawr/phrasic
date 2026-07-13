@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; base-uri 'none'; object-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'none'; img-src 'self' data: https://i.scdn.co; font-src 'self'; connect-src 'self' https://accounts.spotify.com https://api.spotify.com; worker-src 'self'; manifest-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Display the currently playing Spotify item in OBS."
+    />
+    <link rel="icon" href="/favicon.ico" />
+    <title>Spotify Now Playing</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/browser/main.tsx"></script>
+  </body>
+</html>

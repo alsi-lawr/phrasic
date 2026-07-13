@@ -1,4 +1,4 @@
-import type { LastPlaybackItem } from "@/domain/playback";
+import type { LastPlaybackItem } from "../../domain/playback.ts";
 import type { ReactElement } from "react";
 import "./Title.css";
 

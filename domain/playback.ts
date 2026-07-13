@@ -675,7 +675,7 @@ export type TrackItemInput = {
 };
 
 export class TrackItem {
-  private readonly itemKind: "track" = "track";
+  private readonly itemKind = "track" as const;
   public readonly providerId: ProviderId;
   public readonly itemId: ProviderItemId;
   public readonly title: DisplayText;
@@ -729,7 +729,7 @@ export type EpisodeItemInput = {
 };
 
 export class EpisodeItem {
-  private readonly itemKind: "episode" = "episode";
+  private readonly itemKind = "episode" as const;
   public readonly providerId: ProviderId;
   public readonly itemId: ProviderItemId;
   public readonly title: DisplayText;
@@ -835,6 +835,25 @@ export function providerFailure(
 
 export function initialPlaybackState(): PlaybackState {
   return freezeState({ kind: "initializing" });
+}
+
+export function currentPlaybackItem(state: PlaybackState): LastPlaybackItem {
+  switch (state.kind) {
+    case "playing":
+    case "paused":
+      return availableLastItem(state.snapshot.item);
+    case "reconnecting":
+      return state.lastItem;
+    case "initializing":
+    case "authorization-required":
+    case "authorizing":
+    case "empty":
+    case "unsupported":
+    case "failure":
+      return unavailableLastPlaybackItem();
+  }
+
+  return assertNever(state);
 }
 
 export function transitionPlaybackState(
