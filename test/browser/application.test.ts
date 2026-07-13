@@ -93,6 +93,25 @@ test("the browser application waits for a validated callback restoration before 
   assert.equal(fixture.replacedUrls.length, 1);
 });
 
+test("the browser application requests runtime configuration from its active origin", async () => {
+  const fixture = applicationFixture({
+    configuration: {
+      spotify: {
+        clientId: "browser-client-id",
+        redirectUri: "https://nowplaying.example:8443/spotify/",
+      },
+    },
+    currentUrl: "https://nowplaying.example:8443/spotify/?setup=1",
+  });
+
+  fixture.application.start();
+  await settleApplicationWork();
+
+  assert.deepEqual(fixture.configurationUrls, [
+    "https://nowplaying.example:8443/config.json",
+  ]);
+});
+
 test("the browser application retains callback credentials while configuration is delayed", async () => {
   const callbackCode = "callback-code-sentinel";
   const callbackState = "callback-state-sentinel";
