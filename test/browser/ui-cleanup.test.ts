@@ -36,6 +36,34 @@ const expectedGlobals = `@import "tailwindcss";
 
 @theme {
   --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-overlay-display: Arial, Helvetica, sans-serif;
+
+  --color-overlay-artwork-surface: #05070a;
+  --color-overlay-border: #313b47;
+  --color-overlay-content-muted: #8f9baa;
+  --color-overlay-content-secondary: #d7dfe8;
+  --color-overlay-content-title: #f7fafc;
+  --color-overlay-rule: #35404d;
+  --color-overlay-shell: #0b0e12;
+  --color-overlay-status-active: #06ab4f;
+  --color-overlay-status-failure: #f2777a;
+  --color-overlay-status-neutral: #c9d2dc;
+  --color-overlay-status-warning: #f2b75d;
+  --color-overlay-surface: #151a20;
+  --color-overlay-vinyl-base: #030405;
+  --color-overlay-vinyl-groove: #202832;
+  --color-overlay-vinyl-groove-inner: #182029;
+  --color-overlay-vinyl-label: #d5e2d9;
+
+  --text-overlay-category: 82px;
+  --text-overlay-detail: 88px;
+  --text-overlay-subtitle: 126px;
+  --text-overlay-title: 258px;
+
+  --tracking-overlay-category: 12px;
+  --tracking-overlay-context: 4px;
+  --tracking-overlay-normal: 0px;
+  --tracking-overlay-status: 10px;
 }
 `;
 
@@ -80,6 +108,60 @@ test("the browser overlay ships only the active Tailwind UI contract", () => {
   );
 });
 
+test("the active overlay SVG uses complete Tailwind presentation contracts", () => {
+  const overlaySource = sourceText("components/overlay");
+  const overlayTsxSource = sourceTextWithExtension("components/overlay", ".tsx")
+    .map((sourcePath) => readProjectText(sourcePath))
+    .join("\n");
+  const metadataAndMarqueeSource = `${readProjectText(
+    "components/overlay/MarqueeText.tsx",
+  )}\n${readProjectText("components/overlay/OverlayMetadata.tsx")}`;
+  const presentationSource = readProjectText(
+    "components/overlay/overlay-presentation.ts",
+  );
+
+  assert.doesNotMatch(overlaySource, /#[0-9a-f]{3,8}\b/i);
+  assert.doesNotMatch(
+    overlayTsxSource,
+    /\b(?:fill|stroke|strokeWidth|fontFamily|fontSize|fontWeight|letterSpacing|opacity|fillOpacity|strokeOpacity)\s*=/,
+  );
+  assert.doesNotMatch(overlayTsxSource, /\bstyle\s*=/);
+  assert.doesNotMatch(overlaySource, /className=\{`/);
+  assert.doesNotMatch(overlaySource, /className=\{[^}]*\+[^}]*\}/);
+  assert.doesNotMatch(
+    overlaySource,
+    /\b(?:fill|stroke|text|font|tracking|opacity)-\[[^\]]+\]/,
+  );
+  assert.doesNotMatch(
+    overlaySource,
+    /\b(?:fill|stroke|text|font|tracking|opacity)-(?:\$\{|["']\s*\+)/,
+  );
+  assert.doesNotMatch(
+    metadataAndMarqueeSource,
+    /\b(?:fill|fontFamily|fontSize|fontWeight|letterSpacing)\s*:/,
+  );
+  assert.match(
+    presentationSource,
+    /"font-overlay-display fill-overlay-content-title text-overlay-title font-bold tracking-overlay-normal"/,
+  );
+  assert.match(
+    presentationSource,
+    /"font-overlay-display fill-overlay-content-secondary text-overlay-subtitle font-semibold tracking-overlay-normal"/,
+  );
+  assert.match(
+    presentationSource,
+    /"font-overlay-display fill-overlay-content-muted text-overlay-detail font-semibold tracking-overlay-context"/,
+  );
+  assert.match(presentationSource, /fill-overlay-status-active/);
+  assert.match(presentationSource, /stroke-overlay-status-active/);
+  assert.match(presentationSource, /fill-overlay-status-failure/);
+  assert.match(presentationSource, /stroke-overlay-status-failure/);
+  assert.match(presentationSource, /fill-overlay-status-neutral/);
+  assert.match(presentationSource, /stroke-overlay-status-neutral/);
+  assert.match(presentationSource, /fill-overlay-status-warning/);
+  assert.match(presentationSource, /stroke-overlay-status-warning/);
+});
+
 function fontFileNames(): ReadonlyArray<string> {
   return readdirSync(join(projectRoot, "public/fonts")).sort();
 }
@@ -113,8 +195,15 @@ function readProjectText(path: string): string {
 }
 
 function sourceText(path: string): string {
-  return projectPathsWithExtension(join(projectRoot, path), ".ts")
-    .concat(projectPathsWithExtension(join(projectRoot, path), ".tsx"))
+  return sourceTextWithExtension(path, ".ts")
+    .concat(sourceTextWithExtension(path, ".tsx"))
     .map((sourcePath) => readProjectText(sourcePath))
     .join("\n");
+}
+
+function sourceTextWithExtension(
+  path: string,
+  extension: string,
+): ReadonlyArray<string> {
+  return projectPathsWithExtension(join(projectRoot, path), extension);
 }

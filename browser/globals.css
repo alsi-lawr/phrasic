@@ -10,4 +10,32 @@
 
 @theme {
   --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-overlay-display: Arial, Helvetica, sans-serif;
+
+  --color-overlay-artwork-surface: #05070a;
+  --color-overlay-border: #313b47;
+  --color-overlay-content-muted: #8f9baa;
+  --color-overlay-content-secondary: #d7dfe8;
+  --color-overlay-content-title: #f7fafc;
+  --color-overlay-rule: #35404d;
+  --color-overlay-shell: #0b0e12;
+  --color-overlay-status-active: #06ab4f;
+  --color-overlay-status-failure: #f2777a;
+  --color-overlay-status-neutral: #c9d2dc;
+  --color-overlay-status-warning: #f2b75d;
+  --color-overlay-surface: #151a20;
+  --color-overlay-vinyl-base: #030405;
+  --color-overlay-vinyl-groove: #202832;
+  --color-overlay-vinyl-groove-inner: #182029;
+  --color-overlay-vinyl-label: #d5e2d9;
+
+  --text-overlay-category: 82px;
+  --text-overlay-detail: 88px;
+  --text-overlay-subtitle: 126px;
+  --text-overlay-title: 258px;
+
+  --tracking-overlay-category: 12px;
+  --tracking-overlay-context: 4px;
+  --tracking-overlay-normal: 0px;
+  --tracking-overlay-status: 10px;
 }

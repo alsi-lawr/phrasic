@@ -14,17 +14,15 @@ import {
   type MarqueeOverflowDecision,
 } from "./overlay-marquee.ts";
 import { type OverlayMotionDecision } from "./overlay-motion.ts";
+import { type OverlayMetadataTextClass } from "./overlay-presentation.ts";
 
 type MarqueeTextProps = {
   readonly animationIdentity: OverlayItemIdentity;
   readonly availableWidth: number;
   readonly clipPathId: string;
-  readonly fill: string;
-  readonly fontSize: number;
-  readonly fontWeight: number;
-  readonly letterSpacing: number;
   readonly motion: OverlayMotionDecision;
   readonly text: string;
+  readonly textClass: OverlayMetadataTextClass;
   readonly x: number;
   readonly y: number;
 };
@@ -38,12 +36,9 @@ export function MarqueeText({
   animationIdentity,
   availableWidth,
   clipPathId,
-  fill,
-  fontSize,
-  fontWeight,
-  letterSpacing,
   motion,
   text,
+  textClass,
   x,
   y,
 }: MarqueeTextProps): ReactElement {
@@ -59,11 +54,8 @@ export function MarqueeText({
       return (
         <StaticMarqueeText
           clipPathId={clipPathId}
-          fill={fill}
-          fontSize={fontSize}
-          fontWeight={fontWeight}
-          letterSpacing={letterSpacing}
           text={text}
+          textClass={textClass}
           textReference={textReference}
           x={x}
           y={y}
@@ -75,11 +67,8 @@ export function MarqueeText({
           animationIdentityKey={animationIdentityKey}
           clipPathId={clipPathId}
           decision={decision}
-          fill={fill}
-          fontSize={fontSize}
-          fontWeight={fontWeight}
-          letterSpacing={letterSpacing}
           text={text}
+          textClass={textClass}
           textReference={textReference}
           x={x}
           y={y}
@@ -94,11 +83,8 @@ type MarqueeTextForDecisionProps = {
   readonly animationIdentityKey: string;
   readonly clipPathId: string;
   readonly decision: MarqueeOverflowDecision;
-  readonly fill: string;
-  readonly fontSize: number;
-  readonly fontWeight: number;
-  readonly letterSpacing: number;
   readonly text: string;
+  readonly textClass: OverlayMetadataTextClass;
   readonly textReference: RefObject<SVGTextElement | null>;
   readonly x: number;
   readonly y: number;
@@ -108,11 +94,8 @@ function MarqueeTextForDecision({
   animationIdentityKey,
   clipPathId,
   decision,
-  fill,
-  fontSize,
-  fontWeight,
-  letterSpacing,
   text,
+  textClass,
   textReference,
   x,
   y,
@@ -122,11 +105,8 @@ function MarqueeTextForDecision({
       return (
         <StaticMarqueeText
           clipPathId={clipPathId}
-          fill={fill}
-          fontSize={fontSize}
-          fontWeight={fontWeight}
-          letterSpacing={letterSpacing}
           text={text}
+          textClass={textClass}
           textReference={textReference}
           x={x}
           y={y}
@@ -138,11 +118,8 @@ function MarqueeTextForDecision({
           animationIdentityKey={animationIdentityKey}
           clipPathId={clipPathId}
           decision={decision}
-          fill={fill}
-          fontSize={fontSize}
-          fontWeight={fontWeight}
-          letterSpacing={letterSpacing}
           text={text}
+          textClass={textClass}
           textReference={textReference}
           x={x}
           y={y}
@@ -155,11 +132,8 @@ function MarqueeTextForDecision({
 
 type StaticMarqueeTextProps = {
   readonly clipPathId: string;
-  readonly fill: string;
-  readonly fontSize: number;
-  readonly fontWeight: number;
-  readonly letterSpacing: number;
   readonly text: string;
+  readonly textClass: OverlayMetadataTextClass;
   readonly textReference: RefObject<SVGTextElement | null>;
   readonly x: number;
   readonly y: number;
@@ -167,26 +141,15 @@ type StaticMarqueeTextProps = {
 
 function StaticMarqueeText({
   clipPathId,
-  fill,
-  fontSize,
-  fontWeight,
-  letterSpacing,
   text,
+  textClass,
   textReference,
   x,
   y,
 }: StaticMarqueeTextProps): ReactElement {
   return (
     <g clipPath={`url(#${clipPathId})`}>
-      <text
-        ref={textReference}
-        x={x}
-        y={y}
-        fill={fill}
-        fontSize={fontSize}
-        fontWeight={fontWeight}
-        letterSpacing={letterSpacing}
-      >
+      <text ref={textReference} x={x} y={y} className={textClass}>
         {text}
       </text>
     </g>
@@ -200,11 +163,8 @@ type AnimatedMarqueeTextProps = {
     MarqueeOverflowDecision,
     { readonly kind: "overflowing" }
   >;
-  readonly fill: string;
-  readonly fontSize: number;
-  readonly fontWeight: number;
-  readonly letterSpacing: number;
   readonly text: string;
+  readonly textClass: OverlayMetadataTextClass;
   readonly textReference: RefObject<SVGTextElement | null>;
   readonly x: number;
   readonly y: number;
@@ -214,11 +174,8 @@ function AnimatedMarqueeText({
   animationIdentityKey,
   clipPathId,
   decision,
-  fill,
-  fontSize,
-  fontWeight,
-  letterSpacing,
   text,
+  textClass,
   textReference,
   x,
   y,
@@ -234,25 +191,10 @@ function AnimatedMarqueeText({
           dur="12s"
           repeatCount="indefinite"
         />
-        <text
-          ref={textReference}
-          x={x}
-          y={y}
-          fill={fill}
-          fontSize={fontSize}
-          fontWeight={fontWeight}
-          letterSpacing={letterSpacing}
-        >
+        <text ref={textReference} x={x} y={y} className={textClass}>
           {text}
         </text>
-        <text
-          x={x + decision.travelDistance}
-          y={y}
-          fill={fill}
-          fontSize={fontSize}
-          fontWeight={fontWeight}
-          letterSpacing={letterSpacing}
-        >
+        <text x={x + decision.travelDistance} y={y} className={textClass}>
           {text}
         </text>
       </g>

@@ -33,9 +33,7 @@ export function OverlayArtwork({
         height={overlayArtworkRectangle.height}
         rx={overlayArtworkRectangle.cornerRadius}
         ry={overlayArtworkRectangle.cornerRadius}
-        fill="#05070a"
-        stroke="#35404d"
-        strokeWidth={4}
+        className="fill-overlay-artwork-surface stroke-overlay-rule stroke-4"
       />
       <ArtworkTreatment motion={motion} treatment={treatment} />
     </g>

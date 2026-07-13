@@ -8,6 +8,11 @@ import {
   type OverlayTrackMetadataView,
 } from "./overlay-metadata.ts";
 import { type OverlayMotionDecision } from "./overlay-motion.ts";
+import {
+  overlayMetadataCategoryTextClass,
+  overlayMetadataTextClasses,
+  type OverlayMetadataTextClass,
+} from "./overlay-presentation.ts";
 
 const metadataTextX = 1_344;
 const metadataTextAvailableWidth = 3_096;
@@ -16,10 +21,7 @@ type OverlayTextLineLayout = {
   readonly clipHeight: number;
   readonly clipPathId: string;
   readonly clipY: number;
-  readonly fill: string;
-  readonly fontSize: number;
-  readonly fontWeight: number;
-  readonly letterSpacing: number;
+  readonly textClass: OverlayMetadataTextClass;
   readonly x: number;
   readonly y: number;
 };
@@ -28,10 +30,7 @@ const titleLine: OverlayTextLineLayout = Object.freeze({
   clipHeight: 302,
   clipPathId: "overlay-metadata-title-clip",
   clipY: 348,
-  fill: "#f7fafc",
-  fontSize: 258,
-  fontWeight: 700,
-  letterSpacing: 0,
+  textClass: overlayMetadataTextClasses.title,
   x: metadataTextX,
   y: 596,
 });
@@ -39,10 +38,7 @@ const subtitleLine: OverlayTextLineLayout = Object.freeze({
   clipHeight: 168,
   clipPathId: "overlay-metadata-subtitle-clip",
   clipY: 650,
-  fill: "#d7dfe8",
-  fontSize: 126,
-  fontWeight: 600,
-  letterSpacing: 0,
+  textClass: overlayMetadataTextClasses.subtitle,
   x: metadataTextX,
   y: 748,
 });
@@ -50,10 +46,7 @@ const contextLine: OverlayTextLineLayout = Object.freeze({
   clipHeight: 126,
   clipPathId: "overlay-metadata-context-clip",
   clipY: 858,
-  fill: "#8f9baa",
-  fontSize: 88,
-  fontWeight: 600,
-  letterSpacing: 4,
+  textClass: overlayMetadataTextClasses.context,
   x: metadataTextX,
   y: 938,
 });
@@ -68,7 +61,7 @@ export function OverlayMetadata({
   motion,
 }: OverlayMetadataProps): ReactElement {
   return (
-    <g fontFamily="Arial, Helvetica, sans-serif">
+    <g>
       <MetadataClipPaths />
       <MetadataView metadata={metadata} motion={motion} />
     </g>
@@ -198,10 +191,7 @@ function MetadataCategory({ value }: MetadataCategoryProps): ReactElement {
     <text
       x={metadataTextX}
       y={272}
-      fill="#8f9baa"
-      fontSize={82}
-      fontWeight={700}
-      letterSpacing={12}
+      className={overlayMetadataCategoryTextClass}
     >
       {value}
     </text>
@@ -226,12 +216,9 @@ function MetadataMarqueeLine({
       animationIdentity={animationIdentity}
       availableWidth={metadataTextAvailableWidth}
       clipPathId={line.clipPathId}
-      fill={line.fill}
-      fontSize={line.fontSize}
-      fontWeight={line.fontWeight}
-      letterSpacing={line.letterSpacing}
       motion={motion}
       text={text}
+      textClass={line.textClass}
       x={line.x}
       y={line.y}
     />
@@ -253,10 +240,7 @@ function StaticMetadataLine({
     <text
       x={line.x}
       y={line.y}
-      fill={line.fill}
-      fontSize={line.fontSize}
-      fontWeight={line.fontWeight}
-      letterSpacing={line.letterSpacing}
+      className={line.textClass}
       textLength={textLength}
       lengthAdjust="spacingAndGlyphs"
     >
