@@ -26,12 +26,6 @@ type OverlaySpotifyShowVisibleTarget = {
   readonly kind: "show-metadata";
 };
 
-export type OverlaySpotifyLinkVisibleTarget =
-  | OverlaySpotifyCreatorVisibleTarget
-  | OverlaySpotifyDetailVisibleTarget
-  | OverlaySpotifyItemVisibleTarget
-  | OverlaySpotifyShowVisibleTarget;
-
 type OverlaySpotifyAlbumLink = {
   readonly destination: "album";
   readonly label: string;
