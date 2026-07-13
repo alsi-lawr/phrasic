@@ -4,6 +4,7 @@ import {
   fallbackVinylClasses,
   overlayMetadataTextClasses,
   overlayShellClass,
+  overlayVisibleSpotifyLinkClasses,
 } from "../../components/overlay/overlay-presentation.ts";
 
 test("overlay presentation variants preserve the baseline hierarchy and vinyl treatment", () => {
@@ -28,4 +29,27 @@ test("overlay presentation variants preserve the baseline hierarchy and vinyl tr
     label: "fill-overlay-vinyl-label",
     rim: "fill-none stroke-overlay-vinyl-rim stroke-8",
   });
+});
+
+test("visible Spotify links retain pointer targets and keyboard-focus indicators", () => {
+  assert.match(
+    overlayVisibleSpotifyLinkClasses.target,
+    /\bpointer-events-auto\b/,
+  );
+  assert.match(
+    overlayVisibleSpotifyLinkClasses.target,
+    /\bgroup-focus-visible:stroke-white\b/,
+  );
+  assert.match(
+    overlayVisibleSpotifyLinkClasses.target,
+    /\bgroup-focus-visible:stroke-40\b/,
+  );
+  assert.match(
+    overlayVisibleSpotifyLinkClasses.focusIndicator,
+    /\bgroup-focus-visible:stroke-white\b/,
+  );
+  assert.match(
+    overlayVisibleSpotifyLinkClasses.creatorTextTarget,
+    /\bpointer-events-auto\b/,
+  );
 });

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   marqueeAnimationDurationSeconds,
   marqueeDecisionForTextBounds,
+  staticMarqueeTextPresentationFor,
 } from "../../components/overlay/overlay-marquee.ts";
 
 test("SVG marquee activates only when measured text exceeds its available width", () => {
@@ -25,4 +26,23 @@ test("SVG marquee activates only when measured text exceeds its available width"
   assert.equal(greaterWidth.endX, -3_097);
   assert.equal(greaterWidth.travelDistance, 6_193);
   assert.equal(marqueeAnimationDurationSeconds, 20);
+});
+
+test("reduced motion preserves complete overflowing text with a static shrink-to-fit presentation", () => {
+  const overflowing = marqueeDecisionForTextBounds({
+    availableWidth: 3_096,
+    measuredWidth: 4_000,
+  });
+  const initialMeasurement = marqueeDecisionForTextBounds({
+    availableWidth: 0,
+    measuredWidth: 4_000,
+  });
+
+  assert.deepEqual(staticMarqueeTextPresentationFor(overflowing), {
+    kind: "shrink-to-fit",
+    textLength: 3_096,
+  });
+  assert.deepEqual(staticMarqueeTextPresentationFor(initialMeasurement), {
+    kind: "natural",
+  });
 });

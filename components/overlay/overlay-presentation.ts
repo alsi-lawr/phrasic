@@ -41,6 +41,26 @@ export const overlayMetadataTextClasses: OverlayMetadataTextClasses =
 
 export const overlayShellClass = "fill-overlay-shell opacity-90";
 
+type OverlayVisibleSpotifyLinkClasses = {
+  readonly anchor: "group absolute inset-0 block pointer-events-none outline-none";
+  readonly creatorText: "font-overlay-display fill-none text-overlay-creator-size font-semibold tracking-overlay-normal uppercase";
+  readonly creatorTextTarget: "pointer-events-auto cursor-pointer fill-transparent";
+  readonly focusIndicator: "pointer-events-none fill-none stroke-transparent stroke-0 group-focus-visible:stroke-white group-focus-visible:stroke-40";
+  readonly target: "pointer-events-auto cursor-pointer fill-transparent stroke-transparent stroke-0 group-focus-visible:stroke-white group-focus-visible:stroke-40";
+};
+
+export const overlayVisibleSpotifyLinkClasses: OverlayVisibleSpotifyLinkClasses =
+  Object.freeze({
+    anchor: "group absolute inset-0 block pointer-events-none outline-none",
+    creatorText:
+      "font-overlay-display fill-none text-overlay-creator-size font-semibold tracking-overlay-normal uppercase",
+    creatorTextTarget: "pointer-events-auto cursor-pointer fill-transparent",
+    focusIndicator:
+      "pointer-events-none fill-none stroke-transparent stroke-0 group-focus-visible:stroke-white group-focus-visible:stroke-40",
+    target:
+      "pointer-events-auto cursor-pointer fill-transparent stroke-transparent stroke-0 group-focus-visible:stroke-white group-focus-visible:stroke-40",
+  } satisfies OverlayVisibleSpotifyLinkClasses);
+
 type FallbackVinylClasses = {
   readonly disc: "fill-overlay-vinyl-disc";
   readonly groove: "fill-none stroke-overlay-vinyl-groove stroke-8";

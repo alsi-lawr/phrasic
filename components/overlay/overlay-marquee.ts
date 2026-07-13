@@ -15,10 +15,21 @@ export type MarqueeOverflowDecision =
       readonly travelDistance: number;
     };
 
+export type StaticMarqueeTextPresentation =
+  | {
+      readonly kind: "natural";
+    }
+  | {
+      readonly kind: "shrink-to-fit";
+      readonly textLength: number;
+    };
+
 export const marqueeAnimationDurationSeconds = 20;
 const containedDecision: MarqueeOverflowDecision = Object.freeze({
   kind: "contained",
 });
+const naturalStaticMarqueeTextPresentation: StaticMarqueeTextPresentation =
+  Object.freeze({ kind: "natural" });
 
 export function marqueeDecisionForTextBounds(
   bounds: SvgTextBounds,
@@ -36,4 +47,36 @@ export function marqueeDecisionForTextBounds(
   };
 
   return Object.freeze(decision);
+}
+
+export function staticMarqueeTextPresentationFor(
+  decision: MarqueeOverflowDecision,
+): StaticMarqueeTextPresentation {
+  switch (decision.kind) {
+    case "contained":
+      return naturalStaticMarqueeTextPresentation;
+    case "overflowing":
+      return shrinkToFitStaticMarqueeTextPresentation(decision.startX);
+  }
+
+  return unreachable(decision);
+}
+
+function shrinkToFitStaticMarqueeTextPresentation(
+  availableWidth: number,
+): StaticMarqueeTextPresentation {
+  if (!(availableWidth > 0)) {
+    return naturalStaticMarqueeTextPresentation;
+  }
+
+  const presentation: StaticMarqueeTextPresentation = {
+    kind: "shrink-to-fit",
+    textLength: availableWidth,
+  };
+
+  return Object.freeze(presentation);
+}
+
+function unreachable(value: never): never {
+  throw new Error(`Unexpected marquee overflow decision: ${String(value)}`);
 }

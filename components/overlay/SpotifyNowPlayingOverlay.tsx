@@ -52,6 +52,7 @@ function SpotifyNowPlayingOverlayContent(): ReactElement {
         geometry={geometry}
         metadata={semantic.metadata}
         motion={motion}
+        spotifyLinks={semantic.spotifyLinks}
         state={state}
       />
       <OverlayControls

@@ -8,7 +8,9 @@ import {
 import {
   marqueeAnimationDurationSeconds,
   marqueeDecisionForTextBounds,
+  staticMarqueeTextPresentationFor,
   type MarqueeOverflowDecision,
+  type StaticMarqueeTextPresentation,
 } from "./overlay-marquee.ts";
 import { type OverlayMotionDecision } from "./overlay-motion.ts";
 import {
@@ -61,8 +63,8 @@ export function MarqueeText({
   switch (motion.kind) {
     case "reduced":
       return (
-        <StaticMarqueeText
-          clipPathId={clipPathId}
+        <ReducedMotionMarqueeText
+          decision={decision}
           text={text}
           textClass={textClass}
           textReference={textReference}
@@ -112,7 +114,7 @@ function MarqueeTextForDecision({
   switch (decision.kind) {
     case "contained":
       return (
-        <StaticMarqueeText
+        <ClippedStaticMarqueeText
           clipPathId={clipPathId}
           text={text}
           textClass={textClass}
@@ -139,7 +141,7 @@ function MarqueeTextForDecision({
   return unreachable(decision);
 }
 
-type StaticMarqueeTextProps = {
+type ClippedStaticMarqueeTextProps = {
   readonly clipPathId: string;
   readonly text: string;
   readonly textClass: OverlayMetadataTextClass;
@@ -148,14 +150,14 @@ type StaticMarqueeTextProps = {
   readonly y: number;
 };
 
-function StaticMarqueeText({
+function ClippedStaticMarqueeText({
   clipPathId,
   text,
   textClass,
   textReference,
   x,
   y,
-}: StaticMarqueeTextProps): ReactElement {
+}: ClippedStaticMarqueeTextProps): ReactElement {
   return (
     <g clipPath={`url(#${clipPathId})`}>
       <text ref={textReference} x={x} y={y} className={textClass}>
@@ -163,6 +165,108 @@ function StaticMarqueeText({
       </text>
     </g>
   );
+}
+
+type ReducedMotionMarqueeTextProps = {
+  readonly decision: MarqueeOverflowDecision;
+  readonly text: string;
+  readonly textClass: OverlayMetadataTextClass;
+  readonly textReference: RefObject<SVGTextElement | null>;
+  readonly x: number;
+  readonly y: number;
+};
+
+function ReducedMotionMarqueeText({
+  decision,
+  text,
+  textClass,
+  textReference,
+  x,
+  y,
+}: ReducedMotionMarqueeTextProps): ReactElement {
+  const presentation = staticMarqueeTextPresentationFor(decision);
+
+  return (
+    <>
+      <ReducedMotionTextMeasurement
+        text={text}
+        textClass={textClass}
+        textReference={textReference}
+        x={x}
+        y={y}
+      />
+      <ReducedMotionStaticText
+        presentation={presentation}
+        text={text}
+        textClass={textClass}
+        x={x}
+        y={y}
+      />
+    </>
+  );
+}
+
+type ReducedMotionTextMeasurementProps = {
+  readonly text: string;
+  readonly textClass: OverlayMetadataTextClass;
+  readonly textReference: RefObject<SVGTextElement | null>;
+  readonly x: number;
+  readonly y: number;
+};
+
+function ReducedMotionTextMeasurement({
+  text,
+  textClass,
+  textReference,
+  x,
+  y,
+}: ReducedMotionTextMeasurementProps): ReactElement {
+  return (
+    <g className="opacity-0">
+      <text ref={textReference} x={x} y={y} className={textClass}>
+        {text}
+      </text>
+    </g>
+  );
+}
+
+type ReducedMotionStaticTextProps = {
+  readonly presentation: StaticMarqueeTextPresentation;
+  readonly text: string;
+  readonly textClass: OverlayMetadataTextClass;
+  readonly x: number;
+  readonly y: number;
+};
+
+function ReducedMotionStaticText({
+  presentation,
+  text,
+  textClass,
+  x,
+  y,
+}: ReducedMotionStaticTextProps): ReactElement {
+  switch (presentation.kind) {
+    case "natural":
+      return (
+        <text x={x} y={y} className={textClass}>
+          {text}
+        </text>
+      );
+    case "shrink-to-fit":
+      return (
+        <text
+          x={x}
+          y={y}
+          textLength={presentation.textLength}
+          lengthAdjust="spacingAndGlyphs"
+          className={textClass}
+        >
+          {text}
+        </text>
+      );
+  }
+
+  return unreachable(presentation);
 }
 
 type AnimatedMarqueeTextProps = {

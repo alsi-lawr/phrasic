@@ -14,6 +14,7 @@ import {
 } from "../../domain/playback.ts";
 import { metadataViewForOverlayState } from "../../components/overlay/overlay-metadata.ts";
 import {
+  spotifyLinkAccessibleName,
   spotifyLinksForMetadata,
   type OverlaySpotifyLink,
   type OverlaySpotifyLinks,
@@ -66,6 +67,39 @@ test("Spotify link mapping preserves a track item, every creator, and its album"
       label: "OPEN ALBUM ON SPOTIFY: Album title",
     },
   ]);
+  assert.deepEqual(visibleLinkDetails(links), [
+    {
+      accessibleName:
+        "LISTEN ON SPOTIFY: TRACK — Track title (opens in a new tab)",
+      destination: "track",
+      visibleTarget: { kind: "item-metadata" },
+    },
+    {
+      accessibleName:
+        "OPEN CREATOR ON SPOTIFY: Track artist (opens in a new tab)",
+      destination: "creator",
+      visibleTarget: {
+        kind: "creator-metadata",
+        precedingText: "",
+        text: "Track artist",
+      },
+    },
+    {
+      accessibleName:
+        "OPEN CREATOR ON SPOTIFY: Second track artist (opens in a new tab)",
+      destination: "creator",
+      visibleTarget: {
+        kind: "creator-metadata",
+        precedingText: "Track artist, ",
+        text: "Second track artist",
+      },
+    },
+    {
+      accessibleName: "OPEN ALBUM ON SPOTIFY: Album title (opens in a new tab)",
+      destination: "album",
+      visibleTarget: { kind: "detail-metadata" },
+    },
+  ]);
 });
 
 test("Spotify link mapping preserves an episode item and its show", () => {
@@ -86,6 +120,19 @@ test("Spotify link mapping preserves an episode item and its show", () => {
       destination: "show",
       href: "https://open.spotify.com/show/show-1",
       label: "OPEN SHOW ON SPOTIFY: Show title",
+    },
+  ]);
+  assert.deepEqual(visibleLinkDetails(links), [
+    {
+      accessibleName:
+        "LISTEN ON SPOTIFY: EPISODE — Episode title (opens in a new tab)",
+      destination: "episode",
+      visibleTarget: { kind: "item-metadata" },
+    },
+    {
+      accessibleName: "OPEN SHOW ON SPOTIFY: Show title (opens in a new tab)",
+      destination: "show",
+      visibleTarget: { kind: "show-metadata" },
     },
   ]);
 });
@@ -270,6 +317,28 @@ function linkDetails(links: ReadonlyArray<OverlaySpotifyLink>): ReadonlyArray<{
       destination: link.destination,
       href: link.providerLink.href,
       label: link.label,
+    }),
+  );
+}
+
+function visibleLinkDetails(
+  links: ReadonlyArray<OverlaySpotifyLink>,
+): ReadonlyArray<{
+  readonly accessibleName: string;
+  readonly destination: OverlaySpotifyLink["destination"];
+  readonly visibleTarget: OverlaySpotifyLink["visibleTarget"];
+}> {
+  return links.map(
+    (
+      link,
+    ): {
+      readonly accessibleName: string;
+      readonly destination: OverlaySpotifyLink["destination"];
+      readonly visibleTarget: OverlaySpotifyLink["visibleTarget"];
+    } => ({
+      accessibleName: spotifyLinkAccessibleName(link),
+      destination: link.destination,
+      visibleTarget: link.visibleTarget,
     }),
   );
 }

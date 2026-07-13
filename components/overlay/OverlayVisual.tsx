@@ -21,11 +21,14 @@ import {
 import { type OverlayUiState } from "./overlay-state.ts";
 import { OverlayMetadata } from "./OverlayMetadata.tsx";
 import { OverlayShell } from "./OverlayShell.tsx";
+import { OverlayVisualSpotifyLinks } from "./OverlayVisualSpotifyLinks.tsx";
+import { type OverlaySpotifyLinks } from "./overlay-spotify-links.ts";
 
 type OverlayVisualProps = {
   readonly geometry: OverlayGeometry;
   readonly metadata: OverlayMetadataView;
   readonly motion: OverlayMotionDecision;
+  readonly spotifyLinks: OverlaySpotifyLinks;
   readonly state: OverlayUiState;
 };
 
@@ -33,33 +36,43 @@ export function OverlayVisual({
   geometry,
   metadata,
   motion,
+  spotifyLinks,
   state,
 }: OverlayVisualProps): ReactElement {
   const animationIdentityKey = overlayMetadataAnimationIdentityKey(metadata);
   const contentSizedShell = useContentSizedShell(animationIdentityKey);
 
   return (
-    <svg
-      aria-hidden="true"
-      className="block shrink-0"
-      width={geometry.width.value}
-      height={geometry.height.value}
-      viewBox={geometry.viewBox}
-    >
-      <OverlayShell width={contentSizedShell.width} />
-      <g clipPath={`url(#${overlayShellClipPathId})`}>
-        <OverlayItemAppearance identity={animationIdentityKey} motion={motion}>
-          <OverlayArtwork motion={motion} state={state} />
-          <OverlayMetadata
-            availableWidth={contentSizedShell.availableWidth}
-            metadata={metadata}
+    <div className="relative shrink-0">
+      <svg
+        aria-hidden="true"
+        className="block"
+        width={geometry.width.value}
+        height={geometry.height.value}
+        viewBox={geometry.viewBox}
+      >
+        <OverlayShell width={contentSizedShell.width} />
+        <g clipPath={`url(#${overlayShellClipPathId})`}>
+          <OverlayItemAppearance
+            identity={animationIdentityKey}
             motion={motion}
-            onTextMeasurement={contentSizedShell.reportTextMeasurement}
-          />
-          <OverlaySpotifyAttribution shellWidth={contentSizedShell.width} />
-        </OverlayItemAppearance>
-      </g>
-    </svg>
+          >
+            <OverlayArtwork motion={motion} state={state} />
+            <OverlayMetadata
+              availableWidth={contentSizedShell.availableWidth}
+              metadata={metadata}
+              motion={motion}
+              onTextMeasurement={contentSizedShell.reportTextMeasurement}
+            />
+            <OverlaySpotifyAttribution shellWidth={contentSizedShell.width} />
+          </OverlayItemAppearance>
+        </g>
+      </svg>
+      <OverlayVisualSpotifyLinks
+        availableWidth={contentSizedShell.availableWidth}
+        links={spotifyLinks}
+      />
+    </div>
   );
 }
 
