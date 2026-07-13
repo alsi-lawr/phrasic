@@ -5,7 +5,7 @@ import {
   type BrowserPlaybackApplicationPorts,
   type BrowserPlaybackWorker,
 } from "./application.ts";
-import NowPlaying from "../components/NowPlaying";
+import SpotifyNowPlayingOverlay from "../components/overlay/SpotifyNowPlayingOverlay.tsx";
 import "./globals.css";
 
 const rootElement = document.getElementById("root");
@@ -16,7 +16,9 @@ if (rootElement === null) {
 const application = createBrowserPlaybackApplication(browserApplicationPorts());
 application.start();
 
-createRoot(rootElement).render(<NowPlaying application={application} />);
+createRoot(rootElement).render(
+  <SpotifyNowPlayingOverlay application={application} />,
+);
 
 function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
   return Object.freeze({
