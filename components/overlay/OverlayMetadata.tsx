@@ -7,6 +7,7 @@ import {
   type OverlayStatusMetadataView,
   type OverlayTrackMetadataView,
 } from "./overlay-metadata.ts";
+import { type OverlayMotionDecision } from "./overlay-motion.ts";
 
 const metadataTextX = 1_344;
 const metadataTextAvailableWidth = 3_096;
@@ -59,31 +60,34 @@ const contextLine: OverlayTextLineLayout = Object.freeze({
 
 type OverlayMetadataProps = {
   readonly metadata: OverlayMetadataView;
+  readonly motion: OverlayMotionDecision;
 };
 
 export function OverlayMetadata({
   metadata,
+  motion,
 }: OverlayMetadataProps): ReactElement {
   return (
     <g fontFamily="Arial, Helvetica, sans-serif">
       <MetadataClipPaths />
-      <MetadataView metadata={metadata} />
+      <MetadataView metadata={metadata} motion={motion} />
     </g>
   );
 }
 
 type MetadataViewProps = {
   readonly metadata: OverlayMetadataView;
+  readonly motion: OverlayMotionDecision;
 };
 
-function MetadataView({ metadata }: MetadataViewProps): ReactElement {
+function MetadataView({ metadata, motion }: MetadataViewProps): ReactElement {
   switch (metadata.kind) {
     case "status":
       return <StatusMetadata metadata={metadata} />;
     case "track":
-      return <TrackMetadata metadata={metadata} />;
+      return <TrackMetadata metadata={metadata} motion={motion} />;
     case "episode":
-      return <EpisodeMetadata metadata={metadata} />;
+      return <EpisodeMetadata metadata={metadata} motion={motion} />;
   }
 
   return unreachable(metadata);
@@ -118,9 +122,10 @@ function StatusMetadata({ metadata }: StatusMetadataProps): ReactElement {
 
 type TrackMetadataProps = {
   readonly metadata: OverlayTrackMetadataView;
+  readonly motion: OverlayMotionDecision;
 };
 
-function TrackMetadata({ metadata }: TrackMetadataProps): ReactElement {
+function TrackMetadata({ metadata, motion }: TrackMetadataProps): ReactElement {
   return (
     <>
       <MetadataCategory
@@ -129,16 +134,19 @@ function TrackMetadata({ metadata }: TrackMetadataProps): ReactElement {
       <MetadataMarqueeLine
         animationIdentity={metadata.itemIdentity}
         line={titleLine}
+        motion={motion}
         text={metadata.trackTitle.value}
       />
       <MetadataMarqueeLine
         animationIdentity={metadata.itemIdentity}
         line={subtitleLine}
+        motion={motion}
         text={artistNames(metadata.artists)}
       />
       <MetadataMarqueeLine
         animationIdentity={metadata.itemIdentity}
         line={contextLine}
+        motion={motion}
         text={metadata.album.title.value}
       />
     </>
@@ -147,9 +155,13 @@ function TrackMetadata({ metadata }: TrackMetadataProps): ReactElement {
 
 type EpisodeMetadataProps = {
   readonly metadata: OverlayEpisodeMetadataView;
+  readonly motion: OverlayMotionDecision;
 };
 
-function EpisodeMetadata({ metadata }: EpisodeMetadataProps): ReactElement {
+function EpisodeMetadata({
+  metadata,
+  motion,
+}: EpisodeMetadataProps): ReactElement {
   return (
     <>
       <MetadataCategory
@@ -158,16 +170,19 @@ function EpisodeMetadata({ metadata }: EpisodeMetadataProps): ReactElement {
       <MetadataMarqueeLine
         animationIdentity={metadata.itemIdentity}
         line={titleLine}
+        motion={motion}
         text={metadata.episodeTitle.value}
       />
       <MetadataMarqueeLine
         animationIdentity={metadata.itemIdentity}
         line={subtitleLine}
+        motion={motion}
         text={metadata.show.title.value}
       />
       <MetadataMarqueeLine
         animationIdentity={metadata.itemIdentity}
         line={contextLine}
+        motion={motion}
         text={metadata.show.publisher.value}
       />
     </>
@@ -196,12 +211,14 @@ function MetadataCategory({ value }: MetadataCategoryProps): ReactElement {
 type MetadataMarqueeLineProps = {
   readonly animationIdentity: OverlayTrackMetadataView["itemIdentity"];
   readonly line: OverlayTextLineLayout;
+  readonly motion: OverlayMotionDecision;
   readonly text: string;
 };
 
 function MetadataMarqueeLine({
   animationIdentity,
   line,
+  motion,
   text,
 }: MetadataMarqueeLineProps): ReactElement {
   return (
@@ -213,6 +230,7 @@ function MetadataMarqueeLine({
       fontSize={line.fontSize}
       fontWeight={line.fontWeight}
       letterSpacing={line.letterSpacing}
+      motion={motion}
       text={text}
       x={line.x}
       y={line.y}

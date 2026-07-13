@@ -13,6 +13,7 @@ import {
   marqueeDecisionForTextBounds,
   type MarqueeOverflowDecision,
 } from "./overlay-marquee.ts";
+import { type OverlayMotionDecision } from "./overlay-motion.ts";
 
 type MarqueeTextProps = {
   readonly animationIdentity: OverlayItemIdentity;
@@ -22,6 +23,7 @@ type MarqueeTextProps = {
   readonly fontSize: number;
   readonly fontWeight: number;
   readonly letterSpacing: number;
+  readonly motion: OverlayMotionDecision;
   readonly text: string;
   readonly x: number;
   readonly y: number;
@@ -40,6 +42,7 @@ export function MarqueeText({
   fontSize,
   fontWeight,
   letterSpacing,
+  motion,
   text,
   x,
   y,
@@ -51,24 +54,175 @@ export function MarqueeText({
     text,
   });
 
-  if (decision.kind === "contained") {
-    return (
-      <g clipPath={`url(#${clipPathId})`}>
-        <text
-          ref={textReference}
-          x={x}
-          y={y}
+  switch (motion.kind) {
+    case "reduced":
+      return (
+        <StaticMarqueeText
+          clipPathId={clipPathId}
           fill={fill}
           fontSize={fontSize}
           fontWeight={fontWeight}
           letterSpacing={letterSpacing}
-        >
-          {text}
-        </text>
-      </g>
-    );
+          text={text}
+          textReference={textReference}
+          x={x}
+          y={y}
+        />
+      );
+    case "enabled":
+      return (
+        <MarqueeTextForDecision
+          animationIdentityKey={animationIdentityKey}
+          clipPathId={clipPathId}
+          decision={decision}
+          fill={fill}
+          fontSize={fontSize}
+          fontWeight={fontWeight}
+          letterSpacing={letterSpacing}
+          text={text}
+          textReference={textReference}
+          x={x}
+          y={y}
+        />
+      );
   }
 
+  return unreachable(motion);
+}
+
+type MarqueeTextForDecisionProps = {
+  readonly animationIdentityKey: string;
+  readonly clipPathId: string;
+  readonly decision: MarqueeOverflowDecision;
+  readonly fill: string;
+  readonly fontSize: number;
+  readonly fontWeight: number;
+  readonly letterSpacing: number;
+  readonly text: string;
+  readonly textReference: RefObject<SVGTextElement | null>;
+  readonly x: number;
+  readonly y: number;
+};
+
+function MarqueeTextForDecision({
+  animationIdentityKey,
+  clipPathId,
+  decision,
+  fill,
+  fontSize,
+  fontWeight,
+  letterSpacing,
+  text,
+  textReference,
+  x,
+  y,
+}: MarqueeTextForDecisionProps): ReactElement {
+  switch (decision.kind) {
+    case "contained":
+      return (
+        <StaticMarqueeText
+          clipPathId={clipPathId}
+          fill={fill}
+          fontSize={fontSize}
+          fontWeight={fontWeight}
+          letterSpacing={letterSpacing}
+          text={text}
+          textReference={textReference}
+          x={x}
+          y={y}
+        />
+      );
+    case "overflowing":
+      return (
+        <AnimatedMarqueeText
+          animationIdentityKey={animationIdentityKey}
+          clipPathId={clipPathId}
+          decision={decision}
+          fill={fill}
+          fontSize={fontSize}
+          fontWeight={fontWeight}
+          letterSpacing={letterSpacing}
+          text={text}
+          textReference={textReference}
+          x={x}
+          y={y}
+        />
+      );
+  }
+
+  return unreachable(decision);
+}
+
+type StaticMarqueeTextProps = {
+  readonly clipPathId: string;
+  readonly fill: string;
+  readonly fontSize: number;
+  readonly fontWeight: number;
+  readonly letterSpacing: number;
+  readonly text: string;
+  readonly textReference: RefObject<SVGTextElement | null>;
+  readonly x: number;
+  readonly y: number;
+};
+
+function StaticMarqueeText({
+  clipPathId,
+  fill,
+  fontSize,
+  fontWeight,
+  letterSpacing,
+  text,
+  textReference,
+  x,
+  y,
+}: StaticMarqueeTextProps): ReactElement {
+  return (
+    <g clipPath={`url(#${clipPathId})`}>
+      <text
+        ref={textReference}
+        x={x}
+        y={y}
+        fill={fill}
+        fontSize={fontSize}
+        fontWeight={fontWeight}
+        letterSpacing={letterSpacing}
+      >
+        {text}
+      </text>
+    </g>
+  );
+}
+
+type AnimatedMarqueeTextProps = {
+  readonly animationIdentityKey: string;
+  readonly clipPathId: string;
+  readonly decision: Extract<
+    MarqueeOverflowDecision,
+    { readonly kind: "overflowing" }
+  >;
+  readonly fill: string;
+  readonly fontSize: number;
+  readonly fontWeight: number;
+  readonly letterSpacing: number;
+  readonly text: string;
+  readonly textReference: RefObject<SVGTextElement | null>;
+  readonly x: number;
+  readonly y: number;
+};
+
+function AnimatedMarqueeText({
+  animationIdentityKey,
+  clipPathId,
+  decision,
+  fill,
+  fontSize,
+  fontWeight,
+  letterSpacing,
+  text,
+  textReference,
+  x,
+  y,
+}: AnimatedMarqueeTextProps): ReactElement {
   return (
     <g clipPath={`url(#${clipPathId})`}>
       <g key={animationIdentityKey}>
@@ -161,4 +315,8 @@ function sameMarqueeOverflowDecision(
     left.measuredWidth === right.measuredWidth &&
     left.travelDistance === right.travelDistance
   );
+}
+
+function unreachable(value: never): never {
+  throw new Error(`Unexpected marquee motion value: ${String(value)}`);
 }

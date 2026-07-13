@@ -4,12 +4,18 @@ import { PlaybackWorkerProvider } from "../playback/PlaybackWorkerProvider.tsx";
 import { usePlaybackWorker } from "../playback/usePlaybackWorker.ts";
 import { OverlayControls } from "./OverlayControls.tsx";
 import { resolveOverlayGeometry } from "./overlay-geometry.ts";
+import { overlayMotionDecisionForPreference } from "./overlay-motion.ts";
+import {
+  OverlaySemanticCompanion,
+  overlaySemanticHeadingId,
+} from "./OverlaySemanticCompanion.tsx";
+import { semanticViewForOverlayState } from "./overlay-semantics.ts";
 import {
   controlPlanForOverlayState,
   overlayUiStateForSnapshot,
 } from "./overlay-state.ts";
-import { metadataViewForOverlayState } from "./overlay-metadata.ts";
 import { OverlayVisual } from "./OverlayVisual.tsx";
+import { useReducedMotionPreference } from "./reduced-motion.ts";
 
 type SpotifyNowPlayingOverlayProps = {
   readonly application: BrowserPlaybackApplication;
@@ -27,20 +33,31 @@ export default function SpotifyNowPlayingOverlay({
 
 function SpotifyNowPlayingOverlayContent(): ReactElement {
   const { beginAuthorization, logout, retry, snapshot } = usePlaybackWorker();
+  const prefersReducedMotion = useReducedMotionPreference();
   const geometry = resolveOverlayGeometry(
     new URL(window.location.href).searchParams,
   );
   const state = overlayUiStateForSnapshot(snapshot);
-  const metadata = metadataViewForOverlayState(state);
+  const motion = overlayMotionDecisionForPreference(prefersReducedMotion);
+  const semantic = semanticViewForOverlayState(state);
   const controls = controlPlanForOverlayState(state, geometry.setupMode);
 
   return (
-    <div className="m-0 flex w-full flex-col items-start justify-start p-0">
-      <OverlayVisual geometry={geometry} metadata={metadata} state={state} />
+    <main className="m-0 flex w-full flex-col items-start justify-start p-0">
+      <h1 id={overlaySemanticHeadingId} className="sr-only">
+        Spotify now playing
+      </h1>
+      <OverlaySemanticCompanion semantic={semantic} />
+      <OverlayVisual
+        geometry={geometry}
+        metadata={semantic.metadata}
+        motion={motion}
+        state={state}
+      />
       <OverlayControls
         actions={{ beginAuthorization, logout, retry }}
         plan={controls}
       />
-    </div>
+    </main>
   );
 }

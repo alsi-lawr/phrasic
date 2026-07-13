@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import type { NowPlayingItem } from "../../domain/playback.ts";
 import { FallbackVinyl } from "./FallbackVinyl.tsx";
+import type { OverlayMotionDecision } from "./overlay-motion.ts";
 import {
   artworkTreatmentForOverlayState,
   type OverlayArtworkTreatment,
@@ -8,10 +9,14 @@ import {
 } from "./overlay-state.ts";
 
 type OverlayArtworkProps = {
+  readonly motion: OverlayMotionDecision;
   readonly state: OverlayUiState;
 };
 
-export function OverlayArtwork({ state }: OverlayArtworkProps): ReactElement {
+export function OverlayArtwork({
+  motion,
+  state,
+}: OverlayArtworkProps): ReactElement {
   const treatment = artworkTreatmentForOverlayState(state);
 
   return (
@@ -26,25 +31,29 @@ export function OverlayArtwork({ state }: OverlayArtworkProps): ReactElement {
         stroke="#35404d"
         strokeWidth={4}
       />
-      <ArtworkTreatment treatment={treatment} />
+      <ArtworkTreatment motion={motion} treatment={treatment} />
     </g>
   );
 }
 
 type ArtworkTreatmentProps = {
+  readonly motion: OverlayMotionDecision;
   readonly treatment: OverlayArtworkTreatment;
 };
 
-function ArtworkTreatment({ treatment }: ArtworkTreatmentProps): ReactElement {
+function ArtworkTreatment({
+  motion,
+  treatment,
+}: ArtworkTreatmentProps): ReactElement {
   switch (treatment.kind) {
     case "fallback":
-      return <FallbackVinyl />;
+      return <FallbackVinyl motion={motion} />;
     case "current-item":
-      return <CurrentArtwork item={treatment.item} />;
+      return <CurrentArtwork item={treatment.item} motion={motion} />;
     case "stale-item":
       return (
         <g opacity={0.45}>
-          <CurrentArtwork item={treatment.item} />
+          <CurrentArtwork item={treatment.item} motion={motion} />
         </g>
       );
   }
@@ -54,9 +63,10 @@ function ArtworkTreatment({ treatment }: ArtworkTreatmentProps): ReactElement {
 
 type CurrentArtworkProps = {
   readonly item: NowPlayingItem;
+  readonly motion: OverlayMotionDecision;
 };
 
-function CurrentArtwork({ item }: CurrentArtworkProps): ReactElement {
+function CurrentArtwork({ item, motion }: CurrentArtworkProps): ReactElement {
   switch (item.artwork.kind) {
     case "available":
       return (
@@ -70,7 +80,7 @@ function CurrentArtwork({ item }: CurrentArtworkProps): ReactElement {
         />
       );
     case "unavailable":
-      return <FallbackVinyl />;
+      return <FallbackVinyl motion={motion} />;
   }
 
   return unreachable(item.artwork);
