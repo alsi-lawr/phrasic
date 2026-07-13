@@ -1,5 +1,8 @@
 import { createBrowserPkceCryptoPort } from "../auth/pkce.ts";
-import { createIndexedDbSpotifyAuthStorage } from "../auth/storage.ts";
+import {
+  createIndexedDbSpotifyAuthStorage,
+  createNativeIndexedDbAuthorizationPort,
+} from "../auth/storage.ts";
 import { createSpotifyAuthFetchPort } from "../auth/token.ts";
 import { createSpotifyCurrentlyPlayingPort } from "../providers/spotify.ts";
 import { createPlaybackWorkerFatalInitializationFailure } from "./protocol.ts";
@@ -57,7 +60,9 @@ function createWorkerBootstrap(): WorkerBootstrap {
       auth: Object.freeze({
         crypto: createBrowserPkceCryptoPort(self.crypto),
         fetch: createSpotifyAuthFetchPort(self.fetch),
-        storage: createIndexedDbSpotifyAuthStorage(self.indexedDB),
+        storage: createIndexedDbSpotifyAuthStorage(
+          createNativeIndexedDbAuthorizationPort(self.indexedDB),
+        ),
       }),
       cancellation: Object.freeze({
         create(): AbortController {

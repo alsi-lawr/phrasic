@@ -92,6 +92,13 @@ export type SpotifyAuthStoragePort = {
   readonly clearSpotifyAuthorization: () => Promise<void>;
 };
 
+export type IndexedDbAuthorizationStoreName =
+  | typeof pendingAuthorizationAttemptsStoreName
+  | typeof spotifyConnectionsStoreName;
+
+export type IndexedDbAuthorizationStorageKey =
+  typeof spotifyProvider | readonly [typeof spotifyProvider, string];
+
 export type IndexedDbRequestHandlers = {
   readonly success: () => void;
   readonly failure: () => void;
@@ -113,8 +120,52 @@ export type IndexedDbTransactionCompletionPort = {
   readonly subscribe: (handlers: IndexedDbTransactionHandlers) => void;
 };
 
+export type IndexedDbAuthorizationObjectStorePort = {
+  readonly put: (value: object, key: IndexedDbAuthorizationStorageKey) => void;
+  readonly get: (
+    key: IndexedDbAuthorizationStorageKey,
+  ) => IndexedDbRequestCompletionPort<unknown>;
+  readonly delete: (key: IndexedDbAuthorizationStorageKey) => void;
+  readonly clear: () => void;
+};
+
+export type IndexedDbAuthorizationTransactionPort =
+  IndexedDbTransactionCompletionPort & {
+    readonly objectStore: (
+      storeName: IndexedDbAuthorizationStoreName,
+    ) => IndexedDbAuthorizationObjectStorePort;
+  };
+
+export type IndexedDbAuthorizationDatabasePort = {
+  readonly hasObjectStore: (
+    storeName: IndexedDbAuthorizationStoreName,
+  ) => boolean;
+  readonly createObjectStore: (
+    storeName: IndexedDbAuthorizationStoreName,
+  ) => void;
+  readonly transaction: (
+    storeNames:
+      | IndexedDbAuthorizationStoreName
+      | ReadonlyArray<IndexedDbAuthorizationStoreName>,
+  ) => IndexedDbAuthorizationTransactionPort;
+  readonly subscribeVersionChange: (handler: () => void) => void;
+  readonly close: () => void;
+};
+
+export type IndexedDbAuthorizationOpenOptions = {
+  readonly name: string;
+  readonly version: number;
+  readonly upgrade: (database: IndexedDbAuthorizationDatabasePort) => void;
+};
+
+export type IndexedDbAuthorizationPort = {
+  readonly open: (
+    options: IndexedDbAuthorizationOpenOptions,
+  ) => IndexedDbRequestCompletionPort<IndexedDbAuthorizationDatabasePort>;
+};
+
 export function createIndexedDbSpotifyAuthStorage(
-  indexedDb: IDBFactory,
+  indexedDb: IndexedDbAuthorizationPort,
 ): SpotifyAuthStoragePort {
   const database = openAuthorizationDatabase(indexedDb);
   const storage: SpotifyAuthStoragePort = {
@@ -124,11 +175,8 @@ export function createIndexedDbSpotifyAuthStorage(
       const openedDatabase = await database;
       const transaction = openedDatabase.transaction(
         pendingAuthorizationAttemptsStoreName,
-        "readwrite",
       );
-      const completion = waitForIndexedDbTransaction(
-        indexedDbTransactionCompletionPort(transaction),
-      );
+      const completion = waitForIndexedDbTransaction(transaction);
 
       try {
         const store = transaction.objectStore(
@@ -161,11 +209,8 @@ export function createIndexedDbSpotifyAuthStorage(
       const openedDatabase = await database;
       const transaction = openedDatabase.transaction(
         spotifyConnectionsStoreName,
-        "readwrite",
       );
-      const completion = waitForIndexedDbTransaction(
-        indexedDbTransactionCompletionPort(transaction),
-      );
+      const completion = waitForIndexedDbTransaction(transaction);
 
       try {
         const store = transaction.objectStore(spotifyConnectionsStoreName);
@@ -182,11 +227,8 @@ export function createIndexedDbSpotifyAuthStorage(
       const openedDatabase = await database;
       const transaction = openedDatabase.transaction(
         spotifyConnectionsStoreName,
-        "readwrite",
       );
-      const completion = waitForIndexedDbTransaction(
-        indexedDbTransactionCompletionPort(transaction),
-      );
+      const completion = waitForIndexedDbTransaction(transaction);
 
       try {
         const store = transaction.objectStore(spotifyConnectionsStoreName);
@@ -198,13 +240,11 @@ export function createIndexedDbSpotifyAuthStorage(
 
     async clearSpotifyAuthorization(): Promise<void> {
       const openedDatabase = await database;
-      const transaction = openedDatabase.transaction(
-        [pendingAuthorizationAttemptsStoreName, spotifyConnectionsStoreName],
-        "readwrite",
-      );
-      const completion = waitForIndexedDbTransaction(
-        indexedDbTransactionCompletionPort(transaction),
-      );
+      const transaction = openedDatabase.transaction([
+        pendingAuthorizationAttemptsStoreName,
+        spotifyConnectionsStoreName,
+      ]);
+      const completion = waitForIndexedDbTransaction(transaction);
 
       try {
         transaction.objectStore(pendingAuthorizationAttemptsStoreName).clear();
@@ -218,7 +258,7 @@ export function createIndexedDbSpotifyAuthStorage(
   return Object.freeze(storage);
 }
 
-export function waitForIndexedDbRequest<Value>(
+function waitForIndexedDbRequest<Value>(
   request: IndexedDbRequestCompletionPort<Value>,
 ): Promise<Value> {
   return new Promise<Value>((resolve, reject) => {
@@ -235,7 +275,7 @@ export function waitForIndexedDbRequest<Value>(
   });
 }
 
-export function waitForIndexedDbTransaction(
+function waitForIndexedDbTransaction(
   transaction: IndexedDbTransactionCompletionPort,
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
@@ -298,41 +338,40 @@ type SpotifyRefreshTokenConnectionReadState =
     };
 
 async function openAuthorizationDatabase(
-  indexedDb: IDBFactory,
-): Promise<IDBDatabase> {
-  const request = indexedDb.open(databaseName, databaseVersion);
-  request.onupgradeneeded = (): void => {
-    const database = request.result;
-    if (
-      !database.objectStoreNames.contains(pendingAuthorizationAttemptsStoreName)
-    ) {
-      database.createObjectStore(pendingAuthorizationAttemptsStoreName);
-    }
+  indexedDb: IndexedDbAuthorizationPort,
+): Promise<IndexedDbAuthorizationDatabasePort> {
+  const request = indexedDb.open(
+    Object.freeze({
+      name: databaseName,
+      version: databaseVersion,
+      upgrade(database: IndexedDbAuthorizationDatabasePort): void {
+        if (!database.hasObjectStore(pendingAuthorizationAttemptsStoreName)) {
+          database.createObjectStore(pendingAuthorizationAttemptsStoreName);
+        }
 
-    if (!database.objectStoreNames.contains(spotifyConnectionsStoreName)) {
-      database.createObjectStore(spotifyConnectionsStoreName);
-    }
-  };
-
-  const database = await waitForIndexedDbRequest(
-    indexedDbRequestCompletionPort(request),
+        if (!database.hasObjectStore(spotifyConnectionsStoreName)) {
+          database.createObjectStore(spotifyConnectionsStoreName);
+        }
+      },
+    }),
   );
-  database.onversionchange = (): void => {
+
+  const database = await waitForIndexedDbRequest(request);
+  database.subscribeVersionChange((): void => {
     database.close();
-  };
+  });
 
   return database;
 }
 
 function consumeStoredPendingAuthorizationAttempt(
-  database: IDBDatabase,
+  database: IndexedDbAuthorizationDatabasePort,
   options: SpotifyPendingAuthorizationAttemptConsumeOptions,
 ): Promise<SpotifyPendingAuthorizationAttemptConsumeResult> {
   return new Promise<SpotifyPendingAuthorizationAttemptConsumeResult>(
     (resolve, reject) => {
       const transaction = database.transaction(
         pendingAuthorizationAttemptsStoreName,
-        "readwrite",
       );
       const store = transaction.objectStore(
         pendingAuthorizationAttemptsStoreName,
@@ -342,149 +381,293 @@ function consumeStoredPendingAuthorizationAttempt(
         kind: "waiting",
       });
 
-      transaction.oncomplete = (): void => {
-        if (state.kind === "waiting") {
-          reject(
-            new Error(
-              "IndexedDB pending authorization transaction completed without a result.",
-            ),
-          );
-          return;
-        }
+      transaction.subscribe(
+        Object.freeze({
+          complete(): void {
+            if (state.kind === "waiting") {
+              reject(
+                new Error(
+                  "IndexedDB pending authorization transaction completed without a result.",
+                ),
+              );
+              return;
+            }
 
-        resolve(state.result);
-      };
-      transaction.onerror = (): void => {
-        reject(indexedDbFailure("transaction", transaction.error));
-      };
-      transaction.onabort = (): void => {
-        reject(indexedDbFailure("transaction", transaction.error));
-      };
+            resolve(state.result);
+          },
+          failure(): void {
+            reject(indexedDbFailure("transaction", transaction.error()));
+          },
+        }),
+      );
 
       const request = store.get(key);
-      request.onerror = (): void => {
-        reject(indexedDbFailure("request", request.error));
-      };
-      request.onsuccess = (): void => {
-        const storedAttempt: unknown = request.result;
-        if (storedAttempt === undefined) {
-          state = frozenPendingAuthorizationAttemptConsumeState(
-            frozenRejectedPendingAttempt("missing-attempt"),
-          );
-          return;
-        }
+      request.subscribe(
+        Object.freeze({
+          success(): void {
+            const storedAttempt = request.value();
+            if (storedAttempt === undefined) {
+              state = frozenPendingAuthorizationAttemptConsumeState(
+                frozenRejectedPendingAttempt("missing-attempt"),
+              );
+              return;
+            }
 
-        store.delete(key);
-        const parsedAttempt =
-          parseStoredPendingAuthorizationAttempt(storedAttempt);
-        if (parsedAttempt.kind === "failure") {
-          state = frozenPendingAuthorizationAttemptConsumeState(
-            parsedAttempt.result,
-          );
-          return;
-        }
+            store.delete(key);
+            const parsedAttempt =
+              parseStoredPendingAuthorizationAttempt(storedAttempt);
+            if (parsedAttempt.kind === "failure") {
+              state = frozenPendingAuthorizationAttemptConsumeState(
+                parsedAttempt.result,
+              );
+              return;
+            }
 
-        if (
-          !matchesPendingAuthorizationAttemptState({
-            pending: parsedAttempt.value,
-            candidate: options.state,
-          })
-        ) {
-          state = frozenPendingAuthorizationAttemptConsumeState(
-            frozenRejectedPendingAttempt("state-mismatch"),
-          );
-          return;
-        }
+            if (
+              !matchesPendingAuthorizationAttemptState({
+                pending: parsedAttempt.value,
+                candidate: options.state,
+              })
+            ) {
+              state = frozenPendingAuthorizationAttemptConsumeState(
+                frozenRejectedPendingAttempt("state-mismatch"),
+              );
+              return;
+            }
 
-        if (
-          isPendingAuthorizationAttemptExpired({
-            pending: parsedAttempt.value,
-            observedAt: options.observedAt,
-          })
-        ) {
-          state = frozenPendingAuthorizationAttemptConsumeState(
-            frozenRejectedPendingAttempt("expired"),
-          );
-          return;
-        }
+            if (
+              isPendingAuthorizationAttemptExpired({
+                pending: parsedAttempt.value,
+                observedAt: options.observedAt,
+              })
+            ) {
+              state = frozenPendingAuthorizationAttemptConsumeState(
+                frozenRejectedPendingAttempt("expired"),
+              );
+              return;
+            }
 
-        state = frozenPendingAuthorizationAttemptConsumeState(
-          frozenConsumedPendingAttempt(parsedAttempt.value),
-        );
-      };
+            state = frozenPendingAuthorizationAttemptConsumeState(
+              frozenConsumedPendingAttempt(parsedAttempt.value),
+            );
+          },
+          failure(): void {
+            reject(indexedDbFailure("request", request.error()));
+          },
+        }),
+      );
     },
   );
 }
 
 function readStoredSpotifyRefreshTokenConnection(
-  database: IDBDatabase,
+  database: IndexedDbAuthorizationDatabasePort,
 ): Promise<SpotifyRefreshTokenConnectionReadResult> {
   return new Promise<SpotifyRefreshTokenConnectionReadResult>(
     (resolve, reject) => {
-      const transaction = database.transaction(
-        spotifyConnectionsStoreName,
-        "readwrite",
-      );
+      const transaction = database.transaction(spotifyConnectionsStoreName);
       const store = transaction.objectStore(spotifyConnectionsStoreName);
       let state: SpotifyRefreshTokenConnectionReadState = Object.freeze({
         kind: "waiting",
       });
 
-      transaction.oncomplete = (): void => {
-        if (state.kind === "waiting") {
-          reject(
-            new Error(
-              "IndexedDB Spotify connection transaction completed without a result.",
-            ),
-          );
-          return;
-        }
+      transaction.subscribe(
+        Object.freeze({
+          complete(): void {
+            if (state.kind === "waiting") {
+              reject(
+                new Error(
+                  "IndexedDB Spotify connection transaction completed without a result.",
+                ),
+              );
+              return;
+            }
 
-        resolve(state.result);
-      };
-      transaction.onerror = (): void => {
-        reject(indexedDbFailure("transaction", transaction.error));
-      };
-      transaction.onabort = (): void => {
-        reject(indexedDbFailure("transaction", transaction.error));
-      };
+            resolve(state.result);
+          },
+          failure(): void {
+            reject(indexedDbFailure("transaction", transaction.error()));
+          },
+        }),
+      );
 
       const request = store.get(spotifyProvider);
-      request.onerror = (): void => {
-        reject(indexedDbFailure("request", request.error));
-      };
-      request.onsuccess = (): void => {
-        const storedConnection: unknown = request.result;
-        if (storedConnection === undefined) {
-          state = frozenSpotifyRefreshTokenConnectionReadState(
-            frozenMissingConnection(),
-          );
-          return;
-        }
+      request.subscribe(
+        Object.freeze({
+          success(): void {
+            const storedConnection = request.value();
+            if (storedConnection === undefined) {
+              state = frozenSpotifyRefreshTokenConnectionReadState(
+                frozenMissingConnection(),
+              );
+              return;
+            }
 
-        const connection =
-          parseStoredSpotifyRefreshTokenConnection(storedConnection);
-        if (connection.kind === "failure") {
-          store.delete(spotifyProvider);
-          state = frozenSpotifyRefreshTokenConnectionReadState(
-            frozenMissingConnection(),
-          );
-          return;
-        }
+            const connection =
+              parseStoredSpotifyRefreshTokenConnection(storedConnection);
+            if (connection.kind === "failure") {
+              store.delete(spotifyProvider);
+              state = frozenSpotifyRefreshTokenConnectionReadState(
+                frozenMissingConnection(),
+              );
+              return;
+            }
 
-        state = frozenSpotifyRefreshTokenConnectionReadState(
-          frozenFoundConnection(connection.value),
-        );
-      };
+            state = frozenSpotifyRefreshTokenConnectionReadState(
+              frozenFoundConnection(connection.value),
+            );
+          },
+          failure(): void {
+            reject(indexedDbFailure("request", request.error()));
+          },
+        }),
+      );
     },
   );
 }
 
-function indexedDbRequestCompletionPort<Value>(
-  request: IDBRequest<Value>,
-): IndexedDbRequestCompletionPort<Value> {
-  const port: IndexedDbRequestCompletionPort<Value> = {
-    value(): Value {
+export function createNativeIndexedDbAuthorizationPort(
+  indexedDb: IDBFactory,
+): IndexedDbAuthorizationPort {
+  const port: IndexedDbAuthorizationPort = {
+    open(
+      options: IndexedDbAuthorizationOpenOptions,
+    ): IndexedDbRequestCompletionPort<IndexedDbAuthorizationDatabasePort> {
+      const request = indexedDb.open(options.name, options.version);
+      request.onupgradeneeded = (): void => {
+        options.upgrade(
+          nativeIndexedDbAuthorizationDatabasePort(request.result),
+        );
+      };
+
+      return nativeIndexedDbAuthorizationOpenRequestCompletionPort(request);
+    },
+  };
+
+  return Object.freeze(port);
+}
+
+function nativeIndexedDbAuthorizationOpenRequestCompletionPort(
+  request: IDBOpenDBRequest,
+): IndexedDbRequestCompletionPort<IndexedDbAuthorizationDatabasePort> {
+  const port: IndexedDbRequestCompletionPort<IndexedDbAuthorizationDatabasePort> =
+    {
+      value(): IndexedDbAuthorizationDatabasePort {
+        return nativeIndexedDbAuthorizationDatabasePort(request.result);
+      },
+      error(): unknown {
+        return request.error;
+      },
+      subscribe(handlers: IndexedDbRequestHandlers): void {
+        request.onsuccess = (): void => {
+          handlers.success();
+        };
+        request.onerror = (): void => {
+          handlers.failure();
+        };
+      },
+    };
+
+  return Object.freeze(port);
+}
+
+function nativeIndexedDbAuthorizationDatabasePort(
+  database: IDBDatabase,
+): IndexedDbAuthorizationDatabasePort {
+  const port: IndexedDbAuthorizationDatabasePort = {
+    hasObjectStore(storeName: IndexedDbAuthorizationStoreName): boolean {
+      return database.objectStoreNames.contains(storeName);
+    },
+    createObjectStore(storeName: IndexedDbAuthorizationStoreName): void {
+      database.createObjectStore(storeName);
+    },
+    transaction(
+      storeNames:
+        | IndexedDbAuthorizationStoreName
+        | ReadonlyArray<IndexedDbAuthorizationStoreName>,
+    ): IndexedDbAuthorizationTransactionPort {
+      return nativeIndexedDbAuthorizationTransactionPort(
+        database.transaction(
+          nativeIndexedDbAuthorizationStoreNames(storeNames),
+          "readwrite",
+        ),
+      );
+    },
+    subscribeVersionChange(handler: () => void): void {
+      database.onversionchange = (): void => {
+        handler();
+      };
+    },
+    close(): void {
+      database.close();
+    },
+  };
+
+  return Object.freeze(port);
+}
+
+function nativeIndexedDbAuthorizationTransactionPort(
+  transaction: IDBTransaction,
+): IndexedDbAuthorizationTransactionPort {
+  const port: IndexedDbAuthorizationTransactionPort = {
+    error(): unknown {
+      return transaction.error;
+    },
+    subscribe(handlers: IndexedDbTransactionHandlers): void {
+      transaction.oncomplete = (): void => {
+        handlers.complete();
+      };
+      transaction.onerror = (): void => {
+        handlers.failure();
+      };
+      transaction.onabort = (): void => {
+        handlers.failure();
+      };
+    },
+    objectStore(
+      storeName: IndexedDbAuthorizationStoreName,
+    ): IndexedDbAuthorizationObjectStorePort {
+      return nativeIndexedDbAuthorizationObjectStorePort(
+        transaction.objectStore(storeName),
+      );
+    },
+  };
+
+  return Object.freeze(port);
+}
+
+function nativeIndexedDbAuthorizationObjectStorePort(
+  store: IDBObjectStore,
+): IndexedDbAuthorizationObjectStorePort {
+  const port: IndexedDbAuthorizationObjectStorePort = {
+    put(value: object, key: IndexedDbAuthorizationStorageKey): void {
+      store.put(value, nativeIndexedDbAuthorizationStorageKey(key));
+    },
+    get(
+      key: IndexedDbAuthorizationStorageKey,
+    ): IndexedDbRequestCompletionPort<unknown> {
+      const request: IDBRequest<unknown> = store.get(
+        nativeIndexedDbAuthorizationStorageKey(key),
+      );
+
+      return nativeIndexedDbRequestCompletionPort(request);
+    },
+    delete(key: IndexedDbAuthorizationStorageKey): void {
+      store.delete(nativeIndexedDbAuthorizationStorageKey(key));
+    },
+    clear(): void {
+      store.clear();
+    },
+  };
+
+  return Object.freeze(port);
+}
+
+function nativeIndexedDbRequestCompletionPort(
+  request: IDBRequest<unknown>,
+): IndexedDbRequestCompletionPort<unknown> {
+  const port: IndexedDbRequestCompletionPort<unknown> = {
+    value(): unknown {
       return request.result;
     },
     error(): unknown {
@@ -503,27 +686,26 @@ function indexedDbRequestCompletionPort<Value>(
   return Object.freeze(port);
 }
 
-function indexedDbTransactionCompletionPort(
-  transaction: IDBTransaction,
-): IndexedDbTransactionCompletionPort {
-  const port: IndexedDbTransactionCompletionPort = {
-    error(): unknown {
-      return transaction.error;
-    },
-    subscribe(handlers: IndexedDbTransactionHandlers): void {
-      transaction.oncomplete = (): void => {
-        handlers.complete();
-      };
-      transaction.onerror = (): void => {
-        handlers.failure();
-      };
-      transaction.onabort = (): void => {
-        handlers.failure();
-      };
-    },
-  };
+function nativeIndexedDbAuthorizationStoreNames(
+  storeNames:
+    | IndexedDbAuthorizationStoreName
+    | ReadonlyArray<IndexedDbAuthorizationStoreName>,
+): string | Array<string> {
+  if (typeof storeNames === "string") {
+    return storeNames;
+  }
 
-  return Object.freeze(port);
+  return [...storeNames];
+}
+
+function nativeIndexedDbAuthorizationStorageKey(
+  key: IndexedDbAuthorizationStorageKey,
+): IDBValidKey {
+  if (typeof key === "string") {
+    return key;
+  }
+
+  return [key[0], key[1]];
 }
 
 function storedPendingAuthorizationAttempt(
@@ -717,8 +899,12 @@ function readStoredDataProperty(
   return succeeded(descriptor.value);
 }
 
-function pendingAttemptStorageKey(state: string): Array<string> {
-  return [spotifyProvider, state];
+function pendingAttemptStorageKey(
+  state: string,
+): readonly [typeof spotifyProvider, string] {
+  const key: [typeof spotifyProvider, string] = [spotifyProvider, state];
+
+  return Object.freeze(key);
 }
 
 function indexedDbFailure(
