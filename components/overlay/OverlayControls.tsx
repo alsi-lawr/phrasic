@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
+import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
+import type { PlaybackState } from "../../domain/playback.ts";
 import type { OverlaySetupMode } from "./overlay-geometry.ts";
-import type { OverlayControlPlans } from "./overlay-view-model.ts";
 
 const controlButtonClass =
   "rounded-md border border-slate-500 bg-slate-950 px-3 py-2 text-sm font-medium text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950";
@@ -13,21 +14,46 @@ type OverlayControlActions = {
 
 type OverlayControlsProps = {
   readonly actions: OverlayControlActions;
-  readonly plans: OverlayControlPlans;
   readonly setupMode: OverlaySetupMode;
+  readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
 export function OverlayControls({
   actions,
-  plans,
   setupMode,
+  snapshot,
 }: OverlayControlsProps): ReactElement | null {
-  const plan = plans[setupMode.kind];
-
-  switch (plan.kind) {
-    case "none":
+  switch (snapshot.kind) {
+    case "fatal":
       return null;
-    case "connect":
+    case "playback":
+      return (
+        <ControlsForPlaybackState
+          actions={actions}
+          setupMode={setupMode}
+          state={snapshot.state}
+        />
+      );
+  }
+
+  return unreachable(snapshot);
+}
+
+type ControlsForPlaybackStateProps = {
+  readonly actions: OverlayControlActions;
+  readonly setupMode: OverlaySetupMode;
+  readonly state: PlaybackState;
+};
+
+function ControlsForPlaybackState({
+  actions,
+  setupMode,
+  state,
+}: ControlsForPlaybackStateProps): ReactElement | null {
+  switch (state.kind) {
+    case "initializing":
+      return null;
+    case "authorization-required":
       return (
         <ControlNavigation>
           <ControlButton
@@ -36,29 +62,52 @@ export function OverlayControls({
           />
         </ControlNavigation>
       );
-    case "disconnect":
+    case "authorizing":
+    case "empty":
+    case "playing":
+    case "paused":
+    case "unsupported":
       return (
-        <ControlNavigation>
+        <SetupControls setupMode={setupMode}>
           <ControlButton label="Disconnect Spotify" onClick={actions.logout} />
-        </ControlNavigation>
+        </SetupControls>
       );
-    case "reconnect-and-disconnect":
+    case "reconnecting":
       return (
-        <ControlNavigation>
+        <SetupControls setupMode={setupMode}>
           <ControlButton label="Reconnect Spotify" onClick={actions.retry} />
           <ControlButton label="Disconnect Spotify" onClick={actions.logout} />
-        </ControlNavigation>
+        </SetupControls>
       );
-    case "retry-and-disconnect":
+    case "failure":
       return (
-        <ControlNavigation>
+        <SetupControls setupMode={setupMode}>
           <ControlButton label="Retry playback" onClick={actions.retry} />
           <ControlButton label="Disconnect Spotify" onClick={actions.logout} />
-        </ControlNavigation>
+        </SetupControls>
       );
   }
 
-  return unreachable(plan);
+  return unreachable(state);
+}
+
+type SetupControlsProps = {
+  readonly children: ReactNode;
+  readonly setupMode: OverlaySetupMode;
+};
+
+function SetupControls({
+  children,
+  setupMode,
+}: SetupControlsProps): ReactElement | null {
+  switch (setupMode.kind) {
+    case "overlay":
+      return null;
+    case "setup":
+      return <ControlNavigation>{children}</ControlNavigation>;
+  }
+
+  return unreachable(setupMode);
 }
 
 type ControlNavigationProps = {
@@ -90,5 +139,5 @@ function ControlButton({ label, onClick }: ControlButtonProps): ReactElement {
 }
 
 function unreachable(value: never): never {
-  throw new Error(`Unexpected overlay control plan: ${String(value)}`);
+  throw new Error(`Unexpected overlay controls value: ${String(value)}`);
 }

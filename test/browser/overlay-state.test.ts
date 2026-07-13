@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
 import { parseSpotifyPlaybackPayload } from "../../browser/providers/spotify-payload.ts";
+import { OverlayControls } from "../../components/overlay/OverlayControls.tsx";
+import { resolveOverlayGeometry } from "../../components/overlay/overlay-geometry.ts";
 import {
   initialPlaybackState,
   providerFailure,
@@ -8,16 +13,6 @@ import {
   type PlaybackState,
   type Result,
 } from "../../domain/playback.ts";
-import { resolveOverlayGeometry } from "../../components/overlay/overlay-geometry.ts";
-import {
-  overlayUiStateForSnapshot,
-  type OverlayUiState,
-} from "../../components/overlay/overlay-state.ts";
-import {
-  overlayViewModelForState,
-  type OverlayControlPlan,
-  type OverlayViewModel,
-} from "../../components/overlay/overlay-view-model.ts";
 import {
   advertisementPayload,
   emptyTrackPayload,
@@ -25,276 +20,139 @@ import {
   playingTrackPayload,
 } from "./providers/spotify-payload.fixture.ts";
 
-test("the overlay projects every browser playback state through one immutable view model", () => {
-  const cases: ReadonlyArray<OverlayViewModelCase> = [
+test("overlay controls render state-specific actions directly from the application snapshot", () => {
+  const cases: ReadonlyArray<OverlayControlsCase> = [
     {
-      label: "INITIALIZING",
-      kind: "initializing",
-      state: overlayUiStateForSnapshot({
-        kind: "playback",
-        state: initialPlaybackState(),
-      }),
+      expectedOverlayLabels: [],
+      expectedSetupLabels: [],
+      snapshot: playbackSnapshot(initialPlaybackState()),
     },
     {
-      label: "CONNECT SPOTIFY",
-      kind: "authorization-required",
-      state: overlayUiStateForSnapshot({
-        kind: "playback",
-        state: authorizationRequiredState(),
-      }),
+      expectedOverlayLabels: ["Connect Spotify"],
+      expectedSetupLabels: ["Connect Spotify"],
+      snapshot: playbackSnapshot(authorizationRequiredState()),
     },
     {
-      label: "AUTHORIZING",
-      kind: "authorizing",
-      state: overlayUiStateForSnapshot({
-        kind: "playback",
-        state: authorizingState(),
-      }),
+      expectedOverlayLabels: [],
+      expectedSetupLabels: ["Disconnect Spotify"],
+      snapshot: playbackSnapshot(authorizingState()),
     },
     {
-      label: "NOTHING PLAYING",
-      kind: "empty",
-      state: overlayUiStateForSnapshot({
-        kind: "playback",
-        state: expectSuccess(parseSpotifyPlaybackPayload(emptyTrackPayload)),
-      }),
+      expectedOverlayLabels: [],
+      expectedSetupLabels: ["Disconnect Spotify"],
+      snapshot: playbackSnapshot(
+        expectSuccess(parseSpotifyPlaybackPayload(emptyTrackPayload)),
+      ),
     },
     {
-      label: "PLAYING",
-      kind: "playing",
-      state: overlayUiStateForSnapshot({
-        kind: "playback",
-        state: playingState(),
-      }),
+      expectedOverlayLabels: [],
+      expectedSetupLabels: ["Disconnect Spotify"],
+      snapshot: playbackSnapshot(playingState()),
     },
     {
-      label: "PAUSED",
-      kind: "paused",
-      state: overlayUiStateForSnapshot({
-        kind: "playback",
-        state: expectSuccess(parseSpotifyPlaybackPayload(pausedEpisodePayload)),
-      }),
+      expectedOverlayLabels: [],
+      expectedSetupLabels: ["Disconnect Spotify"],
+      snapshot: playbackSnapshot(
+        expectSuccess(parseSpotifyPlaybackPayload(pausedEpisodePayload)),
+      ),
     },
     {
-      label: "UNSUPPORTED",
-      kind: "unsupported",
-      state: overlayUiStateForSnapshot({
-        kind: "playback",
-        state: expectSuccess(parseSpotifyPlaybackPayload(advertisementPayload)),
-      }),
+      expectedOverlayLabels: [],
+      expectedSetupLabels: ["Disconnect Spotify"],
+      snapshot: playbackSnapshot(
+        expectSuccess(parseSpotifyPlaybackPayload(advertisementPayload)),
+      ),
     },
     {
-      label: "RECONNECTING",
-      kind: "reconnecting",
-      state: overlayUiStateForSnapshot({
-        kind: "playback",
-        state: reconnectingStateWithoutStaleItem(),
-      }),
+      expectedOverlayLabels: [],
+      expectedSetupLabels: ["Reconnect Spotify", "Disconnect Spotify"],
+      snapshot: playbackSnapshot(reconnectingStateWithoutStaleItem()),
     },
     {
-      label: "PLAYBACK UNAVAILABLE",
-      kind: "failure",
-      state: overlayUiStateForSnapshot({
-        kind: "playback",
-        state: failureState(),
-      }),
+      expectedOverlayLabels: [],
+      expectedSetupLabels: ["Reconnect Spotify", "Disconnect Spotify"],
+      snapshot: playbackSnapshot(reconnectingStateWithStaleItem()),
     },
     {
-      label: "OVERLAY UNAVAILABLE",
-      kind: "fatal-initialization-failure",
-      state: overlayUiStateForSnapshot({
+      expectedOverlayLabels: [],
+      expectedSetupLabels: ["Retry playback", "Disconnect Spotify"],
+      snapshot: playbackSnapshot(failureState()),
+    },
+    {
+      expectedOverlayLabels: [],
+      expectedSetupLabels: [],
+      snapshot: Object.freeze({
         kind: "fatal",
         reason: "browser-capability-unavailable",
       }),
     },
   ];
-  const seenLabels = new Set<string>();
-  const seenKinds = new Set<OverlayViewModel["kind"]>();
 
   for (const overlayCase of cases) {
-    const viewModel = overlayViewModelForState(overlayCase.state);
-
-    assert.equal(Object.isFrozen(viewModel), true);
-    assert.equal(Object.isFrozen(viewModel.artwork), true);
-    assert.equal(Object.isFrozen(viewModel.controls), true);
-    assert.equal(Object.isFrozen(viewModel.metadata), true);
-    assert.equal(Object.isFrozen(viewModel.semantic), true);
-    assert.equal(Object.isFrozen(viewModel.spotifyLinks), true);
-    assert.equal(Object.isFrozen(viewModel.status), true);
-    assert.equal(viewModel.kind, overlayCase.kind);
-    assert.equal(viewModel.status.label, overlayCase.label);
-    assert.equal(
-      viewModel.semantic.announcement.identity.stateKind,
-      viewModel.kind,
+    assertControlLabels(
+      renderControls(overlayCase.snapshot, new URLSearchParams()),
+      overlayCase.expectedOverlayLabels,
     );
-    assert.equal(
-      seenLabels.has(viewModel.status.label),
-      false,
-      viewModel.status.label,
+    assertControlLabels(
+      renderControls(overlayCase.snapshot, new URLSearchParams("setup=1")),
+      overlayCase.expectedSetupLabels,
     );
-    assert.equal(seenKinds.has(viewModel.kind), false, viewModel.kind);
-    seenLabels.add(viewModel.status.label);
-    seenKinds.add(viewModel.kind);
   }
-
-  const configurationFailure = overlayUiStateForSnapshot({
-    kind: "fatal",
-    reason: "configuration-unavailable",
-  });
-  const configurationViewModel = overlayViewModelForState(configurationFailure);
-
-  assert.equal(
-    configurationViewModel.status.message,
-    "The browser configuration is unavailable.",
-  );
-  assert.equal(configurationViewModel.metadata.kind, "status");
-  if (configurationViewModel.metadata.kind !== "status") {
-    throw new Error("Expected status metadata for configuration failure.");
-  }
-  assert.equal(
-    configurationViewModel.metadata.context,
-    "The public Spotify configuration could not be loaded.",
-  );
-  assert.equal(configurationViewModel.spotifyLinks.kind, "not-applicable");
 });
 
-test("the overlay preserves a stale reconnecting item without using an absence sentinel", () => {
-  const reconnectingWithoutItem = overlayUiStateForSnapshot({
-    kind: "playback",
-    state: reconnectingStateWithoutStaleItem(),
-  });
-  const reconnectingWithItem = overlayUiStateForSnapshot({
-    kind: "playback",
-    state: reconnectingStateWithStaleItem(),
-  });
-  const unavailableViewModel = overlayViewModelForState(
-    reconnectingWithoutItem,
-  );
-  const staleViewModel = overlayViewModelForState(reconnectingWithItem);
-
-  assert.equal(unavailableViewModel.artwork.kind, "fallback");
-  assert.equal(unavailableViewModel.metadata.kind, "status");
-  if (unavailableViewModel.metadata.kind !== "status") {
-    throw new Error("Expected status metadata without a stale item.");
-  }
-  assert.equal(
-    unavailableViewModel.metadata.subtitle,
-    "No previous item is available.",
-  );
-  assert.equal(unavailableViewModel.spotifyLinks.kind, "not-applicable");
-
-  assert.equal(staleViewModel.artwork.kind, "stale-item");
-  if (staleViewModel.artwork.kind !== "stale-item") {
-    throw new Error("Expected a stale artwork treatment.");
-  }
-  assert.equal(staleViewModel.artwork.item.title.value, "Track title");
-  assert.equal(staleViewModel.metadata.kind, "track");
-  if (staleViewModel.metadata.kind !== "track") {
-    throw new Error("Expected track metadata for the stale item.");
-  }
-  assert.equal(staleViewModel.metadata.presentation.kind, "stale");
-  assert.equal(staleViewModel.metadata.trackTitle.value, "Track title");
-  assert.deepEqual(
-    staleViewModel.metadata.artists.map((artist): string => artist.name.value),
-    ["Track artist"],
-  );
-  assert.equal(staleViewModel.metadata.album.title.value, "Album title");
-  assert.equal(staleViewModel.spotifyLinks.kind, "available");
-});
-
-test("the overlay carries only supported setup controls for each state", () => {
-  const overlayMode = resolveOverlayGeometry(new URLSearchParams()).setupMode;
-  const setupMode = resolveOverlayGeometry(
+test("setup controls retain named Spotify navigation and button semantics", () => {
+  const markup = renderControls(
+    playbackSnapshot(reconnectingStateWithStaleItem()),
     new URLSearchParams("setup=1"),
-  ).setupMode;
-  const cases: ReadonlyArray<OverlayControlCase> = [
-    {
-      expectedOverlay: "none",
-      expectedSetup: "none",
-      state: initialPlaybackState(),
-    },
-    {
-      expectedOverlay: "connect",
-      expectedSetup: "connect",
-      state: authorizationRequiredState(),
-    },
-    {
-      expectedOverlay: "none",
-      expectedSetup: "disconnect",
-      state: authorizingState(),
-    },
-    {
-      expectedOverlay: "none",
-      expectedSetup: "disconnect",
-      state: expectSuccess(parseSpotifyPlaybackPayload(emptyTrackPayload)),
-    },
-    {
-      expectedOverlay: "none",
-      expectedSetup: "disconnect",
-      state: playingState(),
-    },
-    {
-      expectedOverlay: "none",
-      expectedSetup: "disconnect",
-      state: expectSuccess(parseSpotifyPlaybackPayload(pausedEpisodePayload)),
-    },
-    {
-      expectedOverlay: "none",
-      expectedSetup: "disconnect",
-      state: expectSuccess(parseSpotifyPlaybackPayload(advertisementPayload)),
-    },
-    {
-      expectedOverlay: "none",
-      expectedSetup: "reconnect-and-disconnect",
-      state: reconnectingStateWithoutStaleItem(),
-    },
-    {
-      expectedOverlay: "none",
-      expectedSetup: "reconnect-and-disconnect",
-      state: reconnectingStateWithStaleItem(),
-    },
-    {
-      expectedOverlay: "none",
-      expectedSetup: "retry-and-disconnect",
-      state: failureState(),
-    },
-    {
-      expectedOverlay: "none",
-      expectedSetup: "none",
-      state: overlayUiStateForSnapshot({
-        kind: "fatal",
-        reason: "configuration-unavailable",
-      }),
-    },
-  ];
+  );
 
-  for (const overlayCase of cases) {
-    const viewModel = overlayViewModelForState(overlayCase.state);
-
-    assert.equal(
-      viewModel.controls[overlayMode.kind].kind,
-      overlayCase.expectedOverlay,
-      overlayCase.state.kind,
-    );
-    assert.equal(
-      viewModel.controls[setupMode.kind].kind,
-      overlayCase.expectedSetup,
-      overlayCase.state.kind,
-    );
-  }
+  assert.match(markup, /<nav[^>]*aria-label="Spotify playback controls"/);
+  assert.match(markup, /<button[^>]*type="button"[^>]*>Reconnect Spotify<\/button>/);
+  assert.match(markup, /<button[^>]*type="button"[^>]*>Disconnect Spotify<\/button>/);
 });
 
-type OverlayViewModelCase = {
-  readonly kind: OverlayViewModel["kind"];
-  readonly label: string;
-  readonly state: OverlayUiState;
+type OverlayControlsCase = {
+  readonly expectedOverlayLabels: ReadonlyArray<string>;
+  readonly expectedSetupLabels: ReadonlyArray<string>;
+  readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
-type OverlayControlCase = {
-  readonly expectedOverlay: OverlayControlPlan["kind"];
-  readonly expectedSetup: OverlayControlPlan["kind"];
-  readonly state: OverlayUiState;
-};
+function renderControls(
+  snapshot: BrowserPlaybackApplicationSnapshot,
+  parameters: URLSearchParams,
+): string {
+  return renderToStaticMarkup(
+    createElement(OverlayControls, {
+      actions: Object.freeze({
+        beginAuthorization: (): void => {},
+        logout: (): void => {},
+        retry: (): void => {},
+      }),
+      setupMode: resolveOverlayGeometry(parameters).setupMode,
+      snapshot,
+    }),
+  );
+}
+
+function assertControlLabels(
+  markup: string,
+  labels: ReadonlyArray<string>,
+): void {
+  if (labels.length === 0) {
+    assert.equal(markup, "");
+    return;
+  }
+
+  for (const label of labels) {
+    assert.match(markup, new RegExp(`>${label}<\\/button>`));
+  }
+}
+
+function playbackSnapshot(
+  state: PlaybackState,
+): BrowserPlaybackApplicationSnapshot {
+  return Object.freeze({ kind: "playback", state });
+}
 
 function authorizationRequiredState(): PlaybackState {
   return expectSuccess(
