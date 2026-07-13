@@ -237,9 +237,7 @@ export function createBrowserPlaybackApplication(
 
       const currentUrl = ports.location.current();
       const callback = captureCallbackCommand(currentUrl);
-      if (callback.kind === "pending") {
-        ports.location.replace(queryStrippedCallbackUrl(currentUrl));
-      }
+      const applicationUrl = new URL("/spotify/", currentUrl.origin);
 
       let worker: BrowserPlaybackWorker;
       try {
@@ -267,7 +265,7 @@ export function createBrowserPlaybackApplication(
           worker,
         });
       runtime = active;
-      void initialize(active, callback);
+      void initialize(active, callback, applicationUrl);
     },
 
     subscribe(listener: () => void): () => void {
@@ -284,11 +282,9 @@ export function createBrowserPlaybackApplication(
   async function initialize(
     active: Extract<ApplicationRuntime, { readonly kind: "active" }>,
     callback: CallbackCommand,
+    applicationUrl: URL,
   ): Promise<void> {
-    const configurationUrl = new URL(
-      "/config.json",
-      ports.location.current().origin,
-    );
+    const configurationUrl = new URL("/config.json", applicationUrl.origin);
 
     let response: BrowserConfigurationResponse;
     try {
@@ -327,7 +323,7 @@ export function createBrowserPlaybackApplication(
     }
 
     const configuration = parseSpotifyPublicConfiguration(source, {
-      applicationUrl: ports.location.current(),
+      applicationUrl,
     });
     if (configuration.kind === "failure") {
       replaceSnapshot(fatalSnapshot("configuration-unavailable"));
@@ -336,7 +332,7 @@ export function createBrowserPlaybackApplication(
 
     postCommand(active, {
       kind: "initialize",
-      applicationUrl: ports.location.current().toString(),
+      applicationUrl: applicationUrl.toString(),
       configuration: serializeWorkerPublicConfiguration(configuration.value),
     });
     if (callback.kind === "pending") {
@@ -497,19 +493,8 @@ function captureCallbackCommand(currentUrl: URL): CallbackCommand {
   });
 }
 
-function queryStrippedCallbackUrl(currentUrl: URL): URL {
-  const stripped = new URL("/spotify/", currentUrl.origin);
-  const display = parseDisplayQuery(
-    currentUrl.searchParams,
-    callbackQueryParameterNames,
-  );
-  appendDisplayQuery(stripped.searchParams, display);
-
-  return stripped;
-}
-
 function displayReturnConfiguration(currentUrl: URL): unknown {
-  const display = parseDisplayQuery(currentUrl.searchParams, []);
+  const display = parseDisplayQuery(currentUrl.searchParams);
   const width = displayWidth(display);
   const setup = displaySetupRequested(display);
 
@@ -546,15 +531,9 @@ function displaySetupRequested(display: DisplayQuery): boolean {
   throw new Error(`Unhandled display query: ${unhandledDisplay}`);
 }
 
-function parseDisplayQuery(
-  parameters: URLSearchParams,
-  allowedNonDisplayParameters: ReadonlyArray<string>,
-): DisplayQuery {
+function parseDisplayQuery(parameters: URLSearchParams): DisplayQuery {
   for (const parameter of parameters.keys()) {
-    if (
-      displayQueryParameterNames.includes(parameter) ||
-      allowedNonDisplayParameters.includes(parameter)
-    ) {
+    if (displayQueryParameterNames.includes(parameter)) {
       continue;
     }
 
@@ -593,30 +572,6 @@ function parseDisplayQuery(
   return hasSetup
     ? frozenWidthAndSetupDisplayQuery(width)
     : frozenWidthDisplayQuery(width);
-}
-
-function appendDisplayQuery(
-  parameters: URLSearchParams,
-  display: DisplayQuery,
-): void {
-  switch (display.kind) {
-    case "invalid":
-    case "none":
-      return;
-    case "setup":
-      parameters.set("setup", "1");
-      return;
-    case "width":
-      parameters.set("width", `${display.width}`);
-      return;
-    case "width-and-setup":
-      parameters.set("width", `${display.width}`);
-      parameters.set("setup", "1");
-      return;
-  }
-
-  const unhandledDisplay: never = display;
-  throw new Error(`Unhandled display query: ${unhandledDisplay}`);
 }
 
 function frozenInvalidDisplayQuery(): DisplayQuery {

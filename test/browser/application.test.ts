@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createBrowserPlaybackApplication,
+  type BrowserConfigurationResponse,
   type BrowserPlaybackApplication,
   type BrowserPlaybackApplicationPorts,
   type BrowserPlaybackWorker,
 } from "../../browser/application.ts";
 import type { PlaybackWorkerCommand } from "../../browser/worker/protocol.ts";
 
-test("the browser application fetches same-origin configuration and validates worker messages before state commits", async () => {
+test("the browser application waits for a validated callback restoration before replacing its URL", async () => {
   const fixture = applicationFixture({
     currentUrl:
       "https://nowplaying.example/spotify/?code=callback-code&state=callback-state",
@@ -21,11 +22,9 @@ test("the browser application fetches same-origin configuration and validates wo
     "https://nowplaying.example/config.json",
   ]);
   assert.deepEqual(fixture.configurationPageUrls, [
-    "https://nowplaying.example/spotify/",
+    "https://nowplaying.example/spotify/?code=callback-code&state=callback-state",
   ]);
-  assert.deepEqual(fixture.replacedUrls, [
-    "https://nowplaying.example/spotify/",
-  ]);
+  assert.deepEqual(fixture.replacedUrls, []);
   assert.deepEqual(commandKinds(fixture.worker.commands), [
     "initialize",
     "consume-callback",
@@ -36,6 +35,10 @@ test("the browser application fetches same-origin configuration and validates wo
   if (initialize === undefined || initialize.kind !== "initialize") {
     throw new Error("Expected an initialize command.");
   }
+  assert.equal(
+    initialize.applicationUrl,
+    "https://nowplaying.example/spotify/",
+  );
   assert.deepEqual(initialize.configuration, {
     spotify: {
       clientId: "browser-client-id",
@@ -60,13 +63,13 @@ test("the browser application fetches same-origin configuration and validates wo
     kind: "playback",
     state: { kind: "empty" },
   });
+  assert.deepEqual(fixture.replacedUrls, []);
 
   fixture.worker.emitMessage({
     kind: "callback-url-restored",
     url: "https://nowplaying.example/spotify/?width=1280&setup=1",
   });
   assert.deepEqual(fixture.replacedUrls, [
-    "https://nowplaying.example/spotify/",
     "https://nowplaying.example/spotify/?width=1280&setup=1",
   ]);
 
@@ -81,45 +84,58 @@ test("the browser application fetches same-origin configuration and validates wo
     "https://nowplaying.example/spotify/?width=1280&setup=1&setup=1",
     "https://nowplaying.example/spotify/?width=1280&setup=true",
     "https://nowplaying.example/spotify/?width=1280&debug=true",
+    "https://nowplaying.example/spotify/?width=1280&code=callback-code",
   ];
   for (const url of invalidRestorations) {
     fixture.worker.emitMessage({ kind: "callback-url-restored", url });
   }
 
-  assert.equal(fixture.replacedUrls.length, 2);
+  assert.equal(fixture.replacedUrls.length, 1);
 });
 
-test("the browser application strips callback credentials before configuration or diagnostics and retains only valid display settings", async () => {
+test("the browser application retains callback credentials while configuration is delayed", async () => {
   const callbackCode = "callback-code-sentinel";
   const callbackState = "callback-state-sentinel";
   const callbackDescription = "callback-description-sentinel";
+  const delayedConfiguration = createDeferred<BrowserConfigurationResponse>();
   const fixture = applicationFixture({
     currentUrl:
       `https://nowplaying.example/spotify/?code=${callbackCode}` +
       `&state=${callbackState}&error=access_denied` +
       `&error_description=${callbackDescription}&width=1280&setup=1`,
+    fetchConfiguration: (): Promise<BrowserConfigurationResponse> =>
+      delayedConfiguration.promise,
   });
 
   fixture.application.start();
-  fixture.worker.emitMessage({
-    kind: "safe-diagnostic",
-    operation: "authorization",
-    code: "authorization-denied",
-    metadata: { kind: "none" },
-  });
+  assert.equal(
+    fixture.locationUrl(),
+    `https://nowplaying.example/spotify/?code=${callbackCode}` +
+      `&state=${callbackState}&error=access_denied` +
+      `&error_description=${callbackDescription}&width=1280&setup=1`,
+  );
+  assert.deepEqual(fixture.replacedUrls, []);
+  assert.equal(fixture.worker.commands.length, 0);
 
-  assert.deepEqual(fixture.replacedUrls, [
-    "https://nowplaying.example/spotify/?width=1280&setup=1",
-  ]);
-  assert.doesNotMatch(
-    fixture.replacedUrls.join("\n"),
-    /callback-(?:code|state|description)-sentinel/,
+  delayedConfiguration.resolve(
+    successfulConfigurationResponse(validConfiguration()),
   );
 
   await settleApplicationWork();
   assert.deepEqual(fixture.configurationPageUrls, [
-    "https://nowplaying.example/spotify/?width=1280&setup=1",
+    `https://nowplaying.example/spotify/?code=${callbackCode}` +
+      `&state=${callbackState}&error=access_denied` +
+      `&error_description=${callbackDescription}&width=1280&setup=1`,
   ]);
+
+  const initialize = fixture.worker.commands[0];
+  if (initialize === undefined || initialize.kind !== "initialize") {
+    throw new Error("Expected an initialize command.");
+  }
+  assert.doesNotMatch(
+    JSON.stringify(initialize),
+    /callback-(?:code|state|description)-sentinel/,
+  );
 
   const consumeCallback = fixture.worker.commands[1];
   if (
@@ -134,6 +150,30 @@ test("the browser application strips callback credentials before configuration o
       `&state=${callbackState}&error=access_denied` +
       `&error_description=${callbackDescription}`,
   );
+  assert.deepEqual(fixture.replacedUrls, []);
+
+  fixture.worker.emitMessage({
+    kind: "safe-diagnostic",
+    operation: "authorization",
+    code: "authorization-denied",
+    metadata: { kind: "none" },
+  });
+  assert.deepEqual(fixture.replacedUrls, []);
+
+  fixture.worker.emitMessage({
+    kind: "callback-url-restored",
+    url: "https://nowplaying.example/spotify/?width=1280&setup=1",
+  });
+  assert.deepEqual(fixture.replacedUrls, [
+    "https://nowplaying.example/spotify/?width=1280&setup=1",
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify({
+      locationUrl: fixture.locationUrl(),
+      snapshot: fixture.application.getSnapshot(),
+    }),
+    /callback-(?:code|state|description)-sentinel/,
+  );
 
   fixture.application.start();
   assert.deepEqual(commandKinds(fixture.worker.commands), [
@@ -143,29 +183,47 @@ test("the browser application strips callback credentials before configuration o
   ]);
 });
 
-test("the browser application never restores unknown, repeated, or malformed callback display parameters", () => {
-  const invalidDisplayQueries: ReadonlyArray<string> = [
-    "width=1280&width=1281",
-    "width=1280.5",
-    "width=319",
-    "setup=true",
-    "setup=1&setup=1",
-    "width=1280&setup=1&debug=true",
-  ];
+test("the browser application leaves the callback URL processable when configuration is unavailable", async () => {
+  const callbackUrl =
+    "https://nowplaying.example/spotify/?code=callback-code&state=callback-state";
+  const fixture = applicationFixture({
+    currentUrl: callbackUrl,
+    fetchConfiguration: (): Promise<BrowserConfigurationResponse> =>
+      Promise.reject(new Error("Configuration is unavailable.")),
+  });
 
-  for (const query of invalidDisplayQueries) {
-    const fixture = applicationFixture({
-      currentUrl:
-        "https://nowplaying.example/spotify/?code=callback-code" +
-        `&state=callback-state&${query}`,
-    });
+  fixture.application.start();
+  await settleApplicationWork();
 
-    fixture.application.start();
+  assert.deepEqual(fixture.application.getSnapshot(), {
+    kind: "fatal",
+    reason: "configuration-unavailable",
+  });
+  assert.equal(fixture.locationUrl(), callbackUrl);
+  assert.deepEqual(fixture.replacedUrls, []);
+  assert.deepEqual(fixture.worker.commands, []);
+});
 
-    assert.deepEqual(fixture.replacedUrls, [
-      "https://nowplaying.example/spotify/",
-    ]);
-  }
+test("the browser application leaves the callback URL processable when disposed before consumption", async () => {
+  const callbackUrl =
+    "https://nowplaying.example/spotify/?code=callback-code&state=callback-state";
+  const delayedConfiguration = createDeferred<BrowserConfigurationResponse>();
+  const fixture = applicationFixture({
+    currentUrl: callbackUrl,
+    fetchConfiguration: (): Promise<BrowserConfigurationResponse> =>
+      delayedConfiguration.promise,
+  });
+
+  fixture.application.start();
+  fixture.application.dispose();
+  delayedConfiguration.resolve(
+    successfulConfigurationResponse(validConfiguration()),
+  );
+  await settleApplicationWork();
+
+  assert.equal(fixture.locationUrl(), callbackUrl);
+  assert.deepEqual(fixture.replacedUrls, []);
+  assert.deepEqual(commandKinds(fixture.worker.commands), ["dispose"]);
 });
 
 test("the browser application falls back to the default display configuration when authorization starts from invalid settings", async () => {
@@ -277,7 +335,8 @@ test("the browser application accepts only Spotify authorization redirects and s
   });
 
   const invalidConfiguration = applicationFixture({
-    currentUrl: "https://nowplaying.example/spotify/",
+    currentUrl:
+      "https://nowplaying.example/spotify/?code=callback-code&state=callback-state",
     configuration: {
       spotify: {
         clientId: "browser-client-id",
@@ -293,17 +352,24 @@ test("the browser application accepts only Spotify authorization redirects and s
     reason: "configuration-unavailable",
   });
   assert.deepEqual(invalidConfiguration.worker.commands, []);
+  assert.equal(
+    invalidConfiguration.locationUrl(),
+    "https://nowplaying.example/spotify/?code=callback-code&state=callback-state",
+  );
+  assert.deepEqual(invalidConfiguration.replacedUrls, []);
 });
 
 type ApplicationFixtureOptions = {
   readonly configuration?: unknown;
   readonly currentUrl: string;
+  readonly fetchConfiguration?: BrowserPlaybackApplicationPorts["fetchConfiguration"];
 };
 
 type ApplicationFixture = {
   readonly application: BrowserPlaybackApplication;
   readonly configurationPageUrls: string[];
   readonly configurationUrls: string[];
+  readonly locationUrl: () => string;
   readonly navigatedUrls: string[];
   readonly replacedUrls: string[];
   readonly setVisibility: (visibility: "hidden" | "visible") => void;
@@ -323,22 +389,16 @@ function applicationFixture(
   let pageHideListener: (() => void) | undefined;
   let visibilityListener: (() => void) | undefined;
   const configuration = options.configuration ?? validConfiguration();
+  const fetchConfiguration =
+    options.fetchConfiguration ?? successfulConfigurationFetch(configuration);
   const ports: BrowserPlaybackApplicationPorts = {
     createWorker(): BrowserPlaybackWorker {
       return worker;
     },
-    async fetchConfiguration(request): Promise<{
-      readonly ok: boolean;
-      readonly readJson: () => Promise<unknown>;
-    }> {
+    async fetchConfiguration(request): Promise<BrowserConfigurationResponse> {
       configurationPageUrls.push(currentUrl.toString());
       configurationUrls.push(request.url.toString());
-      return Object.freeze({
-        ok: true,
-        async readJson(): Promise<unknown> {
-          return configuration;
-        },
-      });
+      return fetchConfiguration(request);
     },
     location: Object.freeze({
       current(): URL {
@@ -378,6 +438,9 @@ function applicationFixture(
     application,
     configurationPageUrls,
     configurationUrls,
+    locationUrl(): string {
+      return currentUrl.toString();
+    },
     navigatedUrls,
     replacedUrls,
     setVisibility(nextVisibility: "hidden" | "visible"): void {
@@ -385,6 +448,43 @@ function applicationFixture(
       visibilityListener?.();
     },
     worker,
+  });
+}
+
+function successfulConfigurationFetch(
+  configuration: unknown,
+): BrowserPlaybackApplicationPorts["fetchConfiguration"] {
+  return (): Promise<BrowserConfigurationResponse> =>
+    Promise.resolve(successfulConfigurationResponse(configuration));
+}
+
+function successfulConfigurationResponse(
+  configuration: unknown,
+): BrowserConfigurationResponse {
+  return Object.freeze({
+    ok: true,
+    readJson(): Promise<unknown> {
+      return Promise.resolve(configuration);
+    },
+  });
+}
+
+function createDeferred<Value>(): {
+  readonly promise: Promise<Value>;
+  readonly resolve: (value: Value) => void;
+} {
+  let resolvePromise: (value: Value) => void = (): void => {
+    throw new Error("Deferred promise is not initialized.");
+  };
+  const promise = new Promise<Value>((resolve): void => {
+    resolvePromise = resolve;
+  });
+
+  return Object.freeze({
+    promise,
+    resolve(value: Value): void {
+      resolvePromise(value);
+    },
   });
 }
 
