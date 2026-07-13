@@ -1,12 +1,17 @@
 import {
   maximumPlatformTimerDelayMilliseconds,
-  type PlaybackState,
+  ProviderId,
 } from "../../domain/playback.ts";
-import type { SpotifyAccessToken } from "../auth/token.ts";
 import type {
   BrowserRequestDeadline,
   BrowserRequestDeadlinePort,
 } from "../request-deadline.ts";
+import type {
+  PlaybackProviderPort,
+  PlaybackProviderRequest,
+  PlaybackProviderResult,
+  PlaybackRetryAfter,
+} from "./registry.ts";
 import { parseSpotifyPlaybackPayload } from "./spotify-payload.ts";
 
 const spotifyCurrentlyPlayingEndpoint =
@@ -16,75 +21,20 @@ const maximumRetryAfterSeconds = Math.floor(
   maximumPlatformTimerDelayMilliseconds / 1_000,
 );
 
-export type SpotifyRetryAfter =
-  | {
-      readonly kind: "valid";
-      readonly delayMilliseconds: number;
-    }
-  | {
-      readonly kind: "invalid-or-missing";
-    };
-
-export type SpotifyCurrentlyPlayingResult =
-  | {
-      readonly kind: "empty";
-    }
-  | {
-      readonly kind: "malformed-response";
-    }
-  | {
-      readonly kind: "network-failure";
-    }
-  | {
-      readonly kind: "playback";
-      readonly state: PlaybackState;
-    }
-  | {
-      readonly kind: "permission-denied";
-      readonly status: 403;
-    }
-  | {
-      readonly kind: "rate-limited";
-      readonly status: 429;
-      readonly retryAfter: SpotifyRetryAfter;
-    }
-  | {
-      readonly kind: "server-failure";
-      readonly status: number;
-    }
-  | {
-      readonly kind: "unauthorized";
-      readonly status: 401;
-    }
-  | {
-      readonly kind: "unexpected-response";
-      readonly status: number;
-    };
-
-export type SpotifyCurrentlyPlayingRequest = {
-  readonly accessToken: SpotifyAccessToken;
-  readonly signal: AbortSignal;
-};
-
-export type SpotifyCurrentlyPlayingPort = {
-  readonly fetchCurrentlyPlaying: (
-    request: SpotifyCurrentlyPlayingRequest,
-  ) => Promise<SpotifyCurrentlyPlayingResult>;
-};
-
-export type CreateSpotifyCurrentlyPlayingPortOptions = {
+export type CreateSpotifyPlaybackProviderOptions = {
   readonly fetchImplementation: typeof globalThis.fetch;
   readonly requestDeadline: BrowserRequestDeadlinePort;
   readonly timeoutMilliseconds: number;
 };
 
-export function createSpotifyCurrentlyPlayingPort(
-  options: CreateSpotifyCurrentlyPlayingPortOptions,
-): SpotifyCurrentlyPlayingPort {
-  const port: SpotifyCurrentlyPlayingPort = {
+export function createSpotifyPlaybackProvider(
+  options: CreateSpotifyPlaybackProviderOptions,
+): PlaybackProviderPort {
+  const provider: PlaybackProviderPort = {
+    providerId: createSpotifyProviderId(),
     async fetchCurrentlyPlaying(
-      request: SpotifyCurrentlyPlayingRequest,
-    ): Promise<SpotifyCurrentlyPlayingResult> {
+      request: PlaybackProviderRequest,
+    ): Promise<PlaybackProviderResult> {
       try {
         const deadline = options.requestDeadline.create({
           signal: request.signal,
@@ -116,7 +66,7 @@ export function createSpotifyCurrentlyPlayingPort(
               return frozenPermissionDenied();
             case 429:
               return frozenRateLimited(
-                parseSpotifyRetryAfter(response.headers.get("Retry-After")),
+                parseRetryAfter(response.headers.get("Retry-After")),
               );
             default:
               if (response.status >= 500 && response.status <= 599) {
@@ -134,13 +84,13 @@ export function createSpotifyCurrentlyPlayingPort(
     },
   };
 
-  return Object.freeze(port);
+  return Object.freeze(provider);
 }
 
 async function parseSuccessfulPlaybackResponse(
   response: Response,
   deadline: BrowserRequestDeadline,
-): Promise<SpotifyCurrentlyPlayingResult> {
+): Promise<PlaybackProviderResult> {
   let payload: unknown;
   try {
     payload = await response.json();
@@ -161,7 +111,7 @@ async function parseSuccessfulPlaybackResponse(
     return frozenMalformedResponse();
   }
 
-  const result: SpotifyCurrentlyPlayingResult = {
+  const result: PlaybackProviderResult = {
     kind: "playback",
     state: parsed.value,
   };
@@ -173,7 +123,7 @@ function hasActiveRequestDeadline(deadline: BrowserRequestDeadline): boolean {
   return deadline.outcome().kind === "active";
 }
 
-function parseSpotifyRetryAfter(header: string | null): SpotifyRetryAfter {
+function parseRetryAfter(header: string | null): PlaybackRetryAfter {
   if (header === null || !retryAfterSecondsPattern.test(header)) {
     return frozenInvalidOrMissingRetryAfter();
   }
@@ -187,7 +137,7 @@ function parseSpotifyRetryAfter(header: string | null): SpotifyRetryAfter {
     return frozenInvalidOrMissingRetryAfter();
   }
 
-  const retryAfter: SpotifyRetryAfter = {
+  const retryAfter: PlaybackRetryAfter = {
     kind: "valid",
     delayMilliseconds: seconds * 1_000,
   };
@@ -195,30 +145,30 @@ function parseSpotifyRetryAfter(header: string | null): SpotifyRetryAfter {
   return Object.freeze(retryAfter);
 }
 
-function frozenEmptyPlayback(): SpotifyCurrentlyPlayingResult {
+function frozenEmptyPlayback(): PlaybackProviderResult {
   return Object.freeze({ kind: "empty" });
 }
 
-function frozenMalformedResponse(): SpotifyCurrentlyPlayingResult {
+function frozenMalformedResponse(): PlaybackProviderResult {
   return Object.freeze({ kind: "malformed-response" });
 }
 
-function frozenNetworkFailure(): SpotifyCurrentlyPlayingResult {
+function frozenNetworkFailure(): PlaybackProviderResult {
   return Object.freeze({ kind: "network-failure" });
 }
 
-function frozenInvalidOrMissingRetryAfter(): SpotifyRetryAfter {
+function frozenInvalidOrMissingRetryAfter(): PlaybackRetryAfter {
   return Object.freeze({ kind: "invalid-or-missing" });
 }
 
-function frozenPermissionDenied(): SpotifyCurrentlyPlayingResult {
+function frozenPermissionDenied(): PlaybackProviderResult {
   return Object.freeze({ kind: "permission-denied", status: 403 });
 }
 
 function frozenRateLimited(
-  retryAfter: SpotifyRetryAfter,
-): SpotifyCurrentlyPlayingResult {
-  const result: SpotifyCurrentlyPlayingResult = {
+  retryAfter: PlaybackRetryAfter,
+): PlaybackProviderResult {
+  const result: PlaybackProviderResult = {
     kind: "rate-limited",
     status: 429,
     retryAfter,
@@ -227,8 +177,8 @@ function frozenRateLimited(
   return Object.freeze(result);
 }
 
-function frozenServerFailure(status: number): SpotifyCurrentlyPlayingResult {
-  const result: SpotifyCurrentlyPlayingResult = {
+function frozenServerFailure(status: number): PlaybackProviderResult {
+  const result: PlaybackProviderResult = {
     kind: "server-failure",
     status,
   };
@@ -236,17 +186,24 @@ function frozenServerFailure(status: number): SpotifyCurrentlyPlayingResult {
   return Object.freeze(result);
 }
 
-function frozenUnauthorized(): SpotifyCurrentlyPlayingResult {
+function frozenUnauthorized(): PlaybackProviderResult {
   return Object.freeze({ kind: "unauthorized", status: 401 });
 }
 
-function frozenUnexpectedResponse(
-  status: number,
-): SpotifyCurrentlyPlayingResult {
-  const result: SpotifyCurrentlyPlayingResult = {
+function frozenUnexpectedResponse(status: number): PlaybackProviderResult {
+  const result: PlaybackProviderResult = {
     kind: "unexpected-response",
     status,
   };
 
   return Object.freeze(result);
+}
+
+function createSpotifyProviderId(): ProviderId {
+  const providerId = ProviderId.create("spotify");
+  if (providerId.kind === "success") {
+    return providerId.value;
+  }
+
+  throw new Error("The static Spotify provider identifier is invalid.");
 }

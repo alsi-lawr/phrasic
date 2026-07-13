@@ -24,19 +24,22 @@ import {
 } from "../../../browser/auth/token.ts";
 import { parseSpotifyPlaybackPayload } from "../../../browser/providers/spotify-payload.ts";
 import {
+  createPlaybackProviderRegistry,
+  type PlaybackProviderPort,
+  type PlaybackProviderRegistry,
+  type PlaybackProviderRequest,
+  type PlaybackProviderResult,
+} from "../../../browser/providers/registry.ts";
+import {
   createPlaybackWorkerRuntime,
   type PlaybackWorkerEventSink,
   type PlaybackWorkerRuntime,
   type PlaybackWorkerSchedulerPort,
 } from "../../../browser/worker/runtime.ts";
-import { createSpotifyCurrentlyPlayingPort } from "../../../browser/providers/spotify.ts";
-import type {
-  SpotifyCurrentlyPlayingPort,
-  SpotifyCurrentlyPlayingRequest,
-  SpotifyCurrentlyPlayingResult,
-} from "../../../browser/providers/spotify.ts";
+import { createSpotifyPlaybackProvider } from "../../../browser/providers/spotify.ts";
 import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";
 import type { PlaybackWorkerEvent } from "../../../browser/worker/protocol.ts";
+import { ProviderId } from "../../../domain/playback.ts";
 import {
   emptyTrackPayload,
   playingTrackPayload,
@@ -45,7 +48,7 @@ import { ManualRequestDeadlineScheduler } from "../request-deadline.fixture.ts";
 
 const testRequestDeadlineMilliseconds = 25;
 
-test("the worker refreshes stored authorization, normalizes playback, and schedules from completion", async () => {
+test("the worker consumes provider-neutral playback results through its registry and schedules from completion", async () => {
   const fixture = await runtimeFixture({
     storedConnection: { kind: "available", refreshToken: "stored-refresh" },
     authResponses: [tokenResponse("initial-access")],
@@ -313,7 +316,7 @@ test("a playback request deadline enters the capped serialized reconnect schedul
   const deadlineScheduler = new ManualRequestDeadlineScheduler();
   const events: PlaybackWorkerEvent[] = [];
   const playbackFetch = abortableNeverSettlingFetch();
-  const spotify = createSpotifyCurrentlyPlayingPort({
+  const spotify = createSpotifyPlaybackProvider({
     fetchImplementation: playbackFetch.fetchImplementation,
     requestDeadline: createBrowserRequestDeadlinePort(deadlineScheduler),
     timeoutMilliseconds: testRequestDeadlineMilliseconds,
@@ -731,8 +734,9 @@ test("safe diagnostics omit credential, callback, request, raw-error, and payloa
   const clock = new FakeClock(1_000_000);
   const scheduler = new FakeScheduler(clock);
   const events: PlaybackWorkerEvent[] = [];
-  const spotify: SpotifyCurrentlyPlayingPort = Object.freeze({
-    async fetchCurrentlyPlaying(): Promise<SpotifyCurrentlyPlayingResult> {
+  const spotify: PlaybackProviderPort = Object.freeze({
+    providerId: spotifyProviderId(),
+    async fetchCurrentlyPlaying(): Promise<PlaybackProviderResult> {
       throw new Error(
         `${sentinels.header} ${sentinels.body} ${sentinels.rawError} ${sentinels.payload}`,
       );
@@ -837,7 +841,7 @@ type RuntimeFixture = {
 
 type RuntimeFixtureOptions = {
   readonly authResponses: ReadonlyArray<SpotifyAuthFetchResult>;
-  readonly spotifyResponses: ReadonlyArray<SpotifyCurrentlyPlayingResult>;
+  readonly spotifyResponses: ReadonlyArray<PlaybackProviderResult>;
   readonly storedConnection:
     | {
         readonly kind: "available";
@@ -853,7 +857,7 @@ type RuntimeDependencies = {
   readonly clock: FakeClock;
   readonly events: PlaybackWorkerEvent[];
   readonly scheduler: FakeScheduler;
-  readonly spotify: SpotifyCurrentlyPlayingPort;
+  readonly spotify: PlaybackProviderPort;
   readonly storage: MemorySpotifyAuthStorage;
 };
 
@@ -947,9 +951,30 @@ function createRuntime(
       },
     }),
     events,
+    playbackProviderId: dependencies.spotify.providerId,
+    playbackProviders: playbackProviderRegistry(dependencies.spotify),
     scheduler: dependencies.scheduler,
-    spotify: dependencies.spotify,
   });
+}
+
+function playbackProviderRegistry(
+  provider: PlaybackProviderPort,
+): PlaybackProviderRegistry {
+  const registry = createPlaybackProviderRegistry([provider]);
+  if (registry.kind === "success") {
+    return registry.value;
+  }
+
+  throw new Error("Expected a unique playback provider test registration.");
+}
+
+function spotifyProviderId(): ProviderId {
+  const providerId = ProviderId.create("spotify");
+  if (providerId.kind === "success") {
+    return providerId.value;
+  }
+
+  throw new Error("Expected a valid Spotify provider identifier fixture.");
 }
 
 function abortableNeverSettlingFetch(): AbortableHttpFetch {
@@ -1106,7 +1131,7 @@ function invalidGrantResponse(): SpotifyAuthFetchResult {
   });
 }
 
-function playbackResult(payload: unknown): SpotifyCurrentlyPlayingResult {
+function playbackResult(payload: unknown): PlaybackProviderResult {
   const parsed = parseSpotifyPlaybackPayload(payload);
   if (parsed.kind === "failure") {
     throw new Error("Expected a valid Spotify playback fixture.");
@@ -1320,13 +1345,15 @@ class DeferredRefreshSpotifyAuthFetch implements SpotifyAuthFetchPort {
   }
 }
 
-class QueuedSpotifyTransport implements SpotifyCurrentlyPlayingPort {
+class QueuedSpotifyTransport implements PlaybackProviderPort {
   private concurrentRequests = 0;
-  private readonly observedRequests: SpotifyCurrentlyPlayingRequest[] = [];
-  private queuedResults: SpotifyCurrentlyPlayingResult[];
+  private readonly observedRequests: PlaybackProviderRequest[] = [];
+  private queuedResults: PlaybackProviderResult[];
   private maximumRequests = 0;
+  public readonly providerId: ProviderId;
 
-  constructor(results: ReadonlyArray<SpotifyCurrentlyPlayingResult>) {
+  constructor(results: ReadonlyArray<PlaybackProviderResult>) {
+    this.providerId = spotifyProviderId();
     this.queuedResults = [...results];
   }
 
@@ -1339,8 +1366,8 @@ class QueuedSpotifyTransport implements SpotifyCurrentlyPlayingPort {
   }
 
   async fetchCurrentlyPlaying(
-    request: SpotifyCurrentlyPlayingRequest,
-  ): Promise<SpotifyCurrentlyPlayingResult> {
+    request: PlaybackProviderRequest,
+  ): Promise<PlaybackProviderResult> {
     this.observedRequests.push(request);
     this.concurrentRequests += 1;
     this.maximumRequests = Math.max(
@@ -1361,14 +1388,15 @@ class QueuedSpotifyTransport implements SpotifyCurrentlyPlayingPort {
   }
 }
 
-class DeferredSpotifyTransport implements SpotifyCurrentlyPlayingPort {
+class DeferredSpotifyTransport implements PlaybackProviderPort {
   private activeRequests = 0;
   private readonly completions: Array<{
-    readonly promise: Promise<SpotifyCurrentlyPlayingResult>;
-    readonly resolve: (result: SpotifyCurrentlyPlayingResult) => void;
+    readonly promise: Promise<PlaybackProviderResult>;
+    readonly resolve: (result: PlaybackProviderResult) => void;
   }> = [];
-  private readonly observedRequests: SpotifyCurrentlyPlayingRequest[] = [];
+  private readonly observedRequests: PlaybackProviderRequest[] = [];
   private maximumRequests = 0;
+  public readonly providerId: ProviderId = spotifyProviderId();
 
   get latestSignal(): AbortSignal | undefined {
     return this.observedRequests[this.observedRequests.length - 1]?.signal;
@@ -1383,8 +1411,8 @@ class DeferredSpotifyTransport implements SpotifyCurrentlyPlayingPort {
   }
 
   async fetchCurrentlyPlaying(
-    request: SpotifyCurrentlyPlayingRequest,
-  ): Promise<SpotifyCurrentlyPlayingResult> {
+    request: PlaybackProviderRequest,
+  ): Promise<PlaybackProviderResult> {
     this.observedRequests.push(request);
     this.activeRequests += 1;
     this.maximumRequests = Math.max(this.maximumRequests, this.activeRequests);
@@ -1398,7 +1426,7 @@ class DeferredSpotifyTransport implements SpotifyCurrentlyPlayingPort {
     }
   }
 
-  resolve(result: SpotifyCurrentlyPlayingResult): void {
+  resolve(result: PlaybackProviderResult): void {
     const completion = this.completions.shift();
     if (completion === undefined) {
       throw new Error("Expected a deferred Spotify request.");
@@ -1481,21 +1509,19 @@ class FakeClock {
 }
 
 function deferredSpotifyResult(): {
-  readonly promise: Promise<SpotifyCurrentlyPlayingResult>;
-  readonly resolve: (result: SpotifyCurrentlyPlayingResult) => void;
+  readonly promise: Promise<PlaybackProviderResult>;
+  readonly resolve: (result: PlaybackProviderResult) => void;
 } {
-  let resolvePromise: (result: SpotifyCurrentlyPlayingResult) => void = () => {
+  let resolvePromise: (result: PlaybackProviderResult) => void = () => {
     throw new Error("Deferred Spotify result did not initialize.");
   };
-  const promise = new Promise<SpotifyCurrentlyPlayingResult>(
-    (resolve): void => {
-      resolvePromise = resolve;
-    },
-  );
+  const promise = new Promise<PlaybackProviderResult>((resolve): void => {
+    resolvePromise = resolve;
+  });
 
   return Object.freeze({
     promise,
-    resolve(result: SpotifyCurrentlyPlayingResult): void {
+    resolve(result: PlaybackProviderResult): void {
       resolvePromise(result);
     },
   });

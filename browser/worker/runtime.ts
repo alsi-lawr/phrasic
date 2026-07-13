@@ -37,12 +37,13 @@ import {
   transitionPlaybackState,
   type PlaybackEvent,
   type PlaybackState,
+  type ProviderId,
 } from "../../domain/playback.ts";
 import { serializePlaybackState } from "./playback-wire.ts";
 import {
-  type SpotifyCurrentlyPlayingPort,
-  type SpotifyCurrentlyPlayingResult,
-} from "../providers/spotify.ts";
+  type PlaybackProviderRegistry,
+  type PlaybackProviderResult,
+} from "../providers/registry.ts";
 import {
   createPlaybackWorkerSafeDiagnostic,
   noPlaybackWorkerDiagnosticMetadata,
@@ -101,8 +102,9 @@ export type PlaybackWorkerRuntimePorts = {
   readonly cancellation: PlaybackWorkerCancellationPort;
   readonly clock: PlaybackWorkerClockPort;
   readonly events: PlaybackWorkerEventSink;
+  readonly playbackProviderId: ProviderId;
+  readonly playbackProviders: PlaybackProviderRegistry;
   readonly scheduler: PlaybackWorkerSchedulerPort;
-  readonly spotify: SpotifyCurrentlyPlayingPort;
 };
 
 export type PlaybackWorkerRuntime = {
@@ -684,9 +686,16 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    let result: SpotifyCurrentlyPlayingResult;
+    const provider = ports.playbackProviders.resolve(ports.playbackProviderId);
+    if (provider.kind === "failure") {
+      emitDiagnostic("playback-poll", "runtime-operation-failed");
+      transitionToFailure(providerFailure("server-error"));
+      return;
+    }
+
+    let result: PlaybackProviderResult;
     try {
-      result = await ports.spotify.fetchCurrentlyPlaying({
+      result = await provider.value.fetchCurrentlyPlaying({
         accessToken: accessTokenState.accessToken,
         signal: operation.controller.signal,
       });
@@ -781,10 +790,7 @@ export function createPlaybackWorkerRuntime(
   }
 
   function handleRateLimitedPlayback(
-    result: Extract<
-      SpotifyCurrentlyPlayingResult,
-      { readonly kind: "rate-limited" }
-    >,
+    result: Extract<PlaybackProviderResult, { readonly kind: "rate-limited" }>,
   ): void {
     switch (result.retryAfter.kind) {
       case "valid":
@@ -1570,7 +1576,7 @@ function frozenUnexpectedRefreshResult(): RuntimeRefreshResult {
   return Object.freeze({ kind: "unexpected" });
 }
 
-function frozenNetworkFailure(): SpotifyCurrentlyPlayingResult {
+function frozenNetworkFailure(): PlaybackProviderResult {
   return Object.freeze({ kind: "network-failure" });
 }
 

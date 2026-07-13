@@ -4,7 +4,8 @@ import {
   createNativeIndexedDbAuthorizationPort,
 } from "../auth/storage.ts";
 import { createSpotifyAuthFetchPort } from "../auth/token.ts";
-import { createSpotifyCurrentlyPlayingPort } from "../providers/spotify.ts";
+import { createPlaybackProviderRegistry } from "../providers/registry.ts";
+import { createSpotifyPlaybackProvider } from "../providers/spotify.ts";
 import {
   createBrowserRequestDeadlinePort,
   spotifyHttpRequestDeadlineMilliseconds,
@@ -64,6 +65,17 @@ function createWorkerBootstrap(): WorkerBootstrap {
     const requestDeadline = createBrowserRequestDeadlinePort(
       nativeRequestDeadlineScheduler(),
     );
+    const spotifyPlaybackProvider = createSpotifyPlaybackProvider({
+      fetchImplementation: self.fetch,
+      requestDeadline,
+      timeoutMilliseconds: spotifyHttpRequestDeadlineMilliseconds,
+    });
+    const playbackProviders = createPlaybackProviderRegistry([
+      spotifyPlaybackProvider,
+    ]);
+    if (playbackProviders.kind === "failure") {
+      return Object.freeze({ kind: "unavailable" });
+    }
     const runtime = createPlaybackWorkerRuntime({
       auth: Object.freeze({
         crypto: createBrowserPkceCryptoPort(self.crypto),
@@ -87,12 +99,9 @@ function createWorkerBootstrap(): WorkerBootstrap {
         },
       }),
       events,
+      playbackProviderId: spotifyPlaybackProvider.providerId,
+      playbackProviders: playbackProviders.value,
       scheduler,
-      spotify: createSpotifyCurrentlyPlayingPort({
-        fetchImplementation: self.fetch,
-        requestDeadline,
-        timeoutMilliseconds: spotifyHttpRequestDeadlineMilliseconds,
-      }),
     });
 
     return Object.freeze({ kind: "ready", runtime });
