@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import type { NowPlayingItem } from "../../domain/playback.ts";
 import { FallbackVinyl } from "./FallbackVinyl.tsx";
 import {
-  overlayArtworkLeftCornerClipPathData,
+  overlayArtworkRoundedClipPathData,
   overlayArtworkClipPathId,
   overlayArtworkRectangle,
 } from "./overlay-layout.ts";
@@ -38,7 +38,7 @@ function ArtworkClipPath(): ReactElement {
   return (
     <defs>
       <clipPath id={overlayArtworkClipPathId} clipPathUnits="userSpaceOnUse">
-        <path d={overlayArtworkLeftCornerClipPathData} />
+        <path d={overlayArtworkRoundedClipPathData} />
       </clipPath>
     </defs>
   );

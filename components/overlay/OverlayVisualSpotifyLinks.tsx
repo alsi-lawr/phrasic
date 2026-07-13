@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { overlayViewBox } from "./overlay-geometry.ts";
 import {
-  overlayArtworkLeftCornerClipPathData,
+  overlayArtworkRoundedClipPathData,
   overlayMetadataLayout,
   type OverlayTextLineLayout,
 } from "./overlay-layout.ts";
@@ -130,7 +130,7 @@ function VisualSpotifyLinkTarget({
 function ArtworkLinkRegion(): ReactElement {
   return (
     <path
-      d={overlayArtworkLeftCornerClipPathData}
+      d={overlayArtworkRoundedClipPathData}
       className={overlayVisibleSpotifyLinkClasses.target}
     />
   );

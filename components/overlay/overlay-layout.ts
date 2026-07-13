@@ -31,11 +31,11 @@ export const overlayArtworkRectangle = Object.freeze({
   y: 0,
 });
 
-export const overlayArtworkClipPathId = "overlay-artwork-left-corners-clip";
+export const overlayArtworkClipPathId = "overlay-artwork-rounded-clip";
 export const overlayShellClipPathId = "overlay-shell-clip";
 
-export const overlayArtworkLeftCornerClipPathData =
-  "M 200 0 H 1080 V 1080 H 200 A 200 200 0 0 1 0 880 V 200 A 200 200 0 0 1 200 0 Z";
+export const overlayArtworkRoundedClipPathData =
+  "M 200 0 H 880 A 200 200 0 0 1 1080 200 V 880 A 200 200 0 0 1 880 1080 H 200 A 200 200 0 0 1 0 880 V 200 A 200 200 0 0 1 200 0 Z";
 
 const overlayCreatorLine = Object.freeze({
   clipHeight: 250,
