@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { OverlayArtwork } from "./OverlayArtwork.tsx";
 import { type OverlayGeometry } from "./overlay-geometry.ts";
+import { type OverlayMetadataView } from "./overlay-metadata.ts";
 import {
   visualTreatmentForOverlayState,
   type OverlayUiState,
@@ -11,11 +12,13 @@ import { OverlayStatus } from "./OverlayStatus.tsx";
 
 type OverlayVisualProps = {
   readonly geometry: OverlayGeometry;
+  readonly metadata: OverlayMetadataView;
   readonly state: OverlayUiState;
 };
 
 export function OverlayVisual({
   geometry,
+  metadata,
   state,
 }: OverlayVisualProps): ReactElement {
   const treatment = visualTreatmentForOverlayState(state);
@@ -30,7 +33,7 @@ export function OverlayVisual({
     >
       <OverlayShell />
       <OverlayArtwork state={state} />
-      <OverlayMetadata state={state} />
+      <OverlayMetadata metadata={metadata} />
       <OverlayStatus treatment={treatment} />
     </svg>
   );

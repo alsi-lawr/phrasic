@@ -11,13 +11,13 @@ import {
 import {
   artworkTreatmentForOverlayState,
   controlPlanForOverlayState,
-  metadataForOverlayState,
   overlayUiStateForSnapshot,
   visualTreatmentForOverlayState,
   type OverlayControlPlan,
   type OverlayUiState,
   type OverlayVisualTreatment,
 } from "../../components/overlay/overlay-state.ts";
+import { metadataViewForOverlayState } from "../../components/overlay/overlay-metadata.ts";
 import { resolveOverlayGeometry } from "../../components/overlay/overlay-geometry.ts";
 import {
   advertisementPayload,
@@ -134,8 +134,14 @@ test("the overlay maps every browser playback snapshot to a distinct visual trea
     configurationTreatment.message,
     "The browser configuration is unavailable.",
   );
+  const configurationMetadata =
+    metadataViewForOverlayState(configurationFailure);
+  assert.equal(configurationMetadata.kind, "status");
+  if (configurationMetadata.kind !== "status") {
+    throw new Error("Expected status metadata for configuration failure.");
+  }
   assert.equal(
-    metadataForOverlayState(configurationFailure).context,
+    configurationMetadata.context,
     "The public Spotify configuration could not be loaded.",
   );
 });
@@ -154,10 +160,14 @@ test("the overlay preserves a stale reconnecting item without using an absence s
     artworkTreatmentForOverlayState(reconnectingWithoutItem).kind,
     "fallback",
   );
-  assert.equal(
-    metadataForOverlayState(reconnectingWithoutItem).subtitle,
-    "No previous item is available.",
+  const unavailableMetadata = metadataViewForOverlayState(
+    reconnectingWithoutItem,
   );
+  assert.equal(unavailableMetadata.kind, "status");
+  if (unavailableMetadata.kind !== "status") {
+    throw new Error("Expected status metadata without a stale item.");
+  }
+  assert.equal(unavailableMetadata.subtitle, "No previous item is available.");
 
   const staleArtwork = artworkTreatmentForOverlayState(reconnectingWithItem);
   assert.equal(staleArtwork.kind, "stale-item");
@@ -165,12 +175,18 @@ test("the overlay preserves a stale reconnecting item without using an absence s
     throw new Error("Expected a stale artwork treatment.");
   }
   assert.equal(staleArtwork.item.title.value, "Track title");
-  assert.deepEqual(metadataForOverlayState(reconnectingWithItem), {
-    category: "STALE TRACK",
-    context: "Reconnecting to Spotify — this item may no longer be current.",
-    subtitle: "Last known artist: Track artist",
-    title: "Track title",
-  });
+  const staleMetadata = metadataViewForOverlayState(reconnectingWithItem);
+  assert.equal(staleMetadata.kind, "track");
+  if (staleMetadata.kind !== "track") {
+    throw new Error("Expected track metadata for the stale item.");
+  }
+  assert.equal(staleMetadata.presentation.kind, "stale");
+  assert.equal(staleMetadata.trackTitle.value, "Track title");
+  assert.deepEqual(
+    staleMetadata.artists.map((artist): string => artist.name.value),
+    ["Track artist"],
+  );
+  assert.equal(staleMetadata.album.title.value, "Album title");
 });
 
 test("the overlay exposes only supported setup controls for each state", () => {

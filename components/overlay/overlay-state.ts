@@ -79,13 +79,6 @@ export type OverlayVisualTreatment =
       readonly tone: OverlayVisualTone;
     };
 
-export type OverlayMetadataContent = {
-  readonly category: string;
-  readonly context: string;
-  readonly subtitle: string;
-  readonly title: string;
-};
-
 export type OverlayArtworkTreatment =
   | {
       readonly kind: "current-item";
@@ -241,63 +234,6 @@ export function visualTreatmentForOverlayState(
   return unreachable(state);
 }
 
-export function metadataForOverlayState(
-  state: OverlayUiState,
-): OverlayMetadataContent {
-  switch (state.kind) {
-    case "initializing":
-      return statusMetadata(
-        state,
-        "Spotify Now Playing",
-        "Preparing the display connection.",
-      );
-    case "authorization-required":
-      return statusMetadata(
-        state,
-        "Connect Spotify to continue.",
-        authorizationRequiredContext(state.reason),
-      );
-    case "authorizing":
-      return statusMetadata(
-        state,
-        "Finish authorization in Spotify.",
-        "This display will reconnect after authorization completes.",
-      );
-    case "empty":
-      return statusMetadata(
-        state,
-        "Spotify is connected.",
-        "Start a track or episode to populate the overlay.",
-      );
-    case "playing":
-      return metadataForCurrentItem(state.snapshot.item, "NOW PLAYING");
-    case "paused":
-      return metadataForCurrentItem(state.snapshot.item, "PAUSED");
-    case "unsupported":
-      return statusMetadata(
-        state,
-        unsupportedSubtitle(state.reason),
-        "Play a supported Spotify track or episode.",
-      );
-    case "reconnecting":
-      return reconnectingMetadata(state);
-    case "failure":
-      return statusMetadata(
-        state,
-        playbackFailureSubtitle(state.error),
-        "Use setup mode to retry playback or disconnect Spotify.",
-      );
-    case "fatal-initialization-failure":
-      return statusMetadata(
-        state,
-        "The browser display could not be initialized.",
-        fatalInitializationFailureContext(state.reason),
-      );
-  }
-
-  return unreachable(state);
-}
-
 export function artworkTreatmentForOverlayState(
   state: OverlayUiState,
 ): OverlayArtworkTreatment {
@@ -369,170 +305,6 @@ function fatalVisualTreatment(
   return unreachable(reason);
 }
 
-function statusMetadata(
-  state: OverlayUiState,
-  subtitle: string,
-  context: string,
-): OverlayMetadataContent {
-  const treatment = visualTreatmentForOverlayState(state);
-  return frozenMetadata(treatment.label, treatment.message, subtitle, context);
-}
-
-function metadataForCurrentItem(
-  item: NowPlayingItem,
-  status: "NOW PLAYING" | "PAUSED",
-): OverlayMetadataContent {
-  switch (item.kind) {
-    case "track":
-      return frozenMetadata(
-        `${status} · TRACK`,
-        item.title.value,
-        item.artists.map((artist): string => artist.name.value).join(", "),
-        item.collection.title.value,
-      );
-    case "episode":
-      return frozenMetadata(
-        `${status} · EPISODE`,
-        item.title.value,
-        item.show.title.value,
-        item.show.publisher.value,
-      );
-  }
-
-  return unreachable(item);
-}
-
-function reconnectingMetadata(
-  state: Extract<OverlayUiState, { readonly kind: "reconnecting" }>,
-): OverlayMetadataContent {
-  switch (state.lastItem.kind) {
-    case "unavailable":
-      return statusMetadata(
-        state,
-        "No previous item is available.",
-        "Waiting for Spotify playback updates to return.",
-      );
-    case "available":
-      return staleItemMetadata(state.lastItem.item);
-  }
-
-  return unreachable(state.lastItem);
-}
-
-function staleItemMetadata(item: NowPlayingItem): OverlayMetadataContent {
-  switch (item.kind) {
-    case "track":
-      return frozenMetadata(
-        "STALE TRACK",
-        item.title.value,
-        `Last known artist: ${item.artists
-          .map((artist): string => artist.name.value)
-          .join(", ")}`,
-        "Reconnecting to Spotify — this item may no longer be current.",
-      );
-    case "episode":
-      return frozenMetadata(
-        "STALE EPISODE",
-        item.title.value,
-        `Last known show: ${item.show.title.value}`,
-        "Reconnecting to Spotify — this item may no longer be current.",
-      );
-  }
-
-  return unreachable(item);
-}
-
-function authorizationRequiredContext(
-  reason: Extract<
-    PlaybackState,
-    { readonly kind: "authorization-required" }
-  >["reason"],
-): string {
-  switch (reason) {
-    case "authorization-expired":
-      return "Spotify authorization expired.";
-    case "authorization-revoked":
-      return "Spotify authorization was revoked.";
-    case "not-authorized":
-      return "Spotify is not connected in this browser profile.";
-    case "permission-required":
-      return "Spotify playback permission is required.";
-  }
-
-  return unreachable(reason);
-}
-
-function unsupportedSubtitle(
-  reason: Extract<PlaybackState, { readonly kind: "unsupported" }>["reason"],
-): string {
-  switch (reason) {
-    case "advertisement":
-      return "Spotify is playing an advertisement.";
-    case "local-item":
-      return "Spotify is playing a local item.";
-    case "unknown-item-type":
-      return "Spotify returned an unsupported item type.";
-  }
-
-  return unreachable(reason);
-}
-
-function playbackFailureSubtitle(
-  failure: Extract<PlaybackState, { readonly kind: "failure" }>["error"],
-): string {
-  switch (failure.kind) {
-    case "authorization-failed":
-      return authorizationFailureSubtitle(failure.reason);
-    case "provider-failed":
-      return providerFailureSubtitle(failure.reason);
-  }
-
-  return unreachable(failure);
-}
-
-function authorizationFailureSubtitle(
-  reason: "authorization-denied" | "code-exchange-rejected",
-): string {
-  switch (reason) {
-    case "authorization-denied":
-      return "Spotify authorization was denied.";
-    case "code-exchange-rejected":
-      return "Spotify rejected the authorization code.";
-  }
-
-  return unreachable(reason);
-}
-
-function providerFailureSubtitle(
-  reason: "malformed-response" | "network" | "rate-limited" | "server-error",
-): string {
-  switch (reason) {
-    case "malformed-response":
-      return "Spotify returned an unreadable playback response.";
-    case "network":
-      return "The Spotify connection is unavailable.";
-    case "rate-limited":
-      return "Spotify temporarily limited playback requests.";
-    case "server-error":
-      return "Spotify returned a server error.";
-  }
-
-  return unreachable(reason);
-}
-
-function fatalInitializationFailureContext(
-  reason: FatalInitializationFailureReason,
-): string {
-  switch (reason) {
-    case "browser-capability-unavailable":
-      return "A required browser playback capability is unavailable.";
-    case "configuration-unavailable":
-      return "The public Spotify configuration could not be loaded.";
-  }
-
-  return unreachable(reason);
-}
-
 function reconnectingArtworkTreatment(
   state: Extract<OverlayUiState, { readonly kind: "reconnecting" }>,
 ): OverlayArtworkTreatment {
@@ -558,22 +330,6 @@ function setupOnly(
   }
 
   return unreachable(setupMode);
-}
-
-function frozenMetadata(
-  category: string,
-  title: string,
-  subtitle: string,
-  context: string,
-): OverlayMetadataContent {
-  const content: OverlayMetadataContent = {
-    category,
-    context,
-    subtitle,
-    title,
-  };
-
-  return Object.freeze(content);
 }
 
 function frozenCurrentArtwork(item: NowPlayingItem): OverlayArtworkTreatment {

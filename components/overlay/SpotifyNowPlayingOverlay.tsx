@@ -8,6 +8,7 @@ import {
   controlPlanForOverlayState,
   overlayUiStateForSnapshot,
 } from "./overlay-state.ts";
+import { metadataViewForOverlayState } from "./overlay-metadata.ts";
 import { OverlayVisual } from "./OverlayVisual.tsx";
 
 type SpotifyNowPlayingOverlayProps = {
@@ -30,11 +31,12 @@ function SpotifyNowPlayingOverlayContent(): ReactElement {
     new URL(window.location.href).searchParams,
   );
   const state = overlayUiStateForSnapshot(snapshot);
+  const metadata = metadataViewForOverlayState(state);
   const controls = controlPlanForOverlayState(state, geometry.setupMode);
 
   return (
     <div className="m-0 flex w-full flex-col items-start justify-start p-0">
-      <OverlayVisual geometry={geometry} state={state} />
+      <OverlayVisual geometry={geometry} metadata={metadata} state={state} />
       <OverlayControls
         actions={{ beginAuthorization, logout, retry }}
         plan={controls}
