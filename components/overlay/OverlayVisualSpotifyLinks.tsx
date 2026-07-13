@@ -10,7 +10,6 @@ import {
   type OverlaySpotifyLink,
   type OverlaySpotifyLinks,
 } from "./overlay-spotify-links.ts";
-import { overlayVisibleSpotifyLinkClasses } from "./overlay-presentation.ts";
 
 type OverlayVisualSpotifyLinksProps = {
   readonly availableWidth: number;
@@ -57,7 +56,7 @@ function VisualSpotifyLink({
   return (
     <a
       aria-label={spotifyLinkAccessibleName(link)}
-      className={overlayVisibleSpotifyLinkClasses.anchor}
+      className="group absolute inset-0 block pointer-events-none outline-none"
       href={link.providerLink.href}
       rel="noopener noreferrer"
       target="_blank"
@@ -131,7 +130,7 @@ function ArtworkLinkRegion(): ReactElement {
   return (
     <path
       d={overlayArtworkRoundedClipPathData}
-      className={overlayVisibleSpotifyLinkClasses.target}
+      className="pointer-events-auto cursor-pointer fill-transparent stroke-transparent stroke-0 group-focus-visible:stroke-white group-focus-visible:stroke-40"
     />
   );
 }
@@ -151,7 +150,7 @@ function MetadataLinkRegion({
       y={line.clipY}
       width={availableWidth}
       height={line.clipHeight}
-      className={overlayVisibleSpotifyLinkClasses.target}
+      className="pointer-events-auto cursor-pointer fill-transparent stroke-transparent stroke-0 group-focus-visible:stroke-white group-focus-visible:stroke-40"
     />
   );
 }
@@ -176,15 +175,15 @@ function CreatorLinkRegion({
         y={line.clipY}
         width={availableWidth}
         height={line.clipHeight}
-        className={overlayVisibleSpotifyLinkClasses.focusIndicator}
+        className="pointer-events-none fill-none stroke-transparent stroke-0 group-focus-visible:stroke-white group-focus-visible:stroke-40"
       />
       <text
         x={overlayMetadataLayout.x}
         y={line.y}
-        className={overlayVisibleSpotifyLinkClasses.creatorText}
+        className="font-overlay-display fill-none text-overlay-creator-size font-semibold tracking-overlay-normal uppercase"
       >
         <tspan className="pointer-events-none">{precedingText}</tspan>
-        <tspan className={overlayVisibleSpotifyLinkClasses.creatorTextTarget}>
+        <tspan className="pointer-events-auto cursor-pointer fill-transparent">
           {text}
         </tspan>
       </text>

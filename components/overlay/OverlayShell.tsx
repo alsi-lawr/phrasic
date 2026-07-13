@@ -1,6 +1,5 @@
 import type { ReactElement } from "react";
 import { overlayShell, overlayShellClipPathId } from "./overlay-layout.ts";
-import { overlayShellClass } from "./overlay-presentation.ts";
 
 type OverlayShellProps = {
   readonly width: number;
@@ -28,7 +27,7 @@ export function OverlayShell({ width }: OverlayShellProps): ReactElement {
         height={overlayShell.height}
         rx={overlayShell.radius}
         ry={overlayShell.radius}
-        className={overlayShellClass}
+        className="fill-overlay-shell opacity-90"
       />
     </>
   );

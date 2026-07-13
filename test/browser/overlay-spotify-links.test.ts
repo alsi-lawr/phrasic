@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { parseSpotifyPlaybackPayload } from "../../browser/providers/spotify-payload.ts";
+import { OverlayVisualSpotifyLinks } from "../../components/overlay/OverlayVisualSpotifyLinks.tsx";
 import {
   Collection,
   Creator,
@@ -132,6 +135,29 @@ test("Spotify link mapping preserves an episode item and its show", () => {
       visibleTarget: { kind: "show-metadata" },
     },
   ]);
+});
+
+test("rendered Spotify links retain accessible pointer and keyboard-focus targets", () => {
+  const links = overlayViewModelForState(
+    playingSpotifyState(),
+  ).spotifyLinks;
+  const markup = renderToStaticMarkup(
+    createElement(OverlayVisualSpotifyLinks, {
+      availableWidth: 2_400,
+      links,
+    }),
+  );
+
+  assert.match(
+    markup,
+    /aria-label="LISTEN ON SPOTIFY: TRACK — Track title \(opens in a new tab\)"/,
+  );
+  assert.match(markup, /target="_blank"/);
+  assert.match(markup, /rel="noopener noreferrer"/);
+  assert.match(
+    markup,
+    /class="[^"]*pointer-events-auto[^"]*group-focus-visible:stroke-white[^"]*group-focus-visible:stroke-40[^"]*"/,
+  );
 });
 
 test("missing or non-Spotify child links cannot produce a partial Spotify link plan", () => {

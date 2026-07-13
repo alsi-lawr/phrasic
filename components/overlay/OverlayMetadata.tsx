@@ -14,10 +14,6 @@ import {
   type OverlayTextLineLayout,
   type OverlayTextMeasurementReporter,
 } from "./overlay-layout.ts";
-import {
-  overlayMetadataTextClasses,
-  type OverlayMetadataTextClass,
-} from "./overlay-presentation.ts";
 
 type OverlayMetadataProps = {
   readonly availableWidth: number;
@@ -123,7 +119,7 @@ function StatusMetadata({
         motion={motion}
         onTextMeasurement={onTextMeasurement}
         text={metadata.category}
-        textClass={overlayMetadataTextClasses.status}
+        textClass="font-overlay-display fill-overlay-status text-overlay-status-size font-semibold tracking-overlay-normal"
       />
       <MetadataMarqueeLine
         animationIdentityKey={animationIdentityKey}
@@ -132,7 +128,7 @@ function StatusMetadata({
         motion={motion}
         onTextMeasurement={onTextMeasurement}
         text={metadata.title}
-        textClass={overlayMetadataTextClasses.detail}
+        textClass="font-overlay-display fill-overlay-detail text-overlay-detail-size font-medium tracking-overlay-detail"
       />
       <MetadataMarqueeLine
         animationIdentityKey={animationIdentityKey}
@@ -141,7 +137,7 @@ function StatusMetadata({
         motion={motion}
         onTextMeasurement={onTextMeasurement}
         text={metadata.subtitle}
-        textClass={overlayMetadataTextClasses.detail}
+        textClass="font-overlay-display fill-overlay-detail text-overlay-detail-size font-medium tracking-overlay-detail"
       />
       <MetadataMarqueeLine
         animationIdentityKey={animationIdentityKey}
@@ -150,7 +146,7 @@ function StatusMetadata({
         motion={motion}
         onTextMeasurement={onTextMeasurement}
         text={metadata.context}
-        textClass={overlayMetadataTextClasses.context}
+        textClass="font-overlay-display fill-overlay-context text-overlay-context-size font-medium tracking-overlay-context"
       />
     </>
   );
@@ -180,7 +176,7 @@ function TrackMetadata({
         motion={motion}
         onTextMeasurement={onTextMeasurement}
         text={artistNames(metadata.artists)}
-        textClass={overlayMetadataTextClasses.creator}
+        textClass="font-overlay-display fill-overlay-creator text-overlay-creator-size font-semibold tracking-overlay-normal uppercase"
       />
       <MetadataMarqueeLine
         animationIdentityKey={animationIdentityKey}
@@ -189,7 +185,7 @@ function TrackMetadata({
         motion={motion}
         onTextMeasurement={onTextMeasurement}
         text={metadata.trackTitle.value}
-        textClass={overlayMetadataTextClasses.title}
+        textClass="font-overlay-display fill-overlay-title text-overlay-title-size font-normal tracking-overlay-normal"
       />
       <MetadataMarqueeLine
         animationIdentityKey={animationIdentityKey}
@@ -198,7 +194,7 @@ function TrackMetadata({
         motion={motion}
         onTextMeasurement={onTextMeasurement}
         text={`ALBUM · ${metadata.album.title.value}`}
-        textClass={overlayMetadataTextClasses.detail}
+        textClass="font-overlay-display fill-overlay-detail text-overlay-detail-size font-medium tracking-overlay-detail"
       />
       <MetadataMarqueeLine
         animationIdentityKey={animationIdentityKey}
@@ -207,7 +203,7 @@ function TrackMetadata({
         motion={motion}
         onTextMeasurement={onTextMeasurement}
         text={trackContextForPresentation(metadata.presentation)}
-        textClass={overlayMetadataTextClasses.context}
+        textClass="font-overlay-display fill-overlay-context text-overlay-context-size font-medium tracking-overlay-context"
       />
     </>
   );
@@ -237,7 +233,7 @@ function EpisodeMetadata({
         motion={motion}
         onTextMeasurement={onTextMeasurement}
         text={metadata.show.publisher.value}
-        textClass={overlayMetadataTextClasses.creator}
+        textClass="font-overlay-display fill-overlay-creator text-overlay-creator-size font-semibold tracking-overlay-normal uppercase"
       />
       <MetadataMarqueeLine
         animationIdentityKey={animationIdentityKey}
@@ -246,7 +242,7 @@ function EpisodeMetadata({
         motion={motion}
         onTextMeasurement={onTextMeasurement}
         text={metadata.episodeTitle.value}
-        textClass={overlayMetadataTextClasses.title}
+        textClass="font-overlay-display fill-overlay-title text-overlay-title-size font-normal tracking-overlay-normal"
       />
       <MetadataMarqueeLine
         animationIdentityKey={animationIdentityKey}
@@ -255,7 +251,7 @@ function EpisodeMetadata({
         motion={motion}
         onTextMeasurement={onTextMeasurement}
         text={`SHOW · ${metadata.show.title.value}`}
-        textClass={overlayMetadataTextClasses.detail}
+        textClass="font-overlay-display fill-overlay-detail text-overlay-detail-size font-medium tracking-overlay-detail"
       />
       <MetadataMarqueeLine
         animationIdentityKey={animationIdentityKey}
@@ -264,7 +260,7 @@ function EpisodeMetadata({
         motion={motion}
         onTextMeasurement={onTextMeasurement}
         text={episodeContextForPresentation(metadata.presentation)}
-        textClass={overlayMetadataTextClasses.context}
+        textClass="font-overlay-display fill-overlay-context text-overlay-context-size font-medium tracking-overlay-context"
       />
     </>
   );
@@ -277,7 +273,7 @@ type MetadataMarqueeLineProps = {
   readonly motion: OverlayMotionDecision;
   readonly onTextMeasurement: OverlayTextMeasurementReporter;
   readonly text: string;
-  readonly textClass: OverlayMetadataTextClass;
+  readonly textClass: string;
 };
 
 function MetadataMarqueeLine({

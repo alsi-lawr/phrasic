@@ -17,7 +17,6 @@ import {
   type OverlayContentLine,
   type OverlayTextMeasurementReporter,
 } from "./overlay-layout.ts";
-import { type OverlayMetadataTextClass } from "./overlay-presentation.ts";
 
 type MarqueeTextProps = {
   readonly animationIdentityKey: string;
@@ -28,7 +27,7 @@ type MarqueeTextProps = {
   readonly motion: OverlayMotionDecision;
   readonly onTextMeasurement: OverlayTextMeasurementReporter;
   readonly text: string;
-  readonly textClass: OverlayMetadataTextClass;
+  readonly textClass: string;
   readonly x: number;
   readonly y: number;
 };
@@ -95,7 +94,7 @@ type MarqueeTextForDecisionProps = {
   readonly clipPathId: string;
   readonly decision: MarqueeOverflowDecision;
   readonly text: string;
-  readonly textClass: OverlayMetadataTextClass;
+  readonly textClass: string;
   readonly textReference: RefObject<SVGTextElement | null>;
   readonly x: number;
   readonly y: number;
@@ -144,7 +143,7 @@ function MarqueeTextForDecision({
 type ClippedStaticMarqueeTextProps = {
   readonly clipPathId: string;
   readonly text: string;
-  readonly textClass: OverlayMetadataTextClass;
+  readonly textClass: string;
   readonly textReference: RefObject<SVGTextElement | null>;
   readonly x: number;
   readonly y: number;
@@ -170,7 +169,7 @@ function ClippedStaticMarqueeText({
 type ReducedMotionMarqueeTextProps = {
   readonly decision: MarqueeOverflowDecision;
   readonly text: string;
-  readonly textClass: OverlayMetadataTextClass;
+  readonly textClass: string;
   readonly textReference: RefObject<SVGTextElement | null>;
   readonly x: number;
   readonly y: number;
@@ -208,7 +207,7 @@ function ReducedMotionMarqueeText({
 
 type ReducedMotionTextMeasurementProps = {
   readonly text: string;
-  readonly textClass: OverlayMetadataTextClass;
+  readonly textClass: string;
   readonly textReference: RefObject<SVGTextElement | null>;
   readonly x: number;
   readonly y: number;
@@ -233,7 +232,7 @@ function ReducedMotionTextMeasurement({
 type ReducedMotionStaticTextProps = {
   readonly presentation: StaticMarqueeTextPresentation;
   readonly text: string;
-  readonly textClass: OverlayMetadataTextClass;
+  readonly textClass: string;
   readonly x: number;
   readonly y: number;
 };
@@ -277,7 +276,7 @@ type AnimatedMarqueeTextProps = {
     { readonly kind: "overflowing" }
   >;
   readonly text: string;
-  readonly textClass: OverlayMetadataTextClass;
+  readonly textClass: string;
   readonly textReference: RefObject<SVGTextElement | null>;
   readonly x: number;
   readonly y: number;

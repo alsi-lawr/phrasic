@@ -53,7 +53,7 @@ assets.
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Authored CSS                              | Every `*.css` under `browser/` and `components/`. This is six legacy CSS files at baseline and one current stylesheet.                                                                                                                                                                                                                                                              |
 | Maintained presentation source            | `browser/main.tsx`, `spotify/index.html`, and every `components/**/*.ts` or `components/**/*.tsx` file. It deliberately includes the new UI's feature modules.                                                                                                                                                                                                                      |
-| Focused maintained styling implementation | Authored CSS, every component TS/TSX module containing a JSX `className` attribute, and the dedicated `components/overlay/overlay-presentation.ts` class/token module when present. This includes every class-bearing legacy component rather than counting only current Tailwind tokens. Whole modules are counted because class contracts are colocated with markup and behavior. |
+| Focused maintained styling implementation | Authored CSS, every component TS/TSX module containing a JSX `className` attribute, and—at measurement time—the dedicated `components/overlay/overlay-presentation.ts` class/token module. This includes every class-bearing legacy component rather than counting only current Tailwind tokens. Whole modules are counted because class contracts are colocated with markup and behavior. |
 | Generated CSS                             | Every `dist/**/*.css` file after the clean production build.                                                                                                                                                                                                                                                                                                                        |
 | Application JS                            | Every module script directly referenced by `dist/spotify/index.html`.                                                                                                                                                                                                                                                                                                               |
 | Worker JS                                 | Every emitted JavaScript URL referenced by `new Worker(new URL(..., import.meta.url))` in the application-JS file set.                                                                                                                                                                                                                                                              |
@@ -90,7 +90,8 @@ The current presentation and focused styling scopes both increase. This is partl
 intentional feature growth: the replacement adds exhaustive UI states, setup
 controls, track/episode metadata, semantic announcements, reduced motion,
 marquee behavior, SVG composition, and Spotify attribution/links. It also
-includes Tailwind utility strings and the dedicated presentation-class map.
+included Tailwind utility strings and the dedicated presentation-class map at
+measurement time.
 The measurements do not separate those two sources of growth, so they do not
 characterize the increase as solely feature work or solely styling overhead.
 
@@ -155,7 +156,7 @@ part of the Initiative 3 performance gate.
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | One authored CSS file          | `browser/globals.css` only (1,234 bytes). It contains only `@import \"tailwindcss\"`, the authorized bundled-Geist `@font-face`, and `@theme` tokens.                                                                                         |
 | Hand-authored CSS restrictions | No selectors, `@apply`, custom `@keyframes`, `animation:`, or `transition:` declarations in authored CSS.                                                                                                                                     |
-| Tailwind class restrictions    | The UI cleanup test finds no `style` props, arbitrary values, template-literal class construction, or concatenated/partial classes. Dynamic status classes come from fully enumerated `overlay-presentation.ts` mappings.                     |
+| Tailwind class restrictions    | At measurement time, the UI cleanup test found no `style` props, arbitrary values, template-literal class construction, or concatenated/partial classes. Dynamic status classes then came from fully enumerated `overlay-presentation.ts` mappings. |
 | Superseded CSS/components      | The six old CSS files, five old presentation components, and `public/fonts/GeistMonoVF.woff` are absent. `browser/main.tsx` imports `SpotifyNowPlayingOverlay`; active source has no path to the retired component directories.               |
 | Remote font and base64 artwork | No `litmus.com/fonts`, `proxima_nova`, or `data:image…;base64` match in current active source or fresh text artifacts.                                                                                                                        |
 | Timer/keyframe choreography    | No component `setTimeout`/`setInterval` calls and no authored-CSS keyframes. Worker scheduling timers remain in `browser/worker/entry.ts` and are not visual choreography.                                                                    |
@@ -166,9 +167,10 @@ part of the Initiative 3 performance gate.
 | Geist Sans                     | `public/fonts/GeistVF.woff` SHA-256 `296fafafd41304f7c992079054b8af914dbbd865f32de97c66d0f613b55755d6` (66,268 bytes); its font family reports as `Geist`. No Geist Mono source or fresh-dist match remains.                                  |
 | Reduced motion                 | Native `matchMedia(\"(prefers-reduced-motion: reduce)\")` drives an exhaustive motion decision. Reduced motion renders static marquee text and omits SVG `animateTransform`; no polyfill is introduced.                                       |
 
-The existing `test/browser/ui-cleanup.test.ts` locks down the sole stylesheet
-exactly and asserts the retired paths, remote-font/base64/Geist Mono absence,
-no component timers, Tailwind class rules, and active overlay import.
+At measurement time, `test/browser/ui-cleanup.test.ts` locked down the sole
+stylesheet exactly and asserted the retired paths, remote-font/base64/Geist
+Mono absence, no component timers, Tailwind class rules, and active overlay
+import.
 
 ## Fresh `dist` inventory and scan
 
