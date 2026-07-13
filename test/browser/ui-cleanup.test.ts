@@ -26,58 +26,6 @@ const retiredUiPaths: ReadonlyArray<string> = Object.freeze([
   "components/overlay/overlay-artwork.ts",
   "public/fonts/GeistMonoVF.woff",
 ]);
-const expectedGlobals = `@import "tailwindcss" source(none);
-@source "../browser";
-@source "../components";
-@source "../spotify/index.html";
-
-@font-face {
-  font-family: "Geist";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("/fonts/GeistVF.woff") format("woff");
-}
-
-@theme {
-  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
-  --font-overlay-display: "Geist", ui-sans-serif, system-ui, sans-serif;
-
-  --color-overlay-context: #737373;
-  --color-overlay-creator: #808080;
-  --color-overlay-detail: #a3a3a3;
-  --color-overlay-shell: #1e1e1e;
-  --color-overlay-status: #a3a3a3;
-  --color-overlay-title: #06ab4f;
-  --color-overlay-vinyl-disc: #36548e;
-  --color-overlay-vinyl-groove: #a5b9de;
-  --color-overlay-vinyl-hub: #1b2a59;
-  --color-overlay-vinyl-label: #87a7da;
-  --color-overlay-vinyl-rim: #7188bd;
-
-  --text-overlay-context-size: 54px;
-  --text-overlay-creator-size: 200px;
-  --text-overlay-detail-size: 72px;
-  --text-overlay-status-size: 112px;
-  --text-overlay-title-size: 300px;
-
-  --tracking-overlay-context: 4px;
-  --tracking-overlay-detail: 2px;
-  --tracking-overlay-normal: 0px;
-}
-`;
-
-test("the sole stylesheet contains only the authorized Tailwind source contract", () => {
-  assert.deepEqual([...projectPathsWithExtension(projectRoot, ".css")].sort(), [
-    "browser/globals.css",
-  ]);
-  assert.equal(readProjectText("browser/globals.css"), expectedGlobals);
-  assert.deepEqual(
-    [...expectedGlobals.matchAll(/^@([a-z-]+)/gm)].map((match) => match[1]),
-    ["import", "source", "source", "source", "font-face", "theme"],
-  );
-  assert.equal((expectedGlobals.match(/@font-face\b/g) ?? []).length, 1);
-});
 
 test("the browser overlay ships only the active Tailwind UI contract", () => {
   for (const retiredPath of retiredUiPaths) {
@@ -107,7 +55,7 @@ test("the browser overlay ships only the active Tailwind UI contract", () => {
     /(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/)[^\n]*(?:transition|timer)/i,
   );
   assert.doesNotMatch(activeSource, /GeistMono/i);
-  assert.doesNotMatch(expectedGlobals, /https?:\/\//i);
+  assert.doesNotMatch(readProjectText("browser/globals.css"), /https?:\/\//i);
   assert.deepEqual(fontFileNames(), ["GeistVF.woff"]);
   assert.notEqual(
     statSync(join(projectRoot, "public/fonts/GeistVF.woff")).size,

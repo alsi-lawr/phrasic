@@ -6,15 +6,10 @@ node_modules/
 
 # Generated and build output
 package-lock.json
-.next/
-out/
 dist/
 coverage/
 .vercel/
-next-env.d.ts
 *.tsbuildinfo
-prisma/migrations/
-prisma/spotify.db*
 
 # Scratch workspace
 .agent-workspace/

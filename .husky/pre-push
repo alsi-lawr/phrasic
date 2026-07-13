@@ -3,3 +3,7 @@ set -eu
 
 npm run format:check
 npm run lint
+npm run typecheck
+npm run typecheck:browser
+npm test
+npm run build

@@ -3,7 +3,8 @@ set -eu
 
 staged_files="$(mktemp "${TMPDIR:-/tmp}/obs-nowplaying-staged.XXXXXX")"
 format_files="$(mktemp "${TMPDIR:-/tmp}/obs-nowplaying-format.XXXXXX")"
-trap 'rm -f -- "$staged_files" "$format_files"' 0 HUP INT TERM
+formatted_files="$(mktemp "${TMPDIR:-/tmp}/obs-nowplaying-formatted.XXXXXX")"
+trap 'rm -f -- "$staged_files" "$format_files" "$formatted_files"' 0 HUP INT TERM
 
 git diff --cached --name-only -z > "$staged_files"
 
@@ -22,5 +23,18 @@ if [ ! -s "$format_files" ]; then
   exit 0
 fi
 
-xargs -0 npm exec -- prettier --write --ignore-unknown -- < "$format_files"
-xargs -0 git add -- < "$format_files"
+prettier_bin="$(git rev-parse --show-toplevel)/node_modules/.bin/prettier"
+
+if [ ! -x "$prettier_bin" ]; then
+  printf '%s\n' 'pre-commit: local Prettier is unavailable; run npm ci before committing.' >&2
+  exit 1
+fi
+
+xargs -0 "$prettier_bin" --write --ignore-unknown -- < "$format_files"
+xargs -0 git diff --name-only -z -- < "$format_files" > "$formatted_files"
+
+if [ ! -s "$formatted_files" ]; then
+  exit 0
+fi
+
+xargs -0 git add -- < "$formatted_files"

@@ -1,10 +1,10 @@
 import { createRoot } from "react-dom/client";
 import {
   createBrowserPlaybackApplication,
-  type BrowserConfigurationResponse,
   type BrowserPlaybackApplicationPorts,
   type BrowserPlaybackWorker,
 } from "./application.ts";
+import { fetchBrowserConfiguration } from "./configuration-fetch.ts";
 import SpotifyNowPlayingOverlay from "../components/overlay/SpotifyNowPlayingOverlay.tsx";
 import "./globals.css";
 
@@ -23,7 +23,13 @@ createRoot(rootElement).render(
 function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
   return Object.freeze({
     createWorker: createPlaybackWorker,
-    fetchConfiguration,
+    fetchConfiguration(options) {
+      return fetchBrowserConfiguration({
+        fetchImplementation: fetch,
+        signal: options.signal,
+        url: options.url,
+      });
+    },
     location: Object.freeze({
       current(): URL {
         return new URL(window.location.href);
@@ -91,25 +97,4 @@ function createPlaybackWorker(): BrowserPlaybackWorker {
   };
 
   return Object.freeze(playbackWorker);
-}
-
-async function fetchConfiguration(options: {
-  readonly signal: AbortSignal;
-  readonly url: URL;
-}): Promise<BrowserConfigurationResponse> {
-  const response = await fetch(options.url, {
-    cache: "no-store",
-    credentials: "same-origin",
-    redirect: "error",
-    signal: options.signal,
-  });
-  const configurationResponse: BrowserConfigurationResponse = {
-    ok: response.ok,
-    async readJson(): Promise<unknown> {
-      const source: unknown = await response.json();
-      return source;
-    },
-  };
-
-  return Object.freeze(configurationResponse);
 }

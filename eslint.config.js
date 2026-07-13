@@ -5,7 +5,7 @@ import tseslint from "typescript-eslint";
 
 export default [
   {
-    ignores: [".agent-workspace/", ".next/", "dist/", "node_modules/"],
+    ignores: [".agent-workspace/", "dist/", "node_modules/"],
   },
   ...tseslint.configs.recommended,
   {

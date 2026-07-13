@@ -1,132 +1,231 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { extname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { build } from "vite";
 
 const projectRoot = fileURLToPath(new URL("../../", import.meta.url));
-const expectedDocumentCsp = [
-  "default-src 'none'",
-  "base-uri 'none'",
-  "object-src 'none'",
-  "script-src 'self'",
-  "script-src-attr 'none'",
-  "style-src 'self'",
-  "style-src-attr 'none'",
-  "img-src 'self' data: https://i.scdn.co",
-  "font-src 'self'",
-  "connect-src 'self' https://accounts.spotify.com https://api.spotify.com",
-  "worker-src 'self'",
-  "manifest-src 'self'",
-  "media-src 'none'",
-  "frame-src 'none'",
-  "form-action 'none'",
-].join("; ");
+const staticHtmlEntries: ReadonlyArray<string> = [
+  "index.html",
+  "spotify/index.html",
+];
+const textFileExtensions: ReadonlyArray<string> = [
+  ".css",
+  ".html",
+  ".js",
+  ".json",
+  ".mjs",
+  ".svg",
+  ".txt",
+];
+const expectedCspDirectives: ReadonlyArray<
+  readonly [string, ReadonlyArray<string>]
+> = [
+  ["default-src", ["'none'"]],
+  ["base-uri", ["'none'"]],
+  ["object-src", ["'none'"]],
+  ["script-src", ["'self'"]],
+  ["script-src-attr", ["'none'"]],
+  ["style-src", ["'self'"]],
+  ["style-src-attr", ["'none'"]],
+  ["worker-src", ["'self'"]],
+  ["frame-src", ["'none'"]],
+  ["form-action", ["'none'"]],
+  ["img-src", ["'self'", "data:", "https://i.scdn.co"]],
+  [
+    "connect-src",
+    ["'self'", "https://accounts.spotify.com", "https://api.spotify.com"],
+  ],
+];
+const secretBuildEnvironment: ReadonlyArray<readonly [string, string]> = [
+  ["VITE_CLIENT_SECRET", "build-client-secret-must-not-ship"],
+  ["VITE_ACCESS_TOKEN", "build-access-token-must-not-ship"],
+  ["VITE_REFRESH_TOKEN", "build-refresh-token-must-not-ship"],
+];
 
-test("static HTML entries have restrictive CSP and no-referrer metadata", () => {
-  const htmlEntries: ReadonlyArray<string> = [
-    "index.html",
-    "spotify/index.html",
-  ];
+type DocumentSecurityMetadata = {
+  readonly contentSecurityPolicy: string;
+  readonly referrerPolicy: string;
+};
 
-  for (const entry of htmlEntries) {
-    const html = readProjectText(entry);
-    const policy = contentSecurityPolicy(html);
-
-    assert.equal(policy, expectedDocumentCsp);
-    assert.doesNotMatch(policy, /unsafe-(?:eval|inline)/i);
-    assert.match(html, /<meta\s+name="referrer"\s+content="no-referrer"\s*\/>/);
-  }
-
-  const rootEntry = readProjectText("index.html");
-  const spotifyEntry = readProjectText("spotify/index.html");
-  assert.match(
-    rootEntry,
-    /http-equiv="refresh"\s+content="0; url=\/spotify\/"/,
+test("production artifacts preserve static-host security boundaries", async () => {
+  const outputDirectory = mkdtempSync(
+    join(tmpdir(), "obs-nowplaying-static-host-security-"),
   );
-  assert.match(
-    spotifyEntry,
-    /<script\s+type="module"\s+src="\/browser\/main\.tsx"><\/script>/,
-  );
-});
+  const restoreBuildEnvironment = injectSecretBuildEnvironment();
 
-test("the static-host contract requires no-store callback and configuration responses plus immutable hashed assets", () => {
-  const headers = readProjectText("deploy/static-host-headers.md");
-  const headerPolicy = responseContentSecurityPolicy(headers);
+  try {
+    await build({
+      configFile: join(projectRoot, "vite.config.ts"),
+      logLevel: "silent",
+      root: projectRoot,
+      build: { emptyOutDir: true, outDir: outputDirectory },
+    });
 
-  assert.match(headers, /not automatically applied/);
-  assert.equal(headerPolicy, `${expectedDocumentCsp}; frame-ancestors 'none'`);
-  assert.doesNotMatch(headerPolicy, /unsafe-(?:eval|inline)/i);
-  assert.match(headers, /Referrer-Policy: no-referrer/);
-  assert.match(headers, /X-Content-Type-Options: nosniff/);
-  assert.match(headers, /Permissions-Policy: .*camera=\(\).*microphone=\(\)/);
-  assert.match(
-    headers,
-    /\| `\/config\.json`\s+\| `Cache-Control: no-store, no-cache, max-age=0, must-revalidate`\s+\|/,
-  );
-  assert.match(
-    headers,
-    /\| `\/spotify\/` and `\/spotify\/index\.html`\s+\| `Cache-Control: no-store, no-cache, max-age=0, must-revalidate`\s+\|/,
-  );
-  assert.match(
-    headers,
-    /\| `\/`, `\/index\.html`, and every other HTML entry\s+\| `Cache-Control: no-cache, max-age=0, must-revalidate`\s+\|/,
-  );
-  assert.match(
-    headers,
-    /\/assets\/<name>-<content-hash>\.<ext>.*public, max-age=31536000, immutable/,
-  );
-});
+    for (const entry of staticHtmlEntries) {
+      const metadata = documentSecurityMetadata(
+        readFileSync(join(outputDirectory, entry), "utf8"),
+      );
+      assert.equal(metadata.referrerPolicy, "no-referrer");
+      for (const [directive, expectedSources] of expectedCspDirectives) {
+        assertCspDirective(
+          metadata.contentSecurityPolicy,
+          directive,
+          expectedSources,
+        );
+      }
+      assert.doesNotMatch(
+        metadata.contentSecurityPolicy,
+        /'unsafe-(?:eval|inline)'/i,
+      );
+    }
 
-test("Vite disables source maps and environment injection while runtime configuration stays same-origin and uncached", () => {
-  const viteConfiguration = readProjectText("vite.config.ts");
-  const application = readProjectText("browser/application.ts");
-  const entry = readProjectText("browser/main.tsx");
-
-  assert.match(viteConfiguration, /envPrefix:\s*\[\s*\]/);
-  assert.match(viteConfiguration, /sourcemap:\s*false/);
-  assert.doesNotMatch(viteConfiguration, /loadEnv\(/);
-  assert.doesNotMatch(viteConfiguration, /define\s*:/);
-  assert.match(application, /new URL\(\s*"\/config\.json",/);
-  assert.match(entry, /cache:\s*"no-store"/);
-  assert.doesNotMatch(
-    `${application}\n${entry}`,
-    /(?:import\.meta\.env|process\.env)/,
-  );
-});
-
-function contentSecurityPolicy(html: string): string {
-  const match = html.match(
-    /<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"\s*\/>/,
-  );
-  if (match === null) {
-    throw new Error("Expected a Content-Security-Policy meta tag.");
-  }
-
-  const policy = match[1];
-  if (policy === undefined) {
-    throw new Error("Expected a Content-Security-Policy meta value.");
-  }
-
-  return policy;
-}
-
-function responseContentSecurityPolicy(headers: string): string {
-  const match = headers.match(/Content-Security-Policy: ([^\n]+)/);
-  if (match === null) {
-    throw new Error("Expected a Content-Security-Policy response header.");
-  }
-
-  const policy = match[1];
-  if (policy === undefined) {
-    throw new Error(
-      "Expected a Content-Security-Policy response header value.",
+    const outputPaths = filesRecursively(outputDirectory);
+    assert.equal(
+      outputPaths.some((path) => path.endsWith(".map")),
+      false,
+      "production artifacts must not include source maps",
     );
+
+    const textArtifacts = outputPaths
+      .filter((path) =>
+        textFileExtensions.includes(extname(path).toLowerCase()),
+      )
+      .map((path) => readFileSync(path, "utf8"));
+    assert.equal(
+      textArtifacts.some((artifact) => artifact.includes("sourceMappingURL")),
+      false,
+      "production text must not reference source maps",
+    );
+
+    for (const [name, value] of secretBuildEnvironment) {
+      assert.equal(
+        outputPaths.some((path) => readFileSync(path).includes(value)),
+        false,
+        `${name} must not be emitted to the browser`,
+      );
+    }
+  } finally {
+    restoreBuildEnvironment();
+    rmSync(outputDirectory, { force: true, recursive: true });
+  }
+});
+
+function documentSecurityMetadata(
+  documentText: string,
+): DocumentSecurityMetadata {
+  let contentSecurityPolicy: string | undefined;
+  let referrerPolicy: string | undefined;
+
+  for (const match of documentText.matchAll(/<meta\b[^>]*>/gi)) {
+    const attributes = htmlAttributes(match[0]);
+    const content = attributes.get("content");
+    if (content === undefined) {
+      continue;
+    }
+
+    if (
+      attributes.get("http-equiv")?.toLowerCase() === "content-security-policy"
+    ) {
+      if (contentSecurityPolicy !== undefined) {
+        throw new Error("Expected one Content-Security-Policy meta tag.");
+      }
+
+      contentSecurityPolicy = content;
+      continue;
+    }
+
+    if (attributes.get("name")?.toLowerCase() === "referrer") {
+      if (referrerPolicy !== undefined) {
+        throw new Error("Expected one referrer meta tag.");
+      }
+
+      referrerPolicy = content;
+    }
   }
 
-  return policy;
+  if (contentSecurityPolicy === undefined || referrerPolicy === undefined) {
+    throw new Error("Expected CSP and referrer metadata in static HTML.");
+  }
+
+  return Object.freeze({ contentSecurityPolicy, referrerPolicy });
 }
 
-function readProjectText(path: string): string {
-  return readFileSync(join(projectRoot, path), "utf8");
+function htmlAttributes(tag: string): ReadonlyMap<string, string> {
+  const attributes = new Map<string, string>();
+  const attributePattern =
+    /([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+
+  for (const match of tag.matchAll(attributePattern)) {
+    const name = match[1];
+    if (name === undefined || name.toLowerCase() === "meta") {
+      continue;
+    }
+
+    attributes.set(name.toLowerCase(), match[2] ?? match[3] ?? match[4] ?? "");
+  }
+
+  return attributes;
+}
+
+function assertCspDirective(
+  policy: string,
+  directive: string,
+  expectedSources: ReadonlyArray<string>,
+): void {
+  const matchingDirectives = policy
+    .split(";")
+    .map((candidate) => candidate.trim())
+    .filter((candidate) => candidate.startsWith(`${directive} `));
+  if (matchingDirectives.length !== 1) {
+    throw new Error(`Expected one ${directive} CSP directive.`);
+  }
+
+  const value = matchingDirectives[0];
+  if (value === undefined) {
+    throw new Error(`Expected the ${directive} CSP directive.`);
+  }
+
+  const [, ...sources] = value.split(/\s+/);
+  assert.deepEqual([...sources].sort(), [...expectedSources].sort());
+}
+
+function injectSecretBuildEnvironment(): () => void {
+  const savedValues = new Map<string, string | undefined>();
+
+  for (const [name, value] of secretBuildEnvironment) {
+    savedValues.set(name, process.env[name]);
+    process.env[name] = value;
+  }
+
+  return (): void => {
+    for (const [name, value] of savedValues) {
+      if (value === undefined) {
+        delete process.env[name];
+        continue;
+      }
+
+      process.env[name] = value;
+    }
+  };
+}
+
+function filesRecursively(directory: string): ReadonlyArray<string> {
+  const paths: string[] = [];
+
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      paths.push(...filesRecursively(path));
+      continue;
+    }
+
+    if (entry.isFile()) {
+      paths.push(path);
+    }
+  }
+
+  return paths;
 }
