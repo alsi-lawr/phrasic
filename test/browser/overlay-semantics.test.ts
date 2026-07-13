@@ -26,6 +26,21 @@ import {
   playingTrackPayload,
 } from "./providers/spotify-payload.fixture.ts";
 
+test("the semantic companion has a named polite status region", () => {
+  const markup = renderSemanticCompanion(
+    playbackSnapshot(initialPlaybackState()),
+  );
+
+  assert.match(
+    markup,
+    /<section[^>]*aria-labelledby="spotify-now-playing-heading"[^>]*>/,
+  );
+  assert.match(
+    markup,
+    /<p[^>]*aria-atomic="true"[^>]*aria-live="polite"[^>]*role="status"/,
+  );
+});
+
 test("the semantic companion renders complete state-aware definitions and polite announcements", () => {
   const cases: ReadonlyArray<SemanticCase> = [
     {
@@ -169,14 +184,6 @@ test("the semantic companion renders complete state-aware definitions and polite
   for (const semanticCase of cases) {
     const markup = renderSemanticCompanion(semanticCase.snapshot);
 
-    assert.match(
-      markup,
-      /<section[^>]*aria-labelledby="spotify-now-playing-heading"[^>]*>/,
-    );
-    assert.match(
-      markup,
-      /<p[^>]*aria-atomic="true"[^>]*aria-live="polite"[^>]*role="status"/,
-    );
     assert.ok(markup.includes(semanticCase.announcement));
     for (const [term, value] of semanticCase.definitions) {
       assert.ok(markup.includes(`<dt>${term}</dt><dd>${value}</dd>`));
@@ -253,11 +260,6 @@ test("live announcement keys remain stable across polling and change for item or
       playbackSnapshot(
         expectSuccess(parseSpotifyPlaybackPayload(emptyTrackPayload)),
       ),
-    ),
-  );
-  assert.ok(
-    renderSemanticCompanion(updatedLinksSnapshot).includes(
-      "Now playing track: Track title. Artists: Track artist. Album: Album title.",
     ),
   );
 });

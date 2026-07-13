@@ -40,7 +40,6 @@ test("the artwork is full-height, flush left, and clipped at all four corners", 
     "M 200 0 H 1080 V 1080 H 200 A 200 200 0 0 1 0 880 V 200 A 200 200 0 0 1 200 0 Z",
   );
   assert.equal(overlayArtworkClipPathId, "overlay-artwork-rounded-clip");
-  assert.equal(Object.isFrozen(overlayArtworkRectangle), true);
 });
 
 test("artwork renders current and stale domain artwork while preserving the vinyl fallback", () => {

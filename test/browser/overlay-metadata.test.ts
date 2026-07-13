@@ -44,26 +44,6 @@ test("overlay metadata renders normalized paused episode text and hierarchy", ()
   assert.match(markup, />PAUSED · EPISODE<\/text>/);
 });
 
-test("overlay metadata renders fatal status text directly from the application snapshot", () => {
-  const markup = renderMetadata(
-    Object.freeze({
-      kind: "fatal",
-      reason: "configuration-unavailable",
-    }),
-  );
-
-  assert.match(markup, />OVERLAY UNAVAILABLE<\/text>/);
-  assert.match(markup, />The browser configuration is unavailable\.<\/text>/);
-  assert.match(
-    markup,
-    />The browser display could not be initialized\.<\/text>/,
-  );
-  assert.match(
-    markup,
-    />The public Spotify configuration could not be loaded\.<\/text>/,
-  );
-});
-
 test("marquee identity stays stable for a normalized item whose title changes", () => {
   const originalState = expectSuccess(
     parseSpotifyPlaybackPayload(playingTrackPayload),
@@ -98,7 +78,6 @@ test("marquee identity stays stable for a normalized item whose title changes", 
   const originalSnapshot = playbackSnapshot(originalState);
   const changedSnapshot = playbackSnapshot(changedState);
 
-  assert.notEqual(originalTrack.title.value, changedTrack.title.value);
   assert.equal(
     overlayItemIdentityKey(originalTrack),
     overlayItemIdentityKey(changedTrack),

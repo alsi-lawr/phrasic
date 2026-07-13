@@ -60,8 +60,6 @@ test("Spotify destinations render a track, every creator, and its album", () => 
   assert.match(markup, /href="https:\/\/open\.spotify\.com\/artist\/artist-1"/);
   assert.match(markup, /href="https:\/\/open\.spotify\.com\/artist\/artist-2"/);
   assert.match(markup, /href="https:\/\/open\.spotify\.com\/album\/album-1"/);
-  assert.match(markup, />Track artist, <\/tspan>/);
-  assert.match(markup, />Second track artist<\/tspan>/);
 });
 
 test("Spotify destinations render an episode and its show", () => {

@@ -156,7 +156,7 @@ part of the Initiative 3 performance gate.
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | One authored CSS file          | `browser/globals.css` only (1,234 bytes). It contains only `@import \"tailwindcss\"`, the authorized bundled-Geist `@font-face`, and `@theme` tokens.                                                                                         |
 | Hand-authored CSS restrictions | No selectors, `@apply`, custom `@keyframes`, `animation:`, or `transition:` declarations in authored CSS.                                                                                                                                     |
-| Tailwind class restrictions    | At measurement time, the UI cleanup test found no `style` props, arbitrary values, template-literal class construction, or concatenated/partial classes. Dynamic status classes then came from fully enumerated `overlay-presentation.ts` mappings. |
+| Tailwind class restrictions    | The historical measurement found no `style` props, arbitrary values, template-literal class construction, or concatenated/partial classes. Dynamic status classes then came from fully enumerated `overlay-presentation.ts` mappings. |
 | Superseded CSS/components      | The six old CSS files, five old presentation components, and `public/fonts/GeistMonoVF.woff` are absent. `browser/main.tsx` imports `SpotifyNowPlayingOverlay`; active source has no path to the retired component directories.               |
 | Remote font and base64 artwork | No `litmus.com/fonts`, `proxima_nova`, or `data:image…;base64` match in current active source or fresh text artifacts.                                                                                                                        |
 | Timer/keyframe choreography    | No component `setTimeout`/`setInterval` calls and no authored-CSS keyframes. Worker scheduling timers remain in `browser/worker/entry.ts` and are not visual choreography.                                                                    |
@@ -167,10 +167,9 @@ part of the Initiative 3 performance gate.
 | Geist Sans                     | `public/fonts/GeistVF.woff` SHA-256 `296fafafd41304f7c992079054b8af914dbbd865f32de97c66d0f613b55755d6` (66,268 bytes); its font family reports as `Geist`. No Geist Mono source or fresh-dist match remains.                                  |
 | Reduced motion                 | Native `matchMedia(\"(prefers-reduced-motion: reduce)\")` drives an exhaustive motion decision. Reduced motion renders static marquee text and omits SVG `animateTransform`; no polyfill is introduced.                                       |
 
-At measurement time, `test/browser/ui-cleanup.test.ts` locked down the sole
-stylesheet exactly and asserted the retired paths, remote-font/base64/Geist
-Mono absence, no component timers, Tailwind class rules, and active overlay
-import.
+The historical measurement recorded the sole stylesheet exactly and asserted
+the retired paths, remote-font/base64/Geist Mono absence, no component timers,
+Tailwind class rules, and active overlay import.
 
 ## Fresh `dist` inventory and scan
 

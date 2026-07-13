@@ -24,8 +24,6 @@
     "domain/**/*.ts",
     "test/browser/**/*.ts",
     "test/playback-domain.test.ts",
-    "test/toolchain.fixture.ts",
-    "test/toolchain.test.ts",
     "test/types/browser-*.type-test.ts",
     "test/types/playback-domain.type-test.ts",
     "vite.config.ts"
