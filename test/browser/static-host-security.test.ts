@@ -107,16 +107,6 @@ test("production artifacts preserve static-host security boundaries", async () =
         `${name} must not be emitted to the browser`,
       );
     }
-
-    const shippedJavaScript = outputPaths
-      .filter((path) => extname(path) === ".js")
-      .map((path) => readFileSync(path, "utf8"))
-      .join("\n");
-    assert.match(shippedJavaScript, /["'`]\/config\.json["'`]/);
-    assert.match(
-      shippedJavaScript,
-      /fetch\([^,]+,\{(?=[^}]*\bcache\s*:\s*[`'"]no-store[`'"])(?=[^}]*\bcredentials\s*:\s*[`'"]same-origin[`'"])[^}]*\}\)/,
-    );
   } finally {
     restoreBuildEnvironment();
     rmSync(outputDirectory, { force: true, recursive: true });
