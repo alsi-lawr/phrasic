@@ -1,7 +1,9 @@
-import type { LastPlaybackItem } from "@/domain/playback";
-import { currentPlaybackItem } from "@/domain/playback-stream";
+import {
+  currentPlaybackItem,
+  type LastPlaybackItem,
+  type PlaybackState,
+} from "../../domain/playback.ts";
 import type { ReactElement } from "react";
-import { useFetchData } from "../hookintoupdates/FetchDataHook";
 import "./Artwork.css";
 
 type ArtworkPresentation =
@@ -14,8 +16,13 @@ type ArtworkPresentation =
       readonly source: string;
     };
 
-export default function AlbumArtworkClient(): ReactElement {
-  const { state } = useFetchData();
+type AlbumArtworkProps = {
+  readonly state: PlaybackState;
+};
+
+export default function AlbumArtworkClient({
+  state,
+}: AlbumArtworkProps): ReactElement {
   const artwork = artworkPresentation(currentPlaybackItem(state));
   const imageClassName = artwork.kind === "fallback" ? "spinning-image" : "";
 

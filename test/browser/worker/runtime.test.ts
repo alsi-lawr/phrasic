@@ -21,7 +21,7 @@ import {
   type SpotifyAuthFetchResult,
   type SpotifyAuthJsonReadResult,
 } from "../../../browser/auth/token.ts";
-import { parseSpotifyPlaybackPayload } from "../../../providers/spotify/playback.ts";
+import { parseSpotifyPlaybackPayload } from "../../../browser/providers/spotify-payload.ts";
 import {
   createPlaybackWorkerRuntime,
   type PlaybackWorkerEventSink,
@@ -37,7 +37,7 @@ import type { PlaybackWorkerEvent } from "../../../browser/worker/protocol.ts";
 import {
   emptyTrackPayload,
   playingTrackPayload,
-} from "../../spotify-playback.fixture.ts";
+} from "../providers/spotify-payload.fixture.ts";
 
 test("the worker refreshes stored authorization, normalizes playback, and schedules from completion", async () => {
   const fixture = await runtimeFixture({
@@ -405,6 +405,14 @@ test("a persisted PKCE attempt is consumed after reload and never exposes token 
   });
 
   assert.equal(lastPlaybackState(fixture.events).state.kind, "playing");
+  assert.equal(
+    fixture.events.some(
+      (event) =>
+        event.kind === "callback-url-restored" &&
+        event.url === "https://nowplaying.example/spotify/?width=1280&setup=1",
+    ),
+    true,
+  );
   assert.equal(fixture.authFetch.requestCount, 1);
   assert.equal(fixture.storage.connectionKind, "found");
   assert.equal(
@@ -880,7 +888,8 @@ function deterministicCrypto(): BrowserPkceCryptoPort {
       },
     },
     sha256: {
-      async digest(_source: Uint8Array): Promise<Uint8Array> {
+      async digest(source: Uint8Array): Promise<Uint8Array> {
+        void source;
         return new Uint8Array(32);
       },
     },

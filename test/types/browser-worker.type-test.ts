@@ -1,4 +1,4 @@
-import type { PlaybackWireState } from "../../domain/playback-stream.ts";
+import type { PlaybackWireState } from "../../browser/worker/playback-wire.ts";
 import type {
   PlaybackWorkerCommand,
   PlaybackWorkerEvent,
@@ -23,6 +23,11 @@ const playbackEvent: PlaybackWorkerEvent = {
   state: wireState,
 };
 
+const callbackRestoration: PlaybackWorkerEvent = {
+  kind: "callback-url-restored",
+  url: "https://nowplaying.example/spotify/?width=1280&setup=1",
+};
+
 const diagnostic: PlaybackWorkerSafeDiagnostic = {
   kind: "safe-diagnostic",
   operation: "playback-poll",
@@ -44,6 +49,13 @@ const tokenBearingEvent: PlaybackWorkerEvent = {
   kind: "playback-state",
   state: wireState,
   // @ts-expect-error Worker playback events expose only provider-neutral wire state.
+  accessToken: "token-value",
+};
+
+const tokenBearingCallbackRestoration: PlaybackWorkerEvent = {
+  kind: "callback-url-restored",
+  url: "https://nowplaying.example/spotify/?width=1280&setup=1",
+  // @ts-expect-error Callback URL restoration events cannot carry credentials.
   accessToken: "token-value",
 };
 
@@ -94,9 +106,11 @@ const rawErrorBearingDiagnostic: PlaybackWorkerSafeDiagnostic = {
 
 void initialize;
 void playbackEvent;
+void callbackRestoration;
 void diagnostic;
 void tokenBearingCommand;
 void tokenBearingEvent;
+void tokenBearingCallbackRestoration;
 void payloadBearingDiagnostic;
 void callbackBearingDiagnostic;
 void headersBearingDiagnostic;

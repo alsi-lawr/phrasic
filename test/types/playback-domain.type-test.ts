@@ -19,7 +19,6 @@ import {
   TrackItem,
   type Result,
 } from "../../domain/playback.ts";
-import type { SpotifyPlaybackParseFailure } from "../../providers/spotify/playback.ts";
 
 const providerId = expectSuccess(ProviderId.create("spotify"));
 const itemId = expectSuccess(ProviderItemId.create("track-1"));
@@ -65,12 +64,6 @@ const track = expectSuccess(
     links: [link],
   }),
 );
-const positiveIntegerSpotifyPlaybackFailure = {
-  kind: "invalid-spotify-playback-payload",
-  path: "$.item.duration_ms",
-  code: "expected-positive-integer",
-} satisfies SpotifyPlaybackParseFailure;
-
 // @ts-expect-error Plain strings are not validated provider IDs.
 const plainStringProviderId: ProviderId = "spotify";
 // @ts-expect-error Item IDs cannot be used as provider IDs.
@@ -108,8 +101,6 @@ void expiresIn;
 void refreshDelay;
 void pollDelay;
 void refreshToken;
-void positiveIntegerSpotifyPlaybackFailure;
-
 type AssertFalse<Value extends false> = Value;
 
 const playbackPollDelayCannotBeUsedAsRefreshDelay: AssertFalse<

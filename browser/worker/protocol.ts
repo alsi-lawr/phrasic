@@ -5,7 +5,7 @@ import {
 import {
   parsePlaybackWireState,
   type PlaybackWireState,
-} from "../../domain/playback-stream.ts";
+} from "./playback-wire.ts";
 
 export type PlaybackWorkerInitializeCommand = {
   readonly kind: "initialize";
@@ -135,6 +135,11 @@ export type PlaybackWorkerAuthorizationRedirect = {
   readonly url: string;
 };
 
+export type PlaybackWorkerCallbackUrlRestored = {
+  readonly kind: "callback-url-restored";
+  readonly url: string;
+};
+
 export type PlaybackWorkerPlaybackState = {
   readonly kind: "playback-state";
   readonly state: PlaybackWireState;
@@ -142,6 +147,7 @@ export type PlaybackWorkerPlaybackState = {
 
 export type PlaybackWorkerEvent =
   | PlaybackWorkerAuthorizationRedirect
+  | PlaybackWorkerCallbackUrlRestored
   | PlaybackWorkerFatalInitializationFailure
   | PlaybackWorkerPlaybackState
   | PlaybackWorkerSafeDiagnostic;
@@ -240,6 +246,8 @@ export function parsePlaybackWorkerEvent(
     switch (kind.value) {
       case "authorization-redirect":
         return parseAuthorizationRedirectEvent(source.value, failures);
+      case "callback-url-restored":
+        return parseCallbackUrlRestoredEvent(source.value, failures);
       case "playback-state":
         return parsePlaybackStateEvent(source.value, failures);
       case "safe-diagnostic":
@@ -442,6 +450,28 @@ function parseAuthorizationRedirectEvent(
 
   const event: PlaybackWorkerAuthorizationRedirect = {
     kind: "authorization-redirect",
+    url: url.value,
+  };
+
+  return succeeded(Object.freeze(event));
+}
+
+function parseCallbackUrlRestoredEvent(
+  source: object,
+  failures: FailureFactory<PlaybackWorkerEventParseFailure>,
+): Result<PlaybackWorkerCallbackUrlRestored, PlaybackWorkerEventParseFailure> {
+  const exact = parseExactObject(source, ["kind", "url"], failures);
+  if (exact.kind === "failure") {
+    return exact;
+  }
+
+  const url = readRequiredNonEmptyString(exact.value, "url", failures);
+  if (url.kind === "failure") {
+    return url;
+  }
+
+  const event: PlaybackWorkerCallbackUrlRestored = {
+    kind: "callback-url-restored",
     url: url.value,
   };
 

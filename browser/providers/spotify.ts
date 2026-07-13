@@ -2,7 +2,7 @@ import {
   maximumPlatformTimerDelayMilliseconds,
   type PlaybackState,
 } from "../../domain/playback.ts";
-import { parseSpotifyPlaybackPayload } from "../../providers/spotify/playback.ts";
+import { parseSpotifyPlaybackPayload } from "./spotify-payload.ts";
 import type { SpotifyAccessToken } from "../auth/token.ts";
 
 const spotifyCurrentlyPlayingEndpoint =

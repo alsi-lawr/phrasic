@@ -1,7 +1,7 @@
 import {
   parseSpotifyPlaybackPayload,
   type SpotifyPlaybackParseFailure,
-} from "../../providers/spotify/playback.ts";
+} from "../../browser/providers/spotify-payload.ts";
 import type { PlaybackState, Result } from "../../domain/playback.ts";
 
 const payload: unknown = {};

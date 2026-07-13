@@ -1,12 +1,17 @@
-import { currentPlaybackItem } from "@/domain/playback-stream";
+import {
+  currentPlaybackItem,
+  type PlaybackState,
+} from "../../domain/playback.ts";
 import type { ReactElement } from "react";
 import Artist from "../artist/Artist";
-import { useFetchData } from "../hookintoupdates/FetchDataHook";
 import Title from "../title/Title";
 import "./SongDetails.css";
 
-export default function SongDetails(): ReactElement {
-  const { state } = useFetchData();
+type SongDetailsProps = {
+  readonly state: PlaybackState;
+};
+
+export default function SongDetails({ state }: SongDetailsProps): ReactElement {
   const item = currentPlaybackItem(state);
   const className =
     item.kind === "available" ? "song-details" : "song-details no-data";

@@ -18,7 +18,6 @@ import {
   Show,
   TrackItem,
   transitionPlaybackState,
-  unavailableLastPlaybackItem,
   unavailableOriginalArtwork,
   type AuthorizationRequiredReason,
   type ArtworkUnavailableReason,
@@ -30,7 +29,7 @@ import {
   type PlaybackState,
   type Result,
   type UnsupportedPlaybackReason,
-} from "./playback.ts";
+} from "../../domain/playback.ts";
 
 type UnknownJsonObject = {
   readonly [key: string]: unknown;
@@ -151,7 +150,7 @@ export type FailurePlaybackWireState = {
   readonly error: PlaybackWireFailure;
 };
 
-/** The only provider-neutral JSON shape sent over the legacy SSE stream. */
+/** JSON-safe playback state transferred between the dedicated worker and main thread. */
 export type PlaybackWireState =
   | AuthorizingPlaybackWireState
   | AuthorizationRequiredPlaybackWireState
@@ -179,50 +178,6 @@ export type PlaybackWireParseFailure = {
 
 export type PlaybackWireDeserializationFailure = {
   readonly kind: "invalid-playback-wire-domain";
-};
-
-export type PlaybackStreamCursor =
-  | {
-      readonly kind: "unobserved";
-    }
-  | {
-      readonly kind: "observed";
-      readonly state: PlaybackWireState;
-    };
-
-export type PlaybackStreamOutcome =
-  | {
-      readonly kind: "changed";
-      readonly state:
-        | AuthorizingPlaybackWireState
-        | AuthorizationRequiredPlaybackWireState
-        | InitializingPlaybackWireState
-        | PausedPlaybackWireState
-        | PlayingPlaybackWireState
-        | ReconnectingPlaybackWireState;
-    }
-  | {
-      readonly kind: "empty";
-    }
-  | {
-      readonly kind: "failure";
-      readonly state: FailurePlaybackWireState;
-    }
-  | {
-      readonly kind: "unchanged";
-    }
-  | {
-      readonly kind: "unsupported";
-      readonly state: UnsupportedPlaybackWireState;
-    };
-
-export type PlaybackStreamEvaluation = {
-  readonly cursor: PlaybackStreamCursor;
-  readonly outcome: PlaybackStreamOutcome;
-};
-
-export type PlaybackStreamSubscription = {
-  readonly evaluate: (state: PlaybackWireState) => PlaybackStreamOutcome;
 };
 
 export type PlaybackWireItemAvailability =
@@ -276,23 +231,6 @@ export function failurePlaybackWireState(
   return Object.freeze(state);
 }
 
-export function initialPlaybackStreamCursor(): PlaybackStreamCursor {
-  return Object.freeze({ kind: "unobserved" });
-}
-
-export function createPlaybackStreamSubscription(): PlaybackStreamSubscription {
-  let cursor = initialPlaybackStreamCursor();
-  const subscription: PlaybackStreamSubscription = {
-    evaluate: (state: PlaybackWireState): PlaybackStreamOutcome => {
-      const evaluation = evaluatePlaybackStream(cursor, state);
-      cursor = evaluation.cursor;
-      return evaluation.outcome;
-    },
-  };
-
-  return Object.freeze(subscription);
-}
-
 export function serializePlaybackState(
   state: PlaybackState,
 ): PlaybackWireState {
@@ -318,24 +256,6 @@ export function serializePlaybackState(
   }
 
   return assertNever(state);
-}
-
-export function evaluatePlaybackStream(
-  cursor: PlaybackStreamCursor,
-  state: PlaybackWireState,
-): PlaybackStreamEvaluation {
-  const nextCursor = observedPlaybackStreamCursor(state);
-  if (cursor.kind === "observed" && sameStreamState(cursor.state, state)) {
-    return Object.freeze({
-      cursor: nextCursor,
-      outcome: unchangedPlaybackStreamOutcome(),
-    });
-  }
-
-  return Object.freeze({
-    cursor: nextCursor,
-    outcome: changedPlaybackStreamOutcome(state),
-  });
 }
 
 export function parsePlaybackWireState(
@@ -375,34 +295,6 @@ export function parsePlaybackWireState(
   }
 }
 
-/**
- * Converts untrusted EventSource data to a safe trusted render state. The raw
- * parse error is intentionally not sent to React because it may contain
- * transport data.
- */
-export function parsePlaybackEvent(input: unknown): PlaybackState {
-  if (typeof input !== "string") {
-    return malformedPlaybackState();
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(input);
-    const wireState = parsePlaybackWireState(parsed);
-    if (wireState.kind === "failure") {
-      return malformedPlaybackState();
-    }
-
-    const state = deserializePlaybackWireState(wireState.value);
-    if (state.kind === "failure") {
-      return malformedPlaybackState();
-    }
-
-    return state.value;
-  } catch {
-    return malformedPlaybackState();
-  }
-}
-
 export function deserializePlaybackWireState(
   state: PlaybackWireState,
 ): Result<PlaybackState, PlaybackWireDeserializationFailure> {
@@ -431,37 +323,6 @@ export function deserializePlaybackWireState(
   }
 
   return assertNever(state);
-}
-
-export function currentPlaybackItem(state: PlaybackState): LastPlaybackItem {
-  switch (state.kind) {
-    case "playing":
-    case "paused":
-      return availableCurrentPlaybackItem(state.snapshot.item);
-    case "reconnecting":
-      return state.lastItem;
-    case "initializing":
-    case "authorization-required":
-    case "authorizing":
-    case "empty":
-    case "unsupported":
-    case "failure":
-      return unavailableLastPlaybackItem();
-  }
-
-  return assertNever(state);
-}
-
-function malformedPlaybackState(): PlaybackState {
-  const transition = transitionPlaybackState(initialPlaybackState(), {
-    kind: "failure",
-    failure: providerFailure("malformed-response"),
-  });
-  if (transition.kind === "success") {
-    return transition.value;
-  }
-
-  throw new Error("Expected malformed playback state transition to succeed");
 }
 
 function deserializeAuthorizingPlaybackState(): Result<
@@ -954,14 +815,6 @@ function playbackWireDeserializationFailure(): PlaybackWireDeserializationFailur
   return Object.freeze({ kind: "invalid-playback-wire-domain" });
 }
 
-function availableCurrentPlaybackItem(item: NowPlayingItem): LastPlaybackItem {
-  const availability: LastPlaybackItem = {
-    kind: "available",
-    item,
-  };
-  return Object.freeze(availability);
-}
-
 function serializePlaybackSnapshot(
   state: Extract<PlaybackState, { readonly kind: "playing" | "paused" }>,
 ): PlaybackWireSnapshot {
@@ -1115,254 +968,6 @@ function unsupportedPlaybackWireState(
     reason,
   };
   return Object.freeze(state);
-}
-
-function observedPlaybackStreamCursor(
-  state: PlaybackWireState,
-): PlaybackStreamCursor {
-  const cursor: PlaybackStreamCursor = {
-    kind: "observed",
-    state,
-  };
-  return Object.freeze(cursor);
-}
-
-function changedPlaybackStreamOutcome(
-  state: PlaybackWireState,
-): PlaybackStreamOutcome {
-  switch (state.kind) {
-    case "empty":
-      return Object.freeze({ kind: "empty" });
-    case "initializing":
-    case "authorization-required":
-    case "authorizing":
-    case "playing":
-    case "paused":
-    case "reconnecting":
-      return Object.freeze({ kind: "changed", state });
-    case "unsupported":
-      return Object.freeze({ kind: "unsupported", state });
-    case "failure":
-      return Object.freeze({ kind: "failure", state });
-  }
-
-  return assertNever(state);
-}
-
-function unchangedPlaybackStreamOutcome(): PlaybackStreamOutcome {
-  return Object.freeze({ kind: "unchanged" });
-}
-
-function sameStreamState(
-  left: PlaybackWireState,
-  right: PlaybackWireState,
-): boolean {
-  if (left.kind !== right.kind) {
-    return false;
-  }
-
-  switch (left.kind) {
-    case "empty":
-      return right.kind === "empty";
-    case "initializing":
-      return right.kind === "initializing";
-    case "authorization-required":
-      return (
-        right.kind === "authorization-required" && left.reason === right.reason
-      );
-    case "authorizing":
-      return right.kind === "authorizing";
-    case "playing":
-      return (
-        right.kind === "playing" &&
-        samePlaybackWireSnapshot(left.snapshot, right.snapshot)
-      );
-    case "paused":
-      return (
-        right.kind === "paused" &&
-        samePlaybackWireSnapshot(left.snapshot, right.snapshot)
-      );
-    case "unsupported":
-      return right.kind === "unsupported" && left.reason === right.reason;
-    case "reconnecting":
-      return (
-        right.kind === "reconnecting" &&
-        samePlaybackWireItemAvailability(left.lastItem, right.lastItem)
-      );
-    case "failure":
-      return (
-        right.kind === "failure" &&
-        samePlaybackWireFailure(left.error, right.error)
-      );
-  }
-
-  return assertNever(left);
-}
-
-function samePlaybackWireSnapshot(
-  left: PlaybackWireSnapshot,
-  right: PlaybackWireSnapshot,
-): boolean {
-  return (
-    left.positionMilliseconds === right.positionMilliseconds &&
-    left.durationMilliseconds === right.durationMilliseconds &&
-    samePlaybackWireItem(left.item, right.item)
-  );
-}
-
-function samePlaybackWireItem(
-  left: PlaybackWireItem,
-  right: PlaybackWireItem,
-): boolean {
-  if (left.kind !== right.kind) {
-    return false;
-  }
-
-  switch (left.kind) {
-    case "track":
-      return right.kind === "track" && samePlaybackWireTrackItem(left, right);
-    case "episode":
-      return (
-        right.kind === "episode" && samePlaybackWireEpisodeItem(left, right)
-      );
-  }
-
-  return assertNever(left);
-}
-
-function samePlaybackWireTrackItem(
-  left: PlaybackWireTrackItem,
-  right: PlaybackWireTrackItem,
-): boolean {
-  return (
-    left.providerId === right.providerId &&
-    left.itemId === right.itemId &&
-    left.title === right.title &&
-    samePlaybackWireCreators(left.artists, right.artists) &&
-    samePlaybackWireCollection(left.collection, right.collection) &&
-    samePlaybackWireArtwork(left.artwork, right.artwork) &&
-    samePlaybackWireLinks(left.links, right.links)
-  );
-}
-
-function samePlaybackWireEpisodeItem(
-  left: PlaybackWireEpisodeItem,
-  right: PlaybackWireEpisodeItem,
-): boolean {
-  return (
-    left.providerId === right.providerId &&
-    left.itemId === right.itemId &&
-    left.title === right.title &&
-    samePlaybackWireShow(left.show, right.show) &&
-    samePlaybackWireArtwork(left.artwork, right.artwork) &&
-    samePlaybackWireLinks(left.links, right.links)
-  );
-}
-
-function samePlaybackWireCreators(
-  left: ReadonlyArray<PlaybackWireCreator>,
-  right: ReadonlyArray<PlaybackWireCreator>,
-): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  return left.every((creator, index): boolean => {
-    const other = right[index];
-    return other !== undefined && samePlaybackWireCreator(creator, other);
-  });
-}
-
-function samePlaybackWireCreator(
-  left: PlaybackWireCreator,
-  right: PlaybackWireCreator,
-): boolean {
-  return (
-    left.name === right.name && samePlaybackWireLinks(left.links, right.links)
-  );
-}
-
-function samePlaybackWireCollection(
-  left: PlaybackWireCollection,
-  right: PlaybackWireCollection,
-): boolean {
-  return (
-    left.id === right.id &&
-    left.title === right.title &&
-    samePlaybackWireLinks(left.links, right.links)
-  );
-}
-
-function samePlaybackWireShow(
-  left: PlaybackWireShow,
-  right: PlaybackWireShow,
-): boolean {
-  return (
-    left.id === right.id &&
-    left.title === right.title &&
-    left.publisher === right.publisher &&
-    samePlaybackWireLinks(left.links, right.links)
-  );
-}
-
-function samePlaybackWireArtwork(
-  left: PlaybackWireArtwork,
-  right: PlaybackWireArtwork,
-): boolean {
-  if (left.kind !== right.kind) {
-    return false;
-  }
-
-  switch (left.kind) {
-    case "available":
-      return right.kind === "available" && left.url === right.url;
-    case "unavailable":
-      return right.kind === "unavailable" && left.reason === right.reason;
-  }
-
-  return assertNever(left);
-}
-
-function samePlaybackWireLinks(
-  left: ReadonlyArray<PlaybackWireLink>,
-  right: ReadonlyArray<PlaybackWireLink>,
-): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  return left.every((link, index): boolean => {
-    const other = right[index];
-    return (
-      other !== undefined &&
-      link.providerId === other.providerId &&
-      link.href === other.href
-    );
-  });
-}
-
-function samePlaybackWireItemAvailability(
-  left: PlaybackWireItemAvailability,
-  right: PlaybackWireItemAvailability,
-): boolean {
-  if (left.kind !== right.kind) {
-    return false;
-  }
-
-  if (left.kind === "unavailable") {
-    return right.kind === "unavailable";
-  }
-
-  return (
-    right.kind === "available" && samePlaybackWireItem(left.item, right.item)
-  );
-}
-
-function samePlaybackWireFailure(
-  left: PlaybackWireFailure,
-  right: PlaybackWireFailure,
-): boolean {
-  return left.kind === right.kind && left.reason === right.reason;
 }
 
 function parseInitializingPlaybackWireState(

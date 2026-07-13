@@ -1,14 +1,14 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "incremental": false,
-    "target": "esnext"
-  },
+  "compilerOptions": { "incremental": false },
   "include": [
     "browser/**/*.ts",
+    "browser/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "domain/**/*.ts",
     "test/browser/**/*.test.ts",
-    "test/types/browser-auth.type-test.ts",
-    "test/types/browser-worker.type-test.ts"
+    "test/types/browser-*.type-test.ts"
   ],
-  "exclude": ["node_modules", ".next"]
+  "exclude": ["dist", "node_modules"]
 }

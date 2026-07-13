@@ -563,7 +563,8 @@ function deterministicCrypto(): BrowserPkceCryptoPort {
       },
     },
     sha256: {
-      async digest(_source: Uint8Array): Promise<Uint8Array> {
+      async digest(source: Uint8Array): Promise<Uint8Array> {
+        void source;
         return new Uint8Array(32);
       },
     },

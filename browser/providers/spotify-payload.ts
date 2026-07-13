@@ -24,7 +24,8 @@ import {
   type Result,
   type ValueValidationError,
 } from "../../domain/playback.ts";
-import type { SpotifyArtworkSize } from "../../services/SpotifyClient/SpotifyServiceConfiguration.ts";
+
+export type SpotifyArtworkSize = "large" | "medium" | "small";
 
 type UnknownJsonObject = {
   readonly [key: string]: unknown;

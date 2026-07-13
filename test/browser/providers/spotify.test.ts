@@ -5,7 +5,7 @@ import { SpotifyAccessToken } from "../../../browser/auth/token.ts";
 import {
   pausedEpisodePayload,
   playingTrackPayload,
-} from "../../spotify-playback.fixture.ts";
+} from "./spotify-payload.fixture.ts";
 
 test("the Spotify worker transport normalizes 200 track and episode playback through the episode-capable endpoint", async () => {
   const requests: CapturedFetchRequest[] = [];

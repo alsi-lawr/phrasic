@@ -67,7 +67,7 @@ test("unknown, extra, and malformed worker commands are rejected without inspect
   }
 });
 
-test("worker events carry only validated provider-neutral wire state or fixed diagnostics", () => {
+test("worker events carry only validated provider-neutral state, redirects, and diagnostics", () => {
   const playback = expectSuccess(
     parsePlaybackWorkerEvent({
       kind: "playback-state",
@@ -84,6 +84,12 @@ test("worker events carry only validated provider-neutral wire state or fixed di
         status: 429,
         retryAfterMilliseconds: 7_000,
       },
+    }),
+  );
+  const callbackRestoration = expectSuccess(
+    parsePlaybackWorkerEvent({
+      kind: "callback-url-restored",
+      url: "https://nowplaying.example/spotify/?width=1280&setup=1",
     }),
   );
   const leaked = parsePlaybackWorkerEvent({
@@ -119,6 +125,10 @@ test("worker events carry only validated provider-neutral wire state or fixed di
       status: 429,
       retryAfterMilliseconds: 7_000,
     },
+  });
+  assert.deepEqual(callbackRestoration, {
+    kind: "callback-url-restored",
+    url: "https://nowplaying.example/spotify/?width=1280&setup=1",
   });
   assert.equal(leaked.kind, "failure");
   assert.deepEqual(capabilityFailure, {

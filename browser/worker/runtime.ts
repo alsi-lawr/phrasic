@@ -3,8 +3,10 @@ import {
   type SpotifyPublicConfiguration,
 } from "../config.ts";
 import {
+  buildQueryStrippedDisplayReturnUrl,
   parseDisplayReturnConfiguration,
   type BrowserPkceCryptoPort,
+  type DisplayReturnConfiguration,
 } from "../auth/pkce.ts";
 import {
   beginSpotifyAuthorization,
@@ -36,7 +38,7 @@ import {
   type PlaybackEvent,
   type PlaybackState,
 } from "../../domain/playback.ts";
-import { serializePlaybackState } from "../../domain/playback-stream.ts";
+import { serializePlaybackState } from "./playback-wire.ts";
 import {
   type SpotifyCurrentlyPlayingPort,
   type SpotifyCurrentlyPlayingResult,
@@ -412,6 +414,7 @@ export function createPlaybackWorkerRuntime(
   ): Promise<void> {
     switch (result.kind) {
       case "connected": {
+        emitCallbackReturnUrl(result.returnTo);
         const connected = transition({ kind: "authorization-complete" });
         if (
           !connected ||
@@ -425,6 +428,7 @@ export function createPlaybackWorkerRuntime(
         return;
       }
       case "authorization-denied":
+        emitCallbackReturnUrl(result.returnTo);
         emitDiagnostic("authorization", "authorization-denied");
         transitionToFailure({
           kind: "authorization-failed",
@@ -439,6 +443,9 @@ export function createPlaybackWorkerRuntime(
         });
         return;
       case "authorization-required":
+        if ("returnTo" in result) {
+          emitCallbackReturnUrl(result.returnTo);
+        }
         emitDiagnostic("authorization", "authorization-required");
         transition({
           kind: "authorization-required",
@@ -446,10 +453,12 @@ export function createPlaybackWorkerRuntime(
         });
         return;
       case "transient-failure":
+        emitCallbackReturnUrl(result.returnTo);
         emitDiagnostic("authorization", "authorization-transient-failure");
         transitionToFailure(providerFailure("network"));
         return;
       case "provider-failure":
+        emitCallbackReturnUrl(result.returnTo);
         emitDiagnostic("authorization", "authorization-provider-failure");
         transitionToFailure({
           kind: "authorization-failed",
@@ -459,6 +468,23 @@ export function createPlaybackWorkerRuntime(
     }
 
     emitDiagnostic("authorization", "runtime-operation-failed");
+  }
+
+  function emitCallbackReturnUrl(returnTo: DisplayReturnConfiguration): void {
+    const configuration = activeConfiguration();
+    if (configuration.kind === "unavailable") {
+      emitDiagnostic("authorization", "runtime-operation-failed");
+      return;
+    }
+
+    const event: PlaybackWorkerEvent = {
+      kind: "callback-url-restored",
+      url: buildQueryStrippedDisplayReturnUrl({
+        configuration: configuration.value,
+        returnTo,
+      }),
+    };
+    ports.events.emit(Object.freeze(event));
   }
 
   async function retryConnection(): Promise<void> {
