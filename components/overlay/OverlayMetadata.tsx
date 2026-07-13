@@ -1,27 +1,15 @@
 import type { ReactElement } from "react";
-import type {
-  LastPlaybackItem,
-  NowPlayingItem,
-} from "../../domain/playback.ts";
-import type { OverlayVisualStatus } from "./overlay-status.ts";
+import {
+  metadataForOverlayState,
+  type OverlayUiState,
+} from "./overlay-state.ts";
 
 type OverlayMetadataProps = {
-  readonly item: LastPlaybackItem;
-  readonly status: OverlayVisualStatus;
+  readonly state: OverlayUiState;
 };
 
-type OverlayMetadataContent = {
-  readonly category: string;
-  readonly context: string;
-  readonly subtitle: string;
-  readonly title: string;
-};
-
-export function OverlayMetadata({
-  item,
-  status,
-}: OverlayMetadataProps): ReactElement {
-  const metadata = metadataContent(item, status);
+export function OverlayMetadata({ state }: OverlayMetadataProps): ReactElement {
+  const metadata = metadataForOverlayState(state);
 
   return (
     <g fontFamily="Arial, Helvetica, sans-serif">
@@ -73,59 +61,6 @@ export function OverlayMetadata({
   );
 }
 
-function metadataContent(
-  item: LastPlaybackItem,
-  status: OverlayVisualStatus,
-): OverlayMetadataContent {
-  if (item.kind === "unavailable") {
-    return frozenMetadata(
-      "SPOTIFY NOW PLAYING",
-      "PLAYBACK UPDATES WILL APPEAR HERE",
-      "Waiting for a playable item",
-      status.message,
-    );
-  }
-
-  return metadataForItem(item.item);
-}
-
-function metadataForItem(item: NowPlayingItem): OverlayMetadataContent {
-  switch (item.kind) {
-    case "track":
-      return frozenMetadata(
-        "TRACK",
-        item.collection.title.value,
-        item.artists.map((artist): string => artist.name.value).join(", "),
-        item.title.value,
-      );
-    case "episode":
-      return frozenMetadata(
-        "EPISODE",
-        item.show.publisher.value,
-        item.show.title.value,
-        item.title.value,
-      );
-  }
-
-  return unreachable(item);
-}
-
-function frozenMetadata(
-  category: string,
-  context: string,
-  subtitle: string,
-  title: string,
-): OverlayMetadataContent {
-  const content: OverlayMetadataContent = {
-    category,
-    context,
-    subtitle,
-    title,
-  };
-
-  return Object.freeze(content);
-}
-
 function titleTextLength(value: string): number {
   return boundedTextLength(value, 720, 2_880, 150);
 }
@@ -145,8 +80,4 @@ function boundedTextLength(
   averageGlyphWidth: number,
 ): number {
   return Math.min(maximum, Math.max(minimum, value.length * averageGlyphWidth));
-}
-
-function unreachable(value: never): never {
-  throw new Error(`Unexpected now-playing item: ${String(value)}`);
 }

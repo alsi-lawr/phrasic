@@ -19,6 +19,7 @@ test("overlay geometry defaults to the validated display width and exact fixed r
     (defaultOverlayDisplayWidth * overlayViewBoxHeight) / overlayViewBoxWidth,
   );
   assert.equal(geometry.viewBox, overlayViewBox);
+  assert.equal(geometry.setupMode.kind, "overlay");
   assert.equal(Object.isFrozen(geometry), true);
   assert.equal(Object.isFrozen(geometry.width), true);
   assert.equal(Object.isFrozen(geometry.height), true);
@@ -31,6 +32,7 @@ test("overlay geometry accepts the inclusive width bounds and setup flag", () =>
   const maximum = resolveOverlayGeometry(
     new URLSearchParams(`width=${maximumOverlayDisplayWidth}&setup=1`),
   );
+  const setupOnly = resolveOverlayGeometry(new URLSearchParams("setup=1"));
 
   assert.equal(minimum.width.value, minimumOverlayDisplayWidth);
   assert.equal(
@@ -42,6 +44,10 @@ test("overlay geometry accepts the inclusive width bounds and setup flag", () =>
     maximum.height.value,
     (maximumOverlayDisplayWidth * overlayViewBoxHeight) / overlayViewBoxWidth,
   );
+  assert.equal(minimum.setupMode.kind, "overlay");
+  assert.equal(maximum.setupMode.kind, "setup");
+  assert.equal(setupOnly.width.value, defaultOverlayDisplayWidth);
+  assert.equal(setupOnly.setupMode.kind, "setup");
 });
 
 test("overlay geometry falls back for display query forms rejected by the application contract", () => {
@@ -60,5 +66,6 @@ test("overlay geometry falls back for display query forms rejected by the applic
     const geometry = resolveOverlayGeometry(new URLSearchParams(query));
 
     assert.equal(geometry.width.value, defaultOverlayDisplayWidth, query);
+    assert.equal(geometry.setupMode.kind, "overlay", query);
   }
 });

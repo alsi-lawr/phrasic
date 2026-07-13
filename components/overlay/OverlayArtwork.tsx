@@ -1,13 +1,18 @@
 import type { ReactElement } from "react";
-import type { LastPlaybackItem } from "../../domain/playback.ts";
+import type { NowPlayingItem } from "../../domain/playback.ts";
 import { FallbackVinyl } from "./FallbackVinyl.tsx";
+import {
+  artworkTreatmentForOverlayState,
+  type OverlayArtworkTreatment,
+  type OverlayUiState,
+} from "./overlay-state.ts";
 
 type OverlayArtworkProps = {
-  readonly item: LastPlaybackItem;
+  readonly state: OverlayUiState;
 };
 
-export function OverlayArtwork({ item }: OverlayArtworkProps): ReactElement {
-  const artworkUrl = originalArtworkUrl(item);
+export function OverlayArtwork({ state }: OverlayArtworkProps): ReactElement {
+  const treatment = artworkTreatmentForOverlayState(state);
 
   return (
     <g>
@@ -21,30 +26,56 @@ export function OverlayArtwork({ item }: OverlayArtworkProps): ReactElement {
         stroke="#35404d"
         strokeWidth={4}
       />
-      {artworkUrl === undefined ? (
-        <FallbackVinyl />
-      ) : (
+      <ArtworkTreatment treatment={treatment} />
+    </g>
+  );
+}
+
+type ArtworkTreatmentProps = {
+  readonly treatment: OverlayArtworkTreatment;
+};
+
+function ArtworkTreatment({ treatment }: ArtworkTreatmentProps): ReactElement {
+  switch (treatment.kind) {
+    case "fallback":
+      return <FallbackVinyl />;
+    case "current-item":
+      return <CurrentArtwork item={treatment.item} />;
+    case "stale-item":
+      return (
+        <g opacity={0.45}>
+          <CurrentArtwork item={treatment.item} />
+        </g>
+      );
+  }
+
+  return unreachable(treatment);
+}
+
+type CurrentArtworkProps = {
+  readonly item: NowPlayingItem;
+};
+
+function CurrentArtwork({ item }: CurrentArtworkProps): ReactElement {
+  switch (item.artwork.kind) {
+    case "available":
+      return (
         <image
-          href={artworkUrl}
+          href={item.artwork.url.value}
           x={128}
           y={128}
           width={824}
           height={824}
           preserveAspectRatio="xMidYMid meet"
         />
-      )}
-    </g>
-  );
+      );
+    case "unavailable":
+      return <FallbackVinyl />;
+  }
+
+  return unreachable(item.artwork);
 }
 
-function originalArtworkUrl(item: LastPlaybackItem): string | undefined {
-  if (item.kind === "unavailable") {
-    return undefined;
-  }
-
-  if (item.item.artwork.kind === "unavailable") {
-    return undefined;
-  }
-
-  return item.item.artwork.url.value;
+function unreachable(value: never): never {
+  throw new Error(`Unexpected overlay artwork treatment: ${String(value)}`);
 }

@@ -5,11 +5,42 @@ export const defaultOverlayDisplayWidth = 1_920;
 export const minimumOverlayDisplayWidth = 320;
 export const maximumOverlayDisplayWidth = 7_680;
 
+export type OverlaySetupMode =
+  | {
+      readonly kind: "overlay";
+    }
+  | {
+      readonly kind: "setup";
+    };
+
 export type OverlayGeometry = {
   readonly height: OverlayDisplayHeight;
+  readonly setupMode: OverlaySetupMode;
   readonly viewBox: typeof overlayViewBox;
   readonly width: OverlayDisplayWidth;
 };
+
+type OverlayDisplayQuery =
+  | {
+      readonly kind: "invalid";
+    }
+  | {
+      readonly kind: "none";
+    }
+  | {
+      readonly kind: "setup";
+    }
+  | {
+      readonly kind: "width";
+      readonly width: number;
+    }
+  | {
+      readonly kind: "width-and-setup";
+      readonly width: number;
+    };
+
+const overlayMode: OverlaySetupMode = Object.freeze({ kind: "overlay" });
+const setupMode: OverlaySetupMode = Object.freeze({ kind: "setup" });
 
 export class OverlayDisplayWidth {
   private readonly pixels: number;
@@ -23,11 +54,10 @@ export class OverlayDisplayWidth {
     return this.pixels;
   }
 
-  public static fromSearchParameters(
-    parameters: URLSearchParams,
+  public static fromDisplayQuery(
+    display: OverlayDisplayQuery,
   ): OverlayDisplayWidth {
-    const width = validatedDisplayWidth(parameters);
-    return new OverlayDisplayWidth(width);
+    return new OverlayDisplayWidth(displayWidth(display));
   }
 }
 
@@ -53,9 +83,11 @@ export class OverlayDisplayHeight {
 export function resolveOverlayGeometry(
   parameters: URLSearchParams,
 ): OverlayGeometry {
-  const width = OverlayDisplayWidth.fromSearchParameters(parameters);
+  const display = parseDisplayQuery(parameters);
+  const width = OverlayDisplayWidth.fromDisplayQuery(display);
   const geometry: OverlayGeometry = {
     height: OverlayDisplayHeight.fromWidth(width),
+    setupMode: displaySetupMode(display),
     viewBox: overlayViewBox,
     width,
   };
@@ -63,41 +95,95 @@ export function resolveOverlayGeometry(
   return Object.freeze(geometry);
 }
 
-function validatedDisplayWidth(parameters: URLSearchParams): number {
+function parseDisplayQuery(parameters: URLSearchParams): OverlayDisplayQuery {
   for (const name of parameters.keys()) {
     if (name !== "setup" && name !== "width") {
-      return defaultOverlayDisplayWidth;
+      return frozenInvalidDisplayQuery();
     }
   }
 
   const widthValues = parameters.getAll("width");
   const setupValues = parameters.getAll("setup");
   if (widthValues.length > 1 || setupValues.length > 1) {
-    return defaultOverlayDisplayWidth;
+    return frozenInvalidDisplayQuery();
   }
 
-  const setup = setupValues[0];
-  if (setup !== undefined && setup !== "1") {
-    return defaultOverlayDisplayWidth;
+  const hasSetup = setupValues.length === 1;
+  if (hasSetup && setupValues[0] !== "1") {
+    return frozenInvalidDisplayQuery();
   }
 
-  const width = widthValues[0];
-  if (width === undefined) {
-    return defaultOverlayDisplayWidth;
+  if (widthValues.length === 0) {
+    return hasSetup ? frozenSetupDisplayQuery() : frozenNoDisplayQuery();
   }
 
-  if (!/^\d+$/.test(width)) {
-    return defaultOverlayDisplayWidth;
+  const widthValue = widthValues[0];
+  if (widthValue === undefined || !/^\d+$/.test(widthValue)) {
+    return frozenInvalidDisplayQuery();
   }
 
-  const parsedWidth = Number(width);
+  const width = Number(widthValue);
   if (
-    !Number.isSafeInteger(parsedWidth) ||
-    parsedWidth < minimumOverlayDisplayWidth ||
-    parsedWidth > maximumOverlayDisplayWidth
+    !Number.isSafeInteger(width) ||
+    width < minimumOverlayDisplayWidth ||
+    width > maximumOverlayDisplayWidth
   ) {
-    return defaultOverlayDisplayWidth;
+    return frozenInvalidDisplayQuery();
   }
 
-  return parsedWidth;
+  return hasSetup
+    ? frozenWidthAndSetupDisplayQuery(width)
+    : frozenWidthDisplayQuery(width);
+}
+
+function displayWidth(display: OverlayDisplayQuery): number {
+  switch (display.kind) {
+    case "invalid":
+    case "none":
+    case "setup":
+      return defaultOverlayDisplayWidth;
+    case "width":
+    case "width-and-setup":
+      return display.width;
+  }
+
+  return unreachable(display);
+}
+
+function displaySetupMode(display: OverlayDisplayQuery): OverlaySetupMode {
+  switch (display.kind) {
+    case "invalid":
+    case "none":
+    case "width":
+      return overlayMode;
+    case "setup":
+    case "width-and-setup":
+      return setupMode;
+  }
+
+  return unreachable(display);
+}
+
+function frozenInvalidDisplayQuery(): OverlayDisplayQuery {
+  return Object.freeze({ kind: "invalid" });
+}
+
+function frozenNoDisplayQuery(): OverlayDisplayQuery {
+  return Object.freeze({ kind: "none" });
+}
+
+function frozenSetupDisplayQuery(): OverlayDisplayQuery {
+  return Object.freeze({ kind: "setup" });
+}
+
+function frozenWidthDisplayQuery(width: number): OverlayDisplayQuery {
+  return Object.freeze({ kind: "width", width });
+}
+
+function frozenWidthAndSetupDisplayQuery(width: number): OverlayDisplayQuery {
+  return Object.freeze({ kind: "width-and-setup", width });
+}
+
+function unreachable(value: never): never {
+  throw new Error(`Unexpected overlay display query: ${String(value)}`);
 }

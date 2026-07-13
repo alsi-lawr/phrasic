@@ -1,29 +1,24 @@
 import type { ReactElement } from "react";
-import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
-import {
-  currentPlaybackItem,
-  unavailableLastPlaybackItem,
-  type LastPlaybackItem,
-} from "../../domain/playback.ts";
 import { OverlayArtwork } from "./OverlayArtwork.tsx";
 import { type OverlayGeometry } from "./overlay-geometry.ts";
-import type { OverlayVisualStatus } from "./overlay-status.ts";
+import {
+  visualTreatmentForOverlayState,
+  type OverlayUiState,
+} from "./overlay-state.ts";
 import { OverlayMetadata } from "./OverlayMetadata.tsx";
 import { OverlayShell } from "./OverlayShell.tsx";
 import { OverlayStatus } from "./OverlayStatus.tsx";
 
 type OverlayVisualProps = {
   readonly geometry: OverlayGeometry;
-  readonly snapshot: BrowserPlaybackApplicationSnapshot;
-  readonly status: OverlayVisualStatus;
+  readonly state: OverlayUiState;
 };
 
 export function OverlayVisual({
   geometry,
-  snapshot,
-  status,
+  state,
 }: OverlayVisualProps): ReactElement {
-  const item = itemForSnapshot(snapshot);
+  const treatment = visualTreatmentForOverlayState(state);
 
   return (
     <svg
@@ -34,19 +29,9 @@ export function OverlayVisual({
       viewBox={geometry.viewBox}
     >
       <OverlayShell />
-      <OverlayArtwork item={item} />
-      <OverlayMetadata item={item} status={status} />
-      <OverlayStatus status={status} />
+      <OverlayArtwork state={state} />
+      <OverlayMetadata state={state} />
+      <OverlayStatus treatment={treatment} />
     </svg>
   );
-}
-
-function itemForSnapshot(
-  snapshot: BrowserPlaybackApplicationSnapshot,
-): LastPlaybackItem {
-  if (snapshot.kind === "fatal") {
-    return unavailableLastPlaybackItem();
-  }
-
-  return currentPlaybackItem(snapshot.state);
 }
