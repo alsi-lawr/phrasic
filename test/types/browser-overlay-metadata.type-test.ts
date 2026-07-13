@@ -2,6 +2,7 @@ import type {
   Collection,
   Creator,
   DisplayText,
+  ProviderLink,
   Show,
 } from "../../domain/playback.ts";
 import type {
@@ -22,10 +23,12 @@ declare const show: Show;
 declare const text: DisplayText;
 declare const metadata: OverlayMetadataView;
 declare const marqueeDecision: MarqueeOverflowDecision;
+declare const itemLinks: ReadonlyArray<ProviderLink>;
 
 const trackMetadata: OverlayTrackMetadataView = Object.freeze({
   album,
   artists,
+  itemLinks,
   itemIdentity: identity,
   kind: "track",
   presentation,
@@ -33,6 +36,7 @@ const trackMetadata: OverlayTrackMetadataView = Object.freeze({
 });
 const episodeMetadata: OverlayEpisodeMetadataView = Object.freeze({
   episodeTitle: text,
+  itemLinks,
   itemIdentity: identity,
   kind: "episode",
   presentation,
@@ -49,6 +53,7 @@ const statusMetadata: OverlayStatusMetadataView = Object.freeze({
 // @ts-expect-error Track metadata always preserves normalized album metadata.
 const invalidTrackMetadata: OverlayTrackMetadataView = {
   artists,
+  itemLinks,
   itemIdentity: identity,
   kind: "track",
   presentation,

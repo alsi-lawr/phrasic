@@ -1,4 +1,8 @@
 import type { ReactElement } from "react";
+import type {
+  OverlaySpotifyLink,
+  OverlaySpotifyLinks,
+} from "./overlay-spotify-links.ts";
 import {
   overlayAnnouncementIdentityKey,
   type OverlayAnnouncement,
@@ -18,8 +22,52 @@ export function OverlaySemanticCompanion({
   return (
     <section aria-labelledby={overlaySemanticHeadingId} className="sr-only">
       <SemanticDetails definitions={semantic.definitions} />
+      <SpotifyLinks links={semantic.spotifyLinks} />
       <PoliteOverlayAnnouncement announcement={semantic.announcement} />
     </section>
+  );
+}
+
+type SpotifyLinksProps = {
+  readonly links: OverlaySpotifyLinks;
+};
+
+function SpotifyLinks({ links }: SpotifyLinksProps): ReactElement | null {
+  switch (links.kind) {
+    case "not-applicable":
+    case "unavailable":
+      return null;
+    case "available":
+      return (
+        <nav aria-label="Spotify destinations">
+          <ul>
+            {links.links.map((link): ReactElement => (
+              <li key={`${link.destination}:${link.providerLink.href}`}>
+                <SpotifyLink link={link} />
+              </li>
+            ))}
+          </ul>
+        </nav>
+      );
+  }
+
+  return unreachable(links);
+}
+
+type SpotifyLinkProps = {
+  readonly link: OverlaySpotifyLink;
+};
+
+function SpotifyLink({ link }: SpotifyLinkProps): ReactElement {
+  return (
+    <a
+      aria-label={`${link.label} (opens in a new tab)`}
+      href={link.providerLink.href}
+      rel="noopener noreferrer"
+      target="_blank"
+    >
+      {link.label}
+    </a>
   );
 }
 
@@ -66,4 +114,8 @@ function PoliteOverlayAnnouncement({
       <span key={announcementKey}>{announcement.message}</span>
     </p>
   );
+}
+
+function unreachable(value: never): never {
+  throw new Error(`Unexpected Spotify links: ${String(value)}`);
 }

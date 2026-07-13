@@ -6,6 +6,10 @@ import {
   type OverlayMetadataView,
 } from "./overlay-metadata.ts";
 import {
+  spotifyLinksForMetadata,
+  type OverlaySpotifyLinks,
+} from "./overlay-spotify-links.ts";
+import {
   visualTreatmentForOverlayState,
   type OverlayUiState,
 } from "./overlay-state.ts";
@@ -41,6 +45,7 @@ export type OverlaySemanticView = {
   readonly announcement: OverlayAnnouncement;
   readonly definitions: ReadonlyArray<OverlaySemanticDefinition>;
   readonly metadata: OverlayMetadataView;
+  readonly spotifyLinks: OverlaySpotifyLinks;
   readonly status: OverlaySemanticStatus;
 };
 
@@ -53,6 +58,7 @@ export function semanticViewForOverlayState(
     announcement: announcementForOverlayState(state, metadata),
     definitions: semanticDefinitionsFor(status, metadata),
     metadata,
+    spotifyLinks: spotifyLinksForMetadata(metadata),
     status,
   };
 

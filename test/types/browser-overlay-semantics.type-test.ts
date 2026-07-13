@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 import { OverlaySemanticCompanion } from "../../components/overlay/OverlaySemanticCompanion.tsx";
 import type { OverlayItemIdentity } from "../../components/overlay/overlay-metadata.ts";
+import type { OverlaySpotifyLinks } from "../../components/overlay/overlay-spotify-links.ts";
 import type {
   OverlayAnnouncementIdentity,
   OverlaySemanticDefinition,
@@ -10,6 +11,7 @@ import type {
 
 declare const itemIdentity: OverlayItemIdentity;
 declare const semantic: OverlaySemanticView;
+declare const spotifyLinks: OverlaySpotifyLinks;
 
 const stateAnnouncementIdentity: OverlayAnnouncementIdentity = Object.freeze({
   kind: "state",
@@ -29,8 +31,18 @@ const semanticDefinition: OverlaySemanticDefinition = Object.freeze({
   term: "Track",
   value: "Track title",
 });
+const semanticView: OverlaySemanticView = Object.freeze({
+  announcement: Object.freeze({
+    identity: stateAnnouncementIdentity,
+    message: "Spotify is connected.",
+  }),
+  definitions: [semanticDefinition],
+  metadata: semantic.metadata,
+  spotifyLinks,
+  status: semanticStatus,
+});
 const companionProps: ComponentProps<typeof OverlaySemanticCompanion> =
-  Object.freeze({ semantic });
+  Object.freeze({ semantic: semanticView });
 
 const invalidStateAnnouncementIdentity: OverlayAnnouncementIdentity = {
   kind: "state",
@@ -52,7 +64,7 @@ semanticStatus.label = "PLAYING";
 // @ts-expect-error Semantic definitions are readonly.
 semanticDefinition.value = "Changed title";
 // @ts-expect-error The semantic companion accepts its view through a readonly prop.
-companionProps.semantic = semantic;
+companionProps.semantic = semanticView;
 
 function announcementIdentityKind(
   identity: OverlayAnnouncementIdentity,
@@ -71,6 +83,7 @@ void stateAnnouncementIdentity;
 void itemAnnouncementIdentity;
 void semanticStatus;
 void semanticDefinition;
+void semanticView;
 void companionProps;
 void invalidStateAnnouncementIdentity;
 void invalidItemAnnouncementIdentity;

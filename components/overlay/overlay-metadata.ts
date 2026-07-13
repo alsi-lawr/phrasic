@@ -5,6 +5,7 @@ import type {
   NowPlayingItem,
   ProviderId,
   ProviderItemId,
+  ProviderLink,
   Show,
 } from "../../domain/playback.ts";
 import {
@@ -31,6 +32,7 @@ export type OverlayItemMetadataPresentation =
 export type OverlayTrackMetadataView = {
   readonly album: Collection;
   readonly artists: ReadonlyArray<Creator>;
+  readonly itemLinks: ReadonlyArray<ProviderLink>;
   readonly itemIdentity: OverlayItemIdentity;
   readonly kind: "track";
   readonly presentation: OverlayItemMetadataPresentation;
@@ -39,6 +41,7 @@ export type OverlayTrackMetadataView = {
 
 export type OverlayEpisodeMetadataView = {
   readonly episodeTitle: DisplayText;
+  readonly itemLinks: ReadonlyArray<ProviderLink>;
   readonly itemIdentity: OverlayItemIdentity;
   readonly kind: "episode";
   readonly presentation: OverlayItemMetadataPresentation;
@@ -153,6 +156,7 @@ function frozenTrackMetadataView(
   const metadata: OverlayTrackMetadataView = {
     album: item.collection,
     artists: item.artists,
+    itemLinks: item.links,
     itemIdentity: overlayItemIdentityFor(item),
     kind: "track",
     presentation,
@@ -168,6 +172,7 @@ function frozenEpisodeMetadataView(
 ): OverlayEpisodeMetadataView {
   const metadata: OverlayEpisodeMetadataView = {
     episodeTitle: item.title,
+    itemLinks: item.links,
     itemIdentity: overlayItemIdentityFor(item),
     kind: "episode",
     presentation,

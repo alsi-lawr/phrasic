@@ -6,6 +6,7 @@ import {
   PlaybackPositionMilliseconds,
   PlaybackSnapshot,
   ProviderItemId,
+  ProviderLink,
   TrackItem,
   initialPlaybackState,
   providerFailure,
@@ -245,6 +246,68 @@ test("announcement identity stays stable for same-item polling and changes for i
     overlayAnnouncementIdentityKey(emptyAnnouncement.identity),
   );
   assert.notEqual(failureAnnouncement.message, emptyAnnouncement.message);
+});
+
+test("Spotify link changes do not create a new polite announcement identity", () => {
+  const originalState = playingTrackState();
+  if (
+    originalState.kind !== "playing" ||
+    originalState.snapshot.item.kind !== "track"
+  ) {
+    throw new Error("Expected a playing track state.");
+  }
+
+  const replacementLink = expectSuccess(
+    ProviderLink.create({
+      href: "https://open.spotify.com/track/track-1?context=updated",
+      providerId: originalState.snapshot.item.providerId,
+    }),
+  );
+  const updatedItem = expectSuccess(
+    TrackItem.create({
+      artwork: originalState.snapshot.item.artwork,
+      artists: originalState.snapshot.item.artists,
+      collection: originalState.snapshot.item.collection,
+      itemId: originalState.snapshot.item.itemId,
+      links: [replacementLink],
+      providerId: originalState.snapshot.item.providerId,
+      title: originalState.snapshot.item.title,
+    }),
+  );
+  const updatedState: PlaybackState = Object.freeze({
+    kind: "playing",
+    snapshot: expectSuccess(
+      PlaybackSnapshot.create({
+        duration: originalState.snapshot.duration,
+        item: updatedItem,
+        position: originalState.snapshot.position,
+      }),
+    ),
+  });
+  const originalSemantic = semanticViewForOverlayState(originalState);
+  const updatedSemantic = semanticViewForOverlayState(updatedState);
+
+  assert.equal(originalSemantic.spotifyLinks.kind, "available");
+  assert.equal(updatedSemantic.spotifyLinks.kind, "available");
+  if (
+    originalSemantic.spotifyLinks.kind !== "available" ||
+    updatedSemantic.spotifyLinks.kind !== "available"
+  ) {
+    throw new Error("Expected available Spotify links.");
+  }
+
+  assert.notEqual(
+    originalSemantic.spotifyLinks.links[0]?.providerLink.href,
+    updatedSemantic.spotifyLinks.links[0]?.providerLink.href,
+  );
+  assert.equal(
+    overlayAnnouncementIdentityKey(originalSemantic.announcement.identity),
+    overlayAnnouncementIdentityKey(updatedSemantic.announcement.identity),
+  );
+  assert.equal(
+    originalSemantic.announcement.message,
+    updatedSemantic.announcement.message,
+  );
 });
 
 type SemanticStateCase = {

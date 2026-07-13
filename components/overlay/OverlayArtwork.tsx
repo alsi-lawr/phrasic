@@ -1,6 +1,10 @@
 import type { ReactElement } from "react";
 import type { NowPlayingItem } from "../../domain/playback.ts";
 import { FallbackVinyl } from "./FallbackVinyl.tsx";
+import {
+  overlayArtworkClipPathId,
+  overlayArtworkRectangle,
+} from "./overlay-artwork.ts";
 import type { OverlayMotionDecision } from "./overlay-motion.ts";
 import {
   artworkTreatmentForOverlayState,
@@ -21,18 +25,37 @@ export function OverlayArtwork({
 
   return (
     <g>
+      <ArtworkClipPath />
       <rect
-        x={128}
-        y={128}
-        width={824}
-        height={824}
-        rx={48}
+        x={overlayArtworkRectangle.x}
+        y={overlayArtworkRectangle.y}
+        width={overlayArtworkRectangle.width}
+        height={overlayArtworkRectangle.height}
+        rx={overlayArtworkRectangle.cornerRadius}
+        ry={overlayArtworkRectangle.cornerRadius}
         fill="#05070a"
         stroke="#35404d"
         strokeWidth={4}
       />
       <ArtworkTreatment motion={motion} treatment={treatment} />
     </g>
+  );
+}
+
+function ArtworkClipPath(): ReactElement {
+  return (
+    <defs>
+      <clipPath id={overlayArtworkClipPathId} clipPathUnits="userSpaceOnUse">
+        <rect
+          x={overlayArtworkRectangle.x}
+          y={overlayArtworkRectangle.y}
+          width={overlayArtworkRectangle.width}
+          height={overlayArtworkRectangle.height}
+          rx={overlayArtworkRectangle.cornerRadius}
+          ry={overlayArtworkRectangle.cornerRadius}
+        />
+      </clipPath>
+    </defs>
   );
 }
 
@@ -51,11 +74,7 @@ function ArtworkTreatment({
     case "current-item":
       return <CurrentArtwork item={treatment.item} motion={motion} />;
     case "stale-item":
-      return (
-        <g opacity={0.45}>
-          <CurrentArtwork item={treatment.item} motion={motion} />
-        </g>
-      );
+      return <CurrentArtwork item={treatment.item} motion={motion} />;
   }
 
   return unreachable(treatment);
@@ -70,14 +89,16 @@ function CurrentArtwork({ item, motion }: CurrentArtworkProps): ReactElement {
   switch (item.artwork.kind) {
     case "available":
       return (
-        <image
-          href={item.artwork.url.value}
-          x={128}
-          y={128}
-          width={824}
-          height={824}
-          preserveAspectRatio="xMidYMid meet"
-        />
+        <g clipPath={`url(#${overlayArtworkClipPathId})`}>
+          <image
+            href={item.artwork.url.value}
+            x={overlayArtworkRectangle.x}
+            y={overlayArtworkRectangle.y}
+            width={overlayArtworkRectangle.width}
+            height={overlayArtworkRectangle.height}
+            preserveAspectRatio="xMidYMid meet"
+          />
+        </g>
       );
     case "unavailable":
       return <FallbackVinyl motion={motion} />;
