@@ -86,6 +86,24 @@ test("browser configuration rejects extra and secret-shaped settings", () => {
     },
     {
       source: {
+        spotify: {
+          ...validConfiguration.spotify,
+          client_secret: "must-not-reach-browser-code",
+        },
+      },
+      expected: configurationFailure("$.spotify", "secret-shaped-field"),
+    },
+    {
+      source: {
+        spotify: {
+          ...validConfiguration.spotify,
+          authorizationCredential: "must-not-reach-browser-code",
+        },
+      },
+      expected: configurationFailure("$.spotify", "secret-shaped-field"),
+    },
+    {
+      source: {
         ...validConfiguration,
         refresh_token: "must-not-reach-browser-code",
       },

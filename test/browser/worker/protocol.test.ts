@@ -3,6 +3,7 @@ import test from "node:test";
 import type { Result } from "../../../domain/playback.ts";
 import {
   createPlaybackWorkerFatalInitializationFailure,
+  createPlaybackWorkerSafeDiagnostic,
   parsePlaybackWorkerCommand,
   parsePlaybackWorkerEvent,
 } from "../../../browser/worker/protocol.ts";
@@ -111,6 +112,19 @@ test("worker events carry only validated provider-neutral state, redirects, and 
     metadata: { kind: "none" },
     payload: { access_token: "token-value" },
   });
+  const callbackCredentialDiagnostic = parsePlaybackWorkerEvent({
+    kind: "safe-diagnostic",
+    operation: "authorization",
+    code: "authorization-denied",
+    metadata: { kind: "none" },
+    callbackUrl:
+      "https://nowplaying.example/spotify/?code=callback-code-sentinel&state=callback-state-sentinel",
+  });
+  const createdDiagnostic = createPlaybackWorkerSafeDiagnostic({
+    operation: "authorization",
+    code: "authorization-denied",
+    metadata: { kind: "none" },
+  });
 
   assert.deepEqual(playback, {
     kind: "playback-state",
@@ -136,6 +150,11 @@ test("worker events carry only validated provider-neutral state, redirects, and 
     code: "browser-capability-unavailable",
   });
   assert.equal(leakedDiagnostic.kind, "failure");
+  assert.equal(callbackCredentialDiagnostic.kind, "failure");
+  assert.doesNotMatch(
+    JSON.stringify(createdDiagnostic),
+    /callback-(?:code|state)-sentinel/,
+  );
 });
 
 function expectSuccess<Value, Failure>(result: Result<Value, Failure>): Value {

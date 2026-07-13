@@ -17,9 +17,32 @@ import {
   type PlaybackState,
 } from "../domain/playback.ts";
 
+const defaultDisplayWidth = 1_920;
 const minimumDisplayWidth = 320;
 const maximumDisplayWidth = 7_680;
 const spotifyAuthorizationOrigin = "https://accounts.spotify.com";
+const spotifyAuthorizationParameterNames: ReadonlyArray<string> = Object.freeze(
+  [
+    "client_id",
+    "response_type",
+    "redirect_uri",
+    "code_challenge_method",
+    "code_challenge",
+    "state",
+    "scope",
+  ],
+);
+const callbackQueryParameterNames: ReadonlyArray<string> = Object.freeze([
+  "code",
+  "error",
+  "error_description",
+  "error_uri",
+  "state",
+]);
+const displayQueryParameterNames: ReadonlyArray<string> = Object.freeze([
+  "width",
+  "setup",
+]);
 
 export type BrowserConfigurationResponse = {
   readonly ok: boolean;
@@ -57,7 +80,6 @@ export type BrowserPlaybackApplicationPorts = {
   };
   readonly onPageHide: (listener: () => void) => () => void;
   readonly onVisibilityChange: (listener: () => void) => () => void;
-  readonly viewportWidth: () => number;
   readonly visibility: () => "hidden" | "visible";
 };
 
@@ -95,6 +117,25 @@ type CallbackCommand =
   | {
       readonly callbackUrl: string;
       readonly kind: "pending";
+    };
+
+type DisplayQuery =
+  | {
+      readonly kind: "invalid";
+    }
+  | {
+      readonly kind: "none";
+    }
+  | {
+      readonly kind: "setup";
+    }
+  | {
+      readonly kind: "width";
+      readonly width: number;
+    }
+  | {
+      readonly kind: "width-and-setup";
+      readonly width: number;
     };
 
 type RestoredCallbackUrl =
@@ -140,10 +181,7 @@ export function createBrowserPlaybackApplication(
 
       postCommand(active.value, {
         kind: "begin-authorization",
-        returnTo: displayReturnConfiguration(
-          ports.location.current(),
-          ports.viewportWidth(),
-        ),
+        returnTo: displayReturnConfiguration(ports.location.current()),
       });
     },
 
@@ -197,11 +235,10 @@ export function createBrowserPlaybackApplication(
         return;
       }
 
-      const callback = captureCallbackCommand(ports.location.current());
+      const currentUrl = ports.location.current();
+      const callback = captureCallbackCommand(currentUrl);
       if (callback.kind === "pending") {
-        ports.location.replace(
-          queryStrippedCallbackUrl(ports.location.current()),
-        );
+        ports.location.replace(queryStrippedCallbackUrl(currentUrl));
       }
 
       let worker: BrowserPlaybackWorker;
@@ -352,7 +389,10 @@ export function createBrowserPlaybackApplication(
   }
 
   function navigateToSpotifyAuthorization(input: string): void {
-    const authorizationUrl = parseSpotifyAuthorizationUrl(input);
+    const authorizationUrl = parseSpotifyAuthorizationUrl(
+      input,
+      ports.location.current(),
+    );
     if (authorizationUrl.kind === "invalid") {
       replaceSnapshot(fatalSnapshot("browser-capability-unavailable"));
       return;
@@ -438,14 +478,7 @@ export function createBrowserPlaybackApplication(
 }
 
 function captureCallbackCommand(currentUrl: URL): CallbackCommand {
-  const callbackParameterNames: ReadonlyArray<string> = [
-    "code",
-    "error",
-    "error_description",
-    "error_uri",
-    "state",
-  ];
-  const isCallback = callbackParameterNames.some((parameter): boolean =>
+  const isCallback = callbackQueryParameterNames.some((parameter): boolean =>
     currentUrl.searchParams.has(parameter),
   );
 
@@ -453,47 +486,157 @@ function captureCallbackCommand(currentUrl: URL): CallbackCommand {
     return Object.freeze({ kind: "none" });
   }
 
+  const callbackUrl = new URL(currentUrl);
+  for (const parameter of displayQueryParameterNames) {
+    callbackUrl.searchParams.delete(parameter);
+  }
+
   return Object.freeze({
     kind: "pending",
-    callbackUrl: currentUrl.toString(),
+    callbackUrl: callbackUrl.toString(),
   });
 }
 
 function queryStrippedCallbackUrl(currentUrl: URL): URL {
-  return new URL("/spotify/", currentUrl.origin);
+  const stripped = new URL("/spotify/", currentUrl.origin);
+  const display = parseDisplayQuery(
+    currentUrl.searchParams,
+    callbackQueryParameterNames,
+  );
+  appendDisplayQuery(stripped.searchParams, display);
+
+  return stripped;
 }
 
-function displayReturnConfiguration(
-  currentUrl: URL,
-  viewportWidth: number,
-): unknown {
-  const width = displayWidth(currentUrl, viewportWidth);
-  const setup = currentUrl.searchParams.get("setup") === "1";
+function displayReturnConfiguration(currentUrl: URL): unknown {
+  const display = parseDisplayQuery(currentUrl.searchParams, []);
+  const width = displayWidth(display);
+  const setup = displaySetupRequested(display);
 
   return Object.freeze({ width, setup });
 }
 
-function displayWidth(currentUrl: URL, viewportWidth: number): number {
-  const configuredWidth = currentUrl.searchParams.get("width");
-  if (configuredWidth !== null && /^\d+$/.test(configuredWidth)) {
-    const parsedWidth = Number(configuredWidth);
+function displayWidth(display: DisplayQuery): number {
+  switch (display.kind) {
+    case "invalid":
+    case "none":
+    case "setup":
+      return defaultDisplayWidth;
+    case "width":
+    case "width-and-setup":
+      return display.width;
+  }
+
+  const unhandledDisplay: never = display;
+  throw new Error(`Unhandled display query: ${unhandledDisplay}`);
+}
+
+function displaySetupRequested(display: DisplayQuery): boolean {
+  switch (display.kind) {
+    case "invalid":
+    case "none":
+    case "width":
+      return false;
+    case "setup":
+    case "width-and-setup":
+      return true;
+  }
+
+  const unhandledDisplay: never = display;
+  throw new Error(`Unhandled display query: ${unhandledDisplay}`);
+}
+
+function parseDisplayQuery(
+  parameters: URLSearchParams,
+  allowedNonDisplayParameters: ReadonlyArray<string>,
+): DisplayQuery {
+  for (const parameter of parameters.keys()) {
     if (
-      Number.isSafeInteger(parsedWidth) &&
-      parsedWidth >= minimumDisplayWidth &&
-      parsedWidth <= maximumDisplayWidth
+      displayQueryParameterNames.includes(parameter) ||
+      allowedNonDisplayParameters.includes(parameter)
     ) {
-      return parsedWidth;
+      continue;
     }
+
+    return frozenInvalidDisplayQuery();
   }
 
-  if (!Number.isFinite(viewportWidth)) {
-    return minimumDisplayWidth;
+  const widthValues = parameters.getAll("width");
+  const setupValues = parameters.getAll("setup");
+  if (widthValues.length > 1 || setupValues.length > 1) {
+    return frozenInvalidDisplayQuery();
   }
 
-  return Math.min(
-    maximumDisplayWidth,
-    Math.max(minimumDisplayWidth, Math.round(viewportWidth)),
-  );
+  const hasSetup = setupValues.length === 1;
+  if (hasSetup && setupValues[0] !== "1") {
+    return frozenInvalidDisplayQuery();
+  }
+
+  if (widthValues.length === 0) {
+    return hasSetup ? frozenSetupDisplayQuery() : frozenNoDisplayQuery();
+  }
+
+  const widthValue = widthValues[0];
+  if (widthValue === undefined || !/^\d+$/.test(widthValue)) {
+    return frozenInvalidDisplayQuery();
+  }
+
+  const width = Number(widthValue);
+  if (
+    !Number.isSafeInteger(width) ||
+    width < minimumDisplayWidth ||
+    width > maximumDisplayWidth
+  ) {
+    return frozenInvalidDisplayQuery();
+  }
+
+  return hasSetup
+    ? frozenWidthAndSetupDisplayQuery(width)
+    : frozenWidthDisplayQuery(width);
+}
+
+function appendDisplayQuery(
+  parameters: URLSearchParams,
+  display: DisplayQuery,
+): void {
+  switch (display.kind) {
+    case "invalid":
+    case "none":
+      return;
+    case "setup":
+      parameters.set("setup", "1");
+      return;
+    case "width":
+      parameters.set("width", `${display.width}`);
+      return;
+    case "width-and-setup":
+      parameters.set("width", `${display.width}`);
+      parameters.set("setup", "1");
+      return;
+  }
+
+  const unhandledDisplay: never = display;
+  throw new Error(`Unhandled display query: ${unhandledDisplay}`);
+}
+
+function frozenInvalidDisplayQuery(): DisplayQuery {
+  return Object.freeze({ kind: "invalid" });
+}
+
+function frozenNoDisplayQuery(): DisplayQuery {
+  return Object.freeze({ kind: "none" });
+}
+
+function frozenSetupDisplayQuery(): DisplayQuery {
+  return Object.freeze({ kind: "setup" });
+}
+
+function frozenWidthDisplayQuery(width: number): DisplayQuery {
+  return Object.freeze({ kind: "width", width });
+}
+
+function frozenWidthAndSetupDisplayQuery(width: number): DisplayQuery {
+  return Object.freeze({ kind: "width-and-setup", width });
 }
 
 function serializeWorkerPublicConfiguration(
@@ -509,7 +652,10 @@ function serializeWorkerPublicConfiguration(
   return Object.freeze(serialized);
 }
 
-function parseSpotifyAuthorizationUrl(input: string): SpotifyAuthorizationUrl {
+function parseSpotifyAuthorizationUrl(
+  input: string,
+  applicationUrl: URL,
+): SpotifyAuthorizationUrl {
   try {
     const url = new URL(input);
     if (
@@ -519,7 +665,7 @@ function parseSpotifyAuthorizationUrl(input: string): SpotifyAuthorizationUrl {
       url.username !== "" ||
       url.password !== "" ||
       url.hash !== "" ||
-      url.search === ""
+      !hasExpectedSpotifyAuthorizationParameters(url, applicationUrl)
     ) {
       return Object.freeze({ kind: "invalid" });
     }
@@ -527,6 +673,75 @@ function parseSpotifyAuthorizationUrl(input: string): SpotifyAuthorizationUrl {
     return Object.freeze({ kind: "valid", value: url });
   } catch {
     return Object.freeze({ kind: "invalid" });
+  }
+}
+
+function hasExpectedSpotifyAuthorizationParameters(
+  authorizationUrl: URL,
+  applicationUrl: URL,
+): boolean {
+  const parameters = authorizationUrl.searchParams;
+  const hasOneValueForEachParameter = spotifyAuthorizationParameterNames.every(
+    (parameter): boolean => parameters.getAll(parameter).length === 1,
+  );
+  const parameterCount = Array.from(parameters.keys()).length;
+  if (
+    !hasOneValueForEachParameter ||
+    parameterCount !== spotifyAuthorizationParameterNames.length
+  ) {
+    return false;
+  }
+
+  const responseType = parameters.getAll("response_type")[0];
+  const codeChallengeMethod = parameters.getAll("code_challenge_method")[0];
+  const scope = parameters.getAll("scope")[0];
+  if (
+    responseType !== "code" ||
+    codeChallengeMethod !== "S256" ||
+    scope !== "user-read-currently-playing"
+  ) {
+    return false;
+  }
+
+  const publicParameters: ReadonlyArray<string | undefined> = [
+    parameters.getAll("client_id")[0],
+    parameters.getAll("code_challenge")[0],
+    parameters.getAll("state")[0],
+  ];
+  if (
+    publicParameters.some(
+      (parameter): boolean =>
+        parameter === undefined || parameter.trim().length === 0,
+    )
+  ) {
+    return false;
+  }
+
+  const redirectUri = parameters.getAll("redirect_uri")[0];
+  if (redirectUri === undefined) {
+    return false;
+  }
+
+  return isSameOriginSpotifyCallback(redirectUri, applicationUrl);
+}
+
+function isSameOriginSpotifyCallback(
+  input: string,
+  applicationUrl: URL,
+): boolean {
+  try {
+    const redirectUri = new URL(input);
+    return (
+      redirectUri.protocol === "https:" &&
+      redirectUri.origin === applicationUrl.origin &&
+      redirectUri.pathname === "/spotify/" &&
+      redirectUri.username === "" &&
+      redirectUri.password === "" &&
+      redirectUri.search === "" &&
+      redirectUri.hash === ""
+    );
+  } catch {
+    return false;
   }
 }
 

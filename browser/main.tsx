@@ -47,9 +47,6 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
         document.removeEventListener("visibilitychange", listener);
       };
     },
-    viewportWidth(): number {
-      return window.innerWidth;
-    },
     visibility(): "hidden" | "visible" {
       return document.visibilityState === "visible" ? "visible" : "hidden";
     },
@@ -99,6 +96,7 @@ async function fetchConfiguration(options: {
   readonly url: URL;
 }): Promise<BrowserConfigurationResponse> {
   const response = await fetch(options.url, {
+    cache: "no-store",
     credentials: "same-origin",
     redirect: "error",
     signal: options.signal,
