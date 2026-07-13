@@ -12,13 +12,12 @@ import {
   type PlaybackState,
   type Result,
 } from "../../domain/playback.ts";
-import { metadataViewForOverlayState } from "../../components/overlay/overlay-metadata.ts";
 import {
   spotifyLinkAccessibleName,
-  spotifyLinksForMetadata,
   type OverlaySpotifyLink,
   type OverlaySpotifyLinks,
 } from "../../components/overlay/overlay-spotify-links.ts";
+import { overlayViewModelForState } from "../../components/overlay/overlay-view-model.ts";
 import {
   pausedEpisodePayload,
   playingTrackPayload,
@@ -42,7 +41,7 @@ test("Spotify link mapping preserves a track item, every creator, and its album"
     }),
   );
   const links = availableLinks(
-    spotifyLinksForMetadata(metadataViewForOverlayState(playingState(track))),
+    overlayViewModelForState(playingState(track)).spotifyLinks,
   );
 
   assert.deepEqual(linkDetails(links), [
@@ -106,9 +105,7 @@ test("Spotify link mapping preserves an episode item and its show", () => {
   const state = expectSuccess(
     parseSpotifyPlaybackPayload(pausedEpisodePayload),
   );
-  const links = availableLinks(
-    spotifyLinksForMetadata(metadataViewForOverlayState(state)),
-  );
+  const links = availableLinks(overlayViewModelForState(state).spotifyLinks);
 
   assert.deepEqual(linkDetails(links), [
     {
@@ -181,9 +178,8 @@ test("missing or non-Spotify child links cannot produce a partial Spotify link p
 
   assert.deepEqual(
     unavailableFailure(
-      spotifyLinksForMetadata(
-        metadataViewForOverlayState(playingState(trackWithoutAlbumLink)),
-      ),
+      overlayViewModelForState(playingState(trackWithoutAlbumLink))
+        .spotifyLinks,
     ),
     {
       destination: "album",
@@ -193,9 +189,8 @@ test("missing or non-Spotify child links cannot produce a partial Spotify link p
   );
   assert.deepEqual(
     unavailableFailure(
-      spotifyLinksForMetadata(
-        metadataViewForOverlayState(playingState(trackWithNonSpotifyCreator)),
-      ),
+      overlayViewModelForState(playingState(trackWithNonSpotifyCreator))
+        .spotifyLinks,
     ),
     {
       destination: "creator",

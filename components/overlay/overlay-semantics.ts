@@ -1,18 +1,10 @@
 import {
-  metadataViewForOverlayState,
   overlayItemIdentityKey,
   type OverlayItemIdentity,
   type OverlayItemMetadataPresentation,
   type OverlayMetadataView,
 } from "./overlay-metadata.ts";
-import {
-  spotifyLinksForMetadata,
-  type OverlaySpotifyLinks,
-} from "./overlay-spotify-links.ts";
-import {
-  visualTreatmentForOverlayState,
-  type OverlayUiState,
-} from "./overlay-state.ts";
+import type { OverlayStatusView, OverlayUiState } from "./overlay-state.ts";
 
 export type OverlayAnnouncementIdentity =
   | {
@@ -30,12 +22,6 @@ export type OverlayAnnouncement = {
   readonly message: string;
 };
 
-export type OverlaySemanticStatus = {
-  readonly kind: OverlayUiState["kind"];
-  readonly label: string;
-  readonly message: string;
-};
-
 export type OverlaySemanticDefinition = {
   readonly term: string;
   readonly value: string;
@@ -44,25 +30,17 @@ export type OverlaySemanticDefinition = {
 export type OverlaySemanticView = {
   readonly announcement: OverlayAnnouncement;
   readonly definitions: ReadonlyArray<OverlaySemanticDefinition>;
-  readonly metadata: OverlayMetadataView;
-  readonly spotifyLinks: OverlaySpotifyLinks;
-  readonly status: OverlaySemanticStatus;
 };
 
-export function semanticViewForOverlayState(
-  state: OverlayUiState,
+export function semanticViewForOverlayPresentation(
+  stateKind: OverlayUiState["kind"],
+  status: OverlayStatusView,
+  metadata: OverlayMetadataView,
 ): OverlaySemanticView {
-  const metadata = metadataViewForOverlayState(state);
-  const status = semanticStatusForOverlayState(state);
-  const semanticView: OverlaySemanticView = {
-    announcement: announcementForOverlayState(state, metadata),
+  return Object.freeze({
+    announcement: announcementForPresentation(stateKind, metadata),
     definitions: semanticDefinitionsFor(status, metadata),
-    metadata,
-    spotifyLinks: spotifyLinksForMetadata(metadata),
-    status,
-  };
-
-  return Object.freeze(semanticView);
+  });
 }
 
 export function overlayAnnouncementIdentityKey(
@@ -78,33 +56,18 @@ export function overlayAnnouncementIdentityKey(
   return unreachable(identity);
 }
 
-function semanticStatusForOverlayState(
-  state: OverlayUiState,
-): OverlaySemanticStatus {
-  const treatment = visualTreatmentForOverlayState(state);
-  const status: OverlaySemanticStatus = {
-    kind: state.kind,
-    label: treatment.label,
-    message: treatment.message,
-  };
-
-  return Object.freeze(status);
-}
-
-function announcementForOverlayState(
-  state: OverlayUiState,
+function announcementForPresentation(
+  stateKind: OverlayUiState["kind"],
   metadata: OverlayMetadataView,
 ): OverlayAnnouncement {
-  const announcement: OverlayAnnouncement = {
-    identity: announcementIdentityForMetadata(state, metadata),
+  return Object.freeze({
+    identity: announcementIdentityForMetadata(stateKind, metadata),
     message: announcementMessageForMetadata(metadata),
-  };
-
-  return Object.freeze(announcement);
+  });
 }
 
 function semanticDefinitionsFor(
-  status: OverlaySemanticStatus,
+  status: OverlayStatusView,
   metadata: OverlayMetadataView,
 ): ReadonlyArray<OverlaySemanticDefinition> {
   const statusDefinitions = semanticStatusDefinitions(status);
@@ -144,7 +107,7 @@ function semanticDefinitionsFor(
 }
 
 function semanticStatusDefinitions(
-  status: OverlaySemanticStatus,
+  status: OverlayStatusView,
 ): ReadonlyArray<OverlaySemanticDefinition> {
   return frozenSemanticDefinitions([
     semanticDefinition("Playback state", status.label),
@@ -153,15 +116,15 @@ function semanticStatusDefinitions(
 }
 
 function announcementIdentityForMetadata(
-  state: OverlayUiState,
+  stateKind: OverlayUiState["kind"],
   metadata: OverlayMetadataView,
 ): OverlayAnnouncementIdentity {
   switch (metadata.kind) {
     case "status":
-      return frozenStateAnnouncementIdentity(state.kind);
+      return frozenStateAnnouncementIdentity(stateKind);
     case "episode":
     case "track":
-      return frozenItemAnnouncementIdentity(state.kind, metadata.itemIdentity);
+      return frozenItemAnnouncementIdentity(stateKind, metadata.itemIdentity);
   }
 
   return unreachable(metadata);
@@ -183,25 +146,18 @@ function announcementMessageForMetadata(metadata: OverlayMetadataView): string {
 function frozenStateAnnouncementIdentity(
   stateKind: OverlayUiState["kind"],
 ): OverlayAnnouncementIdentity {
-  const identity: OverlayAnnouncementIdentity = {
-    kind: "state",
-    stateKind,
-  };
-
-  return Object.freeze(identity);
+  return Object.freeze({ kind: "state", stateKind });
 }
 
 function frozenItemAnnouncementIdentity(
   stateKind: OverlayUiState["kind"],
   itemIdentity: OverlayItemIdentity,
 ): OverlayAnnouncementIdentity {
-  const identity: OverlayAnnouncementIdentity = {
+  return Object.freeze({
     itemIdentity,
     kind: "state-and-item",
     stateKind,
-  };
-
-  return Object.freeze(identity);
+  });
 }
 
 function itemPresentationAnnouncement(
@@ -244,9 +200,7 @@ function semanticDefinition(
   term: string,
   value: string,
 ): OverlaySemanticDefinition {
-  const definition: OverlaySemanticDefinition = { term, value };
-
-  return Object.freeze(definition);
+  return Object.freeze({ term, value });
 }
 
 function frozenSemanticDefinitions(

@@ -8,17 +8,16 @@ import {
   type PlaybackState,
   type Result,
 } from "../../domain/playback.ts";
-import {
-  artworkTreatmentForOverlayState,
-  controlPlanForOverlayState,
-  overlayUiStateForSnapshot,
-  visualTreatmentForOverlayState,
-  type OverlayControlPlan,
-  type OverlayUiState,
-  type OverlayVisualTreatment,
-} from "../../components/overlay/overlay-state.ts";
-import { metadataViewForOverlayState } from "../../components/overlay/overlay-metadata.ts";
 import { resolveOverlayGeometry } from "../../components/overlay/overlay-geometry.ts";
+import {
+  overlayUiStateForSnapshot,
+  type OverlayUiState,
+} from "../../components/overlay/overlay-state.ts";
+import {
+  overlayViewModelForState,
+  type OverlayControlPlan,
+  type OverlayViewModel,
+} from "../../components/overlay/overlay-view-model.ts";
 import {
   advertisementPayload,
   emptyTrackPayload,
@@ -26,124 +25,137 @@ import {
   playingTrackPayload,
 } from "./providers/spotify-payload.fixture.ts";
 
-test("the overlay maps every browser playback snapshot to a distinct visual treatment", () => {
-  const cases: ReadonlyArray<OverlayVisualCase> = [
+test("the overlay projects every browser playback state through one immutable view model", () => {
+  const cases: ReadonlyArray<OverlayViewModelCase> = [
     {
+      label: "INITIALIZING",
+      kind: "initializing",
       state: overlayUiStateForSnapshot({
         kind: "playback",
         state: initialPlaybackState(),
       }),
-      label: "INITIALIZING",
-      kind: "initializing",
     },
     {
+      label: "CONNECT SPOTIFY",
+      kind: "authorization-required",
       state: overlayUiStateForSnapshot({
         kind: "playback",
         state: authorizationRequiredState(),
       }),
-      label: "CONNECT SPOTIFY",
-      kind: "authorization-required",
     },
     {
+      label: "AUTHORIZING",
+      kind: "authorizing",
       state: overlayUiStateForSnapshot({
         kind: "playback",
         state: authorizingState(),
       }),
-      label: "AUTHORIZING",
-      kind: "authorizing",
     },
     {
+      label: "NOTHING PLAYING",
+      kind: "empty",
       state: overlayUiStateForSnapshot({
         kind: "playback",
         state: expectSuccess(parseSpotifyPlaybackPayload(emptyTrackPayload)),
       }),
-      label: "NOTHING PLAYING",
-      kind: "empty",
     },
     {
+      label: "PLAYING",
+      kind: "playing",
       state: overlayUiStateForSnapshot({
         kind: "playback",
         state: playingState(),
       }),
-      label: "PLAYING",
-      kind: "playing",
     },
     {
+      label: "PAUSED",
+      kind: "paused",
       state: overlayUiStateForSnapshot({
         kind: "playback",
         state: expectSuccess(parseSpotifyPlaybackPayload(pausedEpisodePayload)),
       }),
-      label: "PAUSED",
-      kind: "paused",
     },
     {
+      label: "UNSUPPORTED",
+      kind: "unsupported",
       state: overlayUiStateForSnapshot({
         kind: "playback",
         state: expectSuccess(parseSpotifyPlaybackPayload(advertisementPayload)),
       }),
-      label: "UNSUPPORTED",
-      kind: "unsupported",
     },
     {
+      label: "RECONNECTING",
+      kind: "reconnecting",
       state: overlayUiStateForSnapshot({
         kind: "playback",
         state: reconnectingStateWithoutStaleItem(),
       }),
-      label: "RECONNECTING",
-      kind: "reconnecting",
     },
     {
+      label: "PLAYBACK UNAVAILABLE",
+      kind: "failure",
       state: overlayUiStateForSnapshot({
         kind: "playback",
         state: failureState(),
       }),
-      label: "PLAYBACK UNAVAILABLE",
-      kind: "failure",
     },
     {
+      label: "OVERLAY UNAVAILABLE",
+      kind: "fatal-initialization-failure",
       state: overlayUiStateForSnapshot({
         kind: "fatal",
         reason: "browser-capability-unavailable",
       }),
-      label: "OVERLAY UNAVAILABLE",
-      kind: "fatal-initialization-failure",
     },
   ];
   const seenLabels = new Set<string>();
-  const seenTreatments = new Set<OverlayVisualTreatment["kind"]>();
+  const seenKinds = new Set<OverlayViewModel["kind"]>();
 
   for (const overlayCase of cases) {
-    const treatment = visualTreatmentForOverlayState(overlayCase.state);
+    const viewModel = overlayViewModelForState(overlayCase.state);
 
-    assert.equal(treatment.label, overlayCase.label);
-    assert.equal(treatment.kind, overlayCase.kind);
-    assert.equal(seenLabels.has(treatment.label), false, treatment.label);
-    assert.equal(seenTreatments.has(treatment.kind), false, treatment.kind);
-    seenLabels.add(treatment.label);
-    seenTreatments.add(treatment.kind);
+    assert.equal(Object.isFrozen(viewModel), true);
+    assert.equal(Object.isFrozen(viewModel.artwork), true);
+    assert.equal(Object.isFrozen(viewModel.controls), true);
+    assert.equal(Object.isFrozen(viewModel.metadata), true);
+    assert.equal(Object.isFrozen(viewModel.semantic), true);
+    assert.equal(Object.isFrozen(viewModel.spotifyLinks), true);
+    assert.equal(Object.isFrozen(viewModel.status), true);
+    assert.equal(viewModel.kind, overlayCase.kind);
+    assert.equal(viewModel.status.label, overlayCase.label);
+    assert.equal(
+      viewModel.semantic.announcement.identity.stateKind,
+      viewModel.kind,
+    );
+    assert.equal(
+      seenLabels.has(viewModel.status.label),
+      false,
+      viewModel.status.label,
+    );
+    assert.equal(seenKinds.has(viewModel.kind), false, viewModel.kind);
+    seenLabels.add(viewModel.status.label);
+    seenKinds.add(viewModel.kind);
   }
 
   const configurationFailure = overlayUiStateForSnapshot({
     kind: "fatal",
     reason: "configuration-unavailable",
   });
-  const configurationTreatment =
-    visualTreatmentForOverlayState(configurationFailure);
+  const configurationViewModel = overlayViewModelForState(configurationFailure);
 
   assert.equal(
-    configurationTreatment.message,
+    configurationViewModel.status.message,
     "The browser configuration is unavailable.",
   );
-  const configurationMetadata =
-    metadataViewForOverlayState(configurationFailure);
-  assert.equal(configurationMetadata.kind, "status");
-  if (configurationMetadata.kind !== "status") {
+  assert.equal(configurationViewModel.metadata.kind, "status");
+  if (configurationViewModel.metadata.kind !== "status") {
     throw new Error("Expected status metadata for configuration failure.");
   }
   assert.equal(
-    configurationMetadata.context,
+    configurationViewModel.metadata.context,
     "The public Spotify configuration could not be loaded.",
   );
+  assert.equal(configurationViewModel.spotifyLinks.kind, "not-applicable");
 });
 
 test("the overlay preserves a stale reconnecting item without using an absence sentinel", () => {
@@ -155,41 +167,42 @@ test("the overlay preserves a stale reconnecting item without using an absence s
     kind: "playback",
     state: reconnectingStateWithStaleItem(),
   });
-
-  assert.equal(
-    artworkTreatmentForOverlayState(reconnectingWithoutItem).kind,
-    "fallback",
-  );
-  const unavailableMetadata = metadataViewForOverlayState(
+  const unavailableViewModel = overlayViewModelForState(
     reconnectingWithoutItem,
   );
-  assert.equal(unavailableMetadata.kind, "status");
-  if (unavailableMetadata.kind !== "status") {
+  const staleViewModel = overlayViewModelForState(reconnectingWithItem);
+
+  assert.equal(unavailableViewModel.artwork.kind, "fallback");
+  assert.equal(unavailableViewModel.metadata.kind, "status");
+  if (unavailableViewModel.metadata.kind !== "status") {
     throw new Error("Expected status metadata without a stale item.");
   }
-  assert.equal(unavailableMetadata.subtitle, "No previous item is available.");
+  assert.equal(
+    unavailableViewModel.metadata.subtitle,
+    "No previous item is available.",
+  );
+  assert.equal(unavailableViewModel.spotifyLinks.kind, "not-applicable");
 
-  const staleArtwork = artworkTreatmentForOverlayState(reconnectingWithItem);
-  assert.equal(staleArtwork.kind, "stale-item");
-  if (staleArtwork.kind !== "stale-item") {
+  assert.equal(staleViewModel.artwork.kind, "stale-item");
+  if (staleViewModel.artwork.kind !== "stale-item") {
     throw new Error("Expected a stale artwork treatment.");
   }
-  assert.equal(staleArtwork.item.title.value, "Track title");
-  const staleMetadata = metadataViewForOverlayState(reconnectingWithItem);
-  assert.equal(staleMetadata.kind, "track");
-  if (staleMetadata.kind !== "track") {
+  assert.equal(staleViewModel.artwork.item.title.value, "Track title");
+  assert.equal(staleViewModel.metadata.kind, "track");
+  if (staleViewModel.metadata.kind !== "track") {
     throw new Error("Expected track metadata for the stale item.");
   }
-  assert.equal(staleMetadata.presentation.kind, "stale");
-  assert.equal(staleMetadata.trackTitle.value, "Track title");
+  assert.equal(staleViewModel.metadata.presentation.kind, "stale");
+  assert.equal(staleViewModel.metadata.trackTitle.value, "Track title");
   assert.deepEqual(
-    staleMetadata.artists.map((artist): string => artist.name.value),
+    staleViewModel.metadata.artists.map((artist): string => artist.name.value),
     ["Track artist"],
   );
-  assert.equal(staleMetadata.album.title.value, "Album title");
+  assert.equal(staleViewModel.metadata.album.title.value, "Album title");
+  assert.equal(staleViewModel.spotifyLinks.kind, "available");
 });
 
-test("the overlay exposes only supported setup controls for each state", () => {
+test("the overlay carries only supported setup controls for each state", () => {
   const overlayMode = resolveOverlayGeometry(new URLSearchParams()).setupMode;
   const setupMode = resolveOverlayGeometry(
     new URLSearchParams("setup=1"),
@@ -256,21 +269,23 @@ test("the overlay exposes only supported setup controls for each state", () => {
   ];
 
   for (const overlayCase of cases) {
+    const viewModel = overlayViewModelForState(overlayCase.state);
+
     assert.equal(
-      controlPlanForOverlayState(overlayCase.state, overlayMode).kind,
+      viewModel.controls[overlayMode.kind].kind,
       overlayCase.expectedOverlay,
       overlayCase.state.kind,
     );
     assert.equal(
-      controlPlanForOverlayState(overlayCase.state, setupMode).kind,
+      viewModel.controls[setupMode.kind].kind,
       overlayCase.expectedSetup,
       overlayCase.state.kind,
     );
   }
 });
 
-type OverlayVisualCase = {
-  readonly kind: OverlayVisualTreatment["kind"];
+type OverlayViewModelCase = {
+  readonly kind: OverlayViewModel["kind"];
   readonly label: string;
   readonly state: OverlayUiState;
 };

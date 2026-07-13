@@ -1,15 +1,14 @@
 import type { ComponentProps } from "react";
 import type { ProviderLink } from "../../domain/playback.ts";
 import { OverlayVisualSpotifyLinks } from "../../components/overlay/OverlayVisualSpotifyLinks.tsx";
-import type { OverlayMetadataView } from "../../components/overlay/overlay-metadata.ts";
 import {
-  spotifyLinksForMetadata,
   type OverlaySpotifyLink,
   type OverlaySpotifyLinks,
 } from "../../components/overlay/overlay-spotify-links.ts";
+import type { OverlayViewModel } from "../../components/overlay/overlay-view-model.ts";
 
-declare const metadata: OverlayMetadataView;
 declare const providerLink: ProviderLink;
+declare const viewModel: OverlayViewModel;
 
 const spotifyLink: OverlaySpotifyLink = Object.freeze({
   destination: "track",
@@ -17,7 +16,7 @@ const spotifyLink: OverlaySpotifyLink = Object.freeze({
   providerLink,
   visibleTarget: Object.freeze({ kind: "item-metadata" }),
 });
-const spotifyLinks: OverlaySpotifyLinks = spotifyLinksForMetadata(metadata);
+const spotifyLinks: OverlaySpotifyLinks = viewModel.spotifyLinks;
 const visualSpotifyLinkProps: ComponentProps<typeof OverlayVisualSpotifyLinks> =
   Object.freeze({ availableWidth: 3_096, links: spotifyLinks });
 const invalidSpotifyLink: OverlaySpotifyLink = {

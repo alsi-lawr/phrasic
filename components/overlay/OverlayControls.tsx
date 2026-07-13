@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
-import type { OverlayControlPlan } from "./overlay-state.ts";
+import type { OverlaySetupMode } from "./overlay-geometry.ts";
+import type { OverlayControlPlans } from "./overlay-view-model.ts";
 
 const controlButtonClass =
   "rounded-md border border-slate-500 bg-slate-950 px-3 py-2 text-sm font-medium text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950";
@@ -12,13 +13,17 @@ type OverlayControlActions = {
 
 type OverlayControlsProps = {
   readonly actions: OverlayControlActions;
-  readonly plan: OverlayControlPlan;
+  readonly plans: OverlayControlPlans;
+  readonly setupMode: OverlaySetupMode;
 };
 
 export function OverlayControls({
   actions,
-  plan,
+  plans,
+  setupMode,
 }: OverlayControlsProps): ReactElement | null {
+  const plan = plans[setupMode.kind];
+
   switch (plan.kind) {
     case "none":
       return null;

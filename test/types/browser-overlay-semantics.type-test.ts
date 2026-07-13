@@ -1,17 +1,15 @@
 import type { ComponentProps } from "react";
 import { OverlaySemanticCompanion } from "../../components/overlay/OverlaySemanticCompanion.tsx";
 import type { OverlayItemIdentity } from "../../components/overlay/overlay-metadata.ts";
-import type { OverlaySpotifyLinks } from "../../components/overlay/overlay-spotify-links.ts";
 import type {
   OverlayAnnouncementIdentity,
   OverlaySemanticDefinition,
-  OverlaySemanticStatus,
   OverlaySemanticView,
 } from "../../components/overlay/overlay-semantics.ts";
+import type { OverlayViewModel } from "../../components/overlay/overlay-view-model.ts";
 
 declare const itemIdentity: OverlayItemIdentity;
-declare const semantic: OverlaySemanticView;
-declare const spotifyLinks: OverlaySpotifyLinks;
+declare const viewModel: OverlayViewModel;
 
 const stateAnnouncementIdentity: OverlayAnnouncementIdentity = Object.freeze({
   kind: "state",
@@ -21,11 +19,6 @@ const itemAnnouncementIdentity: OverlayAnnouncementIdentity = Object.freeze({
   itemIdentity,
   kind: "state-and-item",
   stateKind: "playing",
-});
-const semanticStatus: OverlaySemanticStatus = Object.freeze({
-  kind: "paused",
-  label: "PAUSED",
-  message: "Spotify is paused.",
 });
 const semanticDefinition: OverlaySemanticDefinition = Object.freeze({
   term: "Track",
@@ -37,9 +30,6 @@ const semanticView: OverlaySemanticView = Object.freeze({
     message: "Spotify is connected.",
   }),
   definitions: [semanticDefinition],
-  metadata: semantic.metadata,
-  spotifyLinks,
-  status: semanticStatus,
 });
 const companionProps: ComponentProps<typeof OverlaySemanticCompanion> =
   Object.freeze({ semantic: semanticView });
@@ -59,12 +49,16 @@ const invalidItemAnnouncementIdentity: OverlayAnnouncementIdentity = {
   kind: "state-and-item",
   stateKind: "playing",
 };
-// @ts-expect-error Semantic status values are readonly.
-semanticStatus.label = "PLAYING";
 // @ts-expect-error Semantic definitions are readonly.
 semanticDefinition.value = "Changed title";
 // @ts-expect-error The semantic companion accepts its view through a readonly prop.
 companionProps.semantic = semanticView;
+Object.keys(
+  // @ts-expect-error Semantic data no longer carries a parallel metadata projection.
+  semanticView.metadata,
+);
+// @ts-expect-error The complete model remains readonly after projection.
+viewModel.semantic = semanticView;
 
 function announcementIdentityKind(
   identity: OverlayAnnouncementIdentity,
@@ -81,7 +75,6 @@ function announcementIdentityKind(
 
 void stateAnnouncementIdentity;
 void itemAnnouncementIdentity;
-void semanticStatus;
 void semanticDefinition;
 void semanticView;
 void companionProps;

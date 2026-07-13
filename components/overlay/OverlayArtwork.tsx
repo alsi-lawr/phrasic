@@ -7,23 +7,17 @@ import {
   overlayArtworkRectangle,
 } from "./overlay-layout.ts";
 import type { OverlayMotionDecision } from "./overlay-motion.ts";
-import {
-  artworkTreatmentForOverlayState,
-  type OverlayArtworkTreatment,
-  type OverlayUiState,
-} from "./overlay-state.ts";
+import { type OverlayArtworkTreatment } from "./overlay-view-model.ts";
 
 type OverlayArtworkProps = {
   readonly motion: OverlayMotionDecision;
-  readonly state: OverlayUiState;
+  readonly treatment: OverlayArtworkTreatment;
 };
 
 export function OverlayArtwork({
   motion,
-  state,
+  treatment,
 }: OverlayArtworkProps): ReactElement {
-  const treatment = artworkTreatmentForOverlayState(state);
-
   return (
     <g>
       <ArtworkClipPath />

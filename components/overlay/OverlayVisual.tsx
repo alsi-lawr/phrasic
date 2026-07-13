@@ -3,10 +3,7 @@ import { OverlayArtwork } from "./OverlayArtwork.tsx";
 import { OverlayItemAppearance } from "./OverlayItemAppearance.tsx";
 import { OverlaySpotifyAttribution } from "./OverlaySpotifyAttribution.tsx";
 import { type OverlayGeometry } from "./overlay-geometry.ts";
-import {
-  overlayMetadataAnimationIdentityKey,
-  type OverlayMetadataView,
-} from "./overlay-metadata.ts";
+import { overlayMetadataAnimationIdentityKey } from "./overlay-metadata.ts";
 import { type OverlayMotionDecision } from "./overlay-motion.ts";
 import {
   emptyOverlayTextWidths,
@@ -18,28 +15,25 @@ import {
   type OverlayTextMeasurementReporter,
   type OverlayTextWidths,
 } from "./overlay-layout.ts";
-import { type OverlayUiState } from "./overlay-state.ts";
+import { type OverlayViewModel } from "./overlay-view-model.ts";
 import { OverlayMetadata } from "./OverlayMetadata.tsx";
 import { OverlayShell } from "./OverlayShell.tsx";
 import { OverlayVisualSpotifyLinks } from "./OverlayVisualSpotifyLinks.tsx";
-import { type OverlaySpotifyLinks } from "./overlay-spotify-links.ts";
 
 type OverlayVisualProps = {
   readonly geometry: OverlayGeometry;
-  readonly metadata: OverlayMetadataView;
   readonly motion: OverlayMotionDecision;
-  readonly spotifyLinks: OverlaySpotifyLinks;
-  readonly state: OverlayUiState;
+  readonly viewModel: OverlayViewModel;
 };
 
 export function OverlayVisual({
   geometry,
-  metadata,
   motion,
-  spotifyLinks,
-  state,
+  viewModel,
 }: OverlayVisualProps): ReactElement {
-  const animationIdentityKey = overlayMetadataAnimationIdentityKey(metadata);
+  const animationIdentityKey = overlayMetadataAnimationIdentityKey(
+    viewModel.metadata,
+  );
   const contentSizedShell = useContentSizedShell(animationIdentityKey);
 
   return (
@@ -57,10 +51,10 @@ export function OverlayVisual({
             identity={animationIdentityKey}
             motion={motion}
           >
-            <OverlayArtwork motion={motion} state={state} />
+            <OverlayArtwork motion={motion} treatment={viewModel.artwork} />
             <OverlayMetadata
               availableWidth={contentSizedShell.availableWidth}
-              metadata={metadata}
+              metadata={viewModel.metadata}
               motion={motion}
               onTextMeasurement={contentSizedShell.reportTextMeasurement}
             />
@@ -70,7 +64,7 @@ export function OverlayVisual({
       </svg>
       <OverlayVisualSpotifyLinks
         availableWidth={contentSizedShell.availableWidth}
-        links={spotifyLinks}
+        links={viewModel.spotifyLinks}
       />
     </div>
   );

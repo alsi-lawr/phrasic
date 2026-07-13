@@ -14,16 +14,17 @@ import {
   type PlaybackState,
   type Result,
 } from "../../domain/playback.ts";
-import {
-  overlayAnnouncementIdentityKey,
-  semanticViewForOverlayState,
-  type OverlaySemanticView,
-} from "../../components/overlay/overlay-semantics.ts";
+import { overlayAnnouncementIdentityKey } from "../../components/overlay/overlay-semantics.ts";
 import type {
   OverlayItemMetadataPresentation,
   OverlayMetadataView,
 } from "../../components/overlay/overlay-metadata.ts";
+import type { OverlaySpotifyLinks } from "../../components/overlay/overlay-spotify-links.ts";
 import type { OverlayUiState } from "../../components/overlay/overlay-state.ts";
+import {
+  overlayViewModelForState,
+  type OverlayViewModel,
+} from "../../components/overlay/overlay-view-model.ts";
 import {
   advertisementPayload,
   emptyTrackPayload,
@@ -38,6 +39,7 @@ test("the semantic companion maps every overlay state to status and complete met
         "Starting Spotify playback. Spotify Now Playing Preparing the display connection.",
       label: "INITIALIZING",
       metadataKind: "status",
+      spotifyLinksKind: "not-applicable",
       state: initialPlaybackState(),
     },
     {
@@ -45,6 +47,7 @@ test("the semantic companion maps every overlay state to status and complete met
         "Spotify authorization is required. Connect Spotify to continue. Spotify is not connected in this browser profile.",
       label: "CONNECT SPOTIFY",
       metadataKind: "status",
+      spotifyLinksKind: "not-applicable",
       state: authorizationRequiredState(),
     },
     {
@@ -52,6 +55,7 @@ test("the semantic companion maps every overlay state to status and complete met
         "Waiting for Spotify authorization. Finish authorization in Spotify. This display will reconnect after authorization completes.",
       label: "AUTHORIZING",
       metadataKind: "status",
+      spotifyLinksKind: "not-applicable",
       state: authorizingState(),
     },
     {
@@ -59,6 +63,7 @@ test("the semantic companion maps every overlay state to status and complete met
         "No track or episode is currently playing. Spotify is connected. Start a track or episode to populate the overlay.",
       label: "NOTHING PLAYING",
       metadataKind: "status",
+      spotifyLinksKind: "not-applicable",
       state: expectSuccess(parseSpotifyPlaybackPayload(emptyTrackPayload)),
     },
     {
@@ -66,6 +71,7 @@ test("the semantic companion maps every overlay state to status and complete met
         "Now playing track: Track title. Artists: Track artist. Album: Album title.",
       label: "PLAYING",
       metadataKind: "track",
+      spotifyLinksKind: "available",
       state: playingTrackState(),
     },
     {
@@ -73,6 +79,7 @@ test("the semantic companion maps every overlay state to status and complete met
         "Playback paused episode: Episode title. Show: Show title. Publisher: Show publisher.",
       label: "PAUSED",
       metadataKind: "episode",
+      spotifyLinksKind: "available",
       state: expectSuccess(parseSpotifyPlaybackPayload(pausedEpisodePayload)),
     },
     {
@@ -80,6 +87,7 @@ test("the semantic companion maps every overlay state to status and complete met
         "The current Spotify item cannot be displayed. Spotify is playing an advertisement. Play a supported Spotify track or episode.",
       label: "UNSUPPORTED",
       metadataKind: "status",
+      spotifyLinksKind: "not-applicable",
       state: expectSuccess(parseSpotifyPlaybackPayload(advertisementPayload)),
     },
     {
@@ -87,6 +95,7 @@ test("the semantic companion maps every overlay state to status and complete met
         "Reconnecting to Spotify. No previous item is available. Waiting for Spotify playback updates to return.",
       label: "RECONNECTING",
       metadataKind: "status",
+      spotifyLinksKind: "not-applicable",
       state: reconnectingStateWithoutStaleItem(),
     },
     {
@@ -94,6 +103,7 @@ test("the semantic companion maps every overlay state to status and complete met
         "Reconnecting to Spotify. Last known track: Track title. Artists: Track artist. Album: Album title.",
       label: "RECONNECTING",
       metadataKind: "track",
+      spotifyLinksKind: "available",
       state: reconnectingStateWithStaleItem(),
     },
     {
@@ -101,6 +111,7 @@ test("the semantic companion maps every overlay state to status and complete met
         "Playback updates failed. The Spotify connection is unavailable. Use setup mode to retry playback or disconnect Spotify.",
       label: "PLAYBACK UNAVAILABLE",
       metadataKind: "status",
+      spotifyLinksKind: "not-applicable",
       state: failureState(),
     },
     {
@@ -108,6 +119,7 @@ test("the semantic companion maps every overlay state to status and complete met
         "This browser cannot start Spotify playback. The browser display could not be initialized. A required browser playback capability is unavailable.",
       label: "OVERLAY UNAVAILABLE",
       metadataKind: "status",
+      spotifyLinksKind: "not-applicable",
       state: Object.freeze({
         kind: "fatal-initialization-failure",
         reason: "browser-capability-unavailable",
@@ -118,6 +130,7 @@ test("the semantic companion maps every overlay state to status and complete met
         "The browser configuration is unavailable. The browser display could not be initialized. The public Spotify configuration could not be loaded.",
       label: "OVERLAY UNAVAILABLE",
       metadataKind: "status",
+      spotifyLinksKind: "not-applicable",
       state: Object.freeze({
         kind: "fatal-initialization-failure",
         reason: "configuration-unavailable",
@@ -126,11 +139,13 @@ test("the semantic companion maps every overlay state to status and complete met
   ];
 
   for (const semanticCase of cases) {
-    const semantic = semanticViewForOverlayState(semanticCase.state);
+    const viewModel = overlayViewModelForState(semanticCase.state);
+    const semantic = viewModel.semantic;
 
-    assert.equal(semantic.status.kind, semanticCase.state.kind);
-    assert.equal(semantic.status.label, semanticCase.label);
-    assert.equal(semantic.metadata.kind, semanticCase.metadataKind);
+    assert.equal(viewModel.kind, semanticCase.state.kind);
+    assert.equal(viewModel.status.label, semanticCase.label);
+    assert.equal(viewModel.metadata.kind, semanticCase.metadataKind);
+    assert.equal(viewModel.spotifyLinks.kind, semanticCase.spotifyLinksKind);
     assert.equal(semantic.announcement.message, semanticCase.announcement);
     assert.equal(
       semantic.announcement.identity.stateKind,
@@ -138,39 +153,44 @@ test("the semantic companion maps every overlay state to status and complete met
     );
     assert.notEqual(semantic.announcement.message, "");
 
-    assertCompleteSemanticMetadata(semantic.metadata);
-    assertSemanticDefinitions(semantic);
+    assertCompleteSemanticMetadata(viewModel.metadata);
+    assertSemanticDefinitions(viewModel);
   }
 });
 
 test("semantic item announcements retain full track and episode metadata", () => {
-  const trackSemantic = semanticViewForOverlayState(playingTrackState());
-  const episodeSemantic = semanticViewForOverlayState(
+  const trackViewModel = overlayViewModelForState(playingTrackState());
+  const episodeViewModel = overlayViewModelForState(
     expectSuccess(parseSpotifyPlaybackPayload(pausedEpisodePayload)),
   );
+  const trackSemantic = trackViewModel.semantic;
+  const episodeSemantic = episodeViewModel.semantic;
 
-  assert.equal(trackSemantic.metadata.kind, "track");
-  if (trackSemantic.metadata.kind !== "track") {
+  assert.equal(trackViewModel.metadata.kind, "track");
+  if (trackViewModel.metadata.kind !== "track") {
     throw new Error("Expected track semantic metadata.");
   }
-  assert.equal(trackSemantic.metadata.trackTitle.value, "Track title");
+  assert.equal(trackViewModel.metadata.trackTitle.value, "Track title");
   assert.deepEqual(
-    trackSemantic.metadata.artists.map((artist): string => artist.name.value),
+    trackViewModel.metadata.artists.map((artist): string => artist.name.value),
     ["Track artist"],
   );
-  assert.equal(trackSemantic.metadata.album.title.value, "Album title");
+  assert.equal(trackViewModel.metadata.album.title.value, "Album title");
   assert.equal(
     trackSemantic.announcement.message,
     "Now playing track: Track title. Artists: Track artist. Album: Album title.",
   );
 
-  assert.equal(episodeSemantic.metadata.kind, "episode");
-  if (episodeSemantic.metadata.kind !== "episode") {
+  assert.equal(episodeViewModel.metadata.kind, "episode");
+  if (episodeViewModel.metadata.kind !== "episode") {
     throw new Error("Expected episode semantic metadata.");
   }
-  assert.equal(episodeSemantic.metadata.episodeTitle.value, "Episode title");
-  assert.equal(episodeSemantic.metadata.show.title.value, "Show title");
-  assert.equal(episodeSemantic.metadata.show.publisher.value, "Show publisher");
+  assert.equal(episodeViewModel.metadata.episodeTitle.value, "Episode title");
+  assert.equal(episodeViewModel.metadata.show.title.value, "Show title");
+  assert.equal(
+    episodeViewModel.metadata.show.publisher.value,
+    "Show publisher",
+  );
   assert.equal(
     episodeSemantic.announcement.message,
     "Playback paused episode: Episode title. Show: Show title. Publisher: Show publisher.",
@@ -209,17 +229,18 @@ test("announcement identity stays stable for same-item polling and changes for i
   });
 
   const originalAnnouncement =
-    semanticViewForOverlayState(playing).announcement;
+    overlayViewModelForState(playing).semantic.announcement;
   const sameItemAnnouncement =
-    semanticViewForOverlayState(sameItemPoll).announcement;
+    overlayViewModelForState(sameItemPoll).semantic.announcement;
   const pausedAnnouncement =
-    semanticViewForOverlayState(pausedSameItem).announcement;
-  const newItemAnnouncement = semanticViewForOverlayState(newItem).announcement;
-  const emptyAnnouncement = semanticViewForOverlayState(
+    overlayViewModelForState(pausedSameItem).semantic.announcement;
+  const newItemAnnouncement =
+    overlayViewModelForState(newItem).semantic.announcement;
+  const emptyAnnouncement = overlayViewModelForState(
     expectSuccess(parseSpotifyPlaybackPayload(emptyTrackPayload)),
-  ).announcement;
+  ).semantic.announcement;
   const failureAnnouncement =
-    semanticViewForOverlayState(failureState()).announcement;
+    overlayViewModelForState(failureState()).semantic.announcement;
 
   assert.deepEqual(
     sameItemAnnouncement.identity,
@@ -284,29 +305,33 @@ test("Spotify link changes do not create a new polite announcement identity", ()
       }),
     ),
   });
-  const originalSemantic = semanticViewForOverlayState(originalState);
-  const updatedSemantic = semanticViewForOverlayState(updatedState);
+  const originalViewModel = overlayViewModelForState(originalState);
+  const updatedViewModel = overlayViewModelForState(updatedState);
 
-  assert.equal(originalSemantic.spotifyLinks.kind, "available");
-  assert.equal(updatedSemantic.spotifyLinks.kind, "available");
+  assert.equal(originalViewModel.spotifyLinks.kind, "available");
+  assert.equal(updatedViewModel.spotifyLinks.kind, "available");
   if (
-    originalSemantic.spotifyLinks.kind !== "available" ||
-    updatedSemantic.spotifyLinks.kind !== "available"
+    originalViewModel.spotifyLinks.kind !== "available" ||
+    updatedViewModel.spotifyLinks.kind !== "available"
   ) {
     throw new Error("Expected available Spotify links.");
   }
 
   assert.notEqual(
-    originalSemantic.spotifyLinks.links[0]?.providerLink.href,
-    updatedSemantic.spotifyLinks.links[0]?.providerLink.href,
+    originalViewModel.spotifyLinks.links[0]?.providerLink.href,
+    updatedViewModel.spotifyLinks.links[0]?.providerLink.href,
   );
   assert.equal(
-    overlayAnnouncementIdentityKey(originalSemantic.announcement.identity),
-    overlayAnnouncementIdentityKey(updatedSemantic.announcement.identity),
+    overlayAnnouncementIdentityKey(
+      originalViewModel.semantic.announcement.identity,
+    ),
+    overlayAnnouncementIdentityKey(
+      updatedViewModel.semantic.announcement.identity,
+    ),
   );
   assert.equal(
-    originalSemantic.announcement.message,
-    updatedSemantic.announcement.message,
+    originalViewModel.semantic.announcement.message,
+    updatedViewModel.semantic.announcement.message,
   );
 });
 
@@ -314,6 +339,7 @@ type SemanticStateCase = {
   readonly announcement: string;
   readonly label: string;
   readonly metadataKind: OverlayMetadataView["kind"];
+  readonly spotifyLinksKind: OverlaySpotifyLinks["kind"];
   readonly state: OverlayUiState;
 };
 
@@ -339,52 +365,59 @@ function assertCompleteSemanticMetadata(metadata: OverlayMetadataView): void {
   return unreachable(metadata);
 }
 
-function assertSemanticDefinitions(semantic: OverlaySemanticView): void {
+function assertSemanticDefinitions(viewModel: OverlayViewModel): void {
   const statusDefinitions = [
-    { term: "Playback state", value: semantic.status.label },
-    { term: "Status", value: semantic.status.message },
+    { term: "Playback state", value: viewModel.status.label },
+    { term: "Status", value: viewModel.status.message },
   ];
 
-  switch (semantic.metadata.kind) {
+  switch (viewModel.metadata.kind) {
     case "status":
-      assert.deepEqual(semantic.definitions, [
+      assert.deepEqual(viewModel.semantic.definitions, [
         ...statusDefinitions,
-        { term: "Details", value: semantic.metadata.subtitle },
-        { term: "Guidance", value: semantic.metadata.context },
+        { term: "Details", value: viewModel.metadata.subtitle },
+        { term: "Guidance", value: viewModel.metadata.context },
       ]);
       return;
     case "track":
-      assert.deepEqual(semantic.definitions, [
+      assert.deepEqual(viewModel.semantic.definitions, [
         ...statusDefinitions,
-        { term: "Track", value: semantic.metadata.trackTitle.value },
+        { term: "Track", value: viewModel.metadata.trackTitle.value },
         {
           term: "Artists",
-          value: semantic.metadata.artists
+          value: viewModel.metadata.artists
             .map((artist): string => artist.name.value)
             .join(", "),
         },
-        { term: "Album", value: semantic.metadata.album.title.value },
+        { term: "Album", value: viewModel.metadata.album.title.value },
         {
           term: "Metadata freshness",
-          value: expectedMetadataFreshness(semantic.metadata.presentation.kind),
+          value: expectedMetadataFreshness(
+            viewModel.metadata.presentation.kind,
+          ),
         },
       ]);
       return;
     case "episode":
-      assert.deepEqual(semantic.definitions, [
+      assert.deepEqual(viewModel.semantic.definitions, [
         ...statusDefinitions,
-        { term: "Episode", value: semantic.metadata.episodeTitle.value },
-        { term: "Show", value: semantic.metadata.show.title.value },
-        { term: "Publisher", value: semantic.metadata.show.publisher.value },
+        { term: "Episode", value: viewModel.metadata.episodeTitle.value },
+        { term: "Show", value: viewModel.metadata.show.title.value },
+        {
+          term: "Publisher",
+          value: viewModel.metadata.show.publisher.value,
+        },
         {
           term: "Metadata freshness",
-          value: expectedMetadataFreshness(semantic.metadata.presentation.kind),
+          value: expectedMetadataFreshness(
+            viewModel.metadata.presentation.kind,
+          ),
         },
       ]);
       return;
   }
 
-  return unreachable(semantic.metadata);
+  return unreachable(viewModel.metadata);
 }
 
 function expectedMetadataFreshness(

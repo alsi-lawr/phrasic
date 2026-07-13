@@ -8,10 +8,8 @@ import {
   type PlaybackState,
   type Result,
 } from "../../domain/playback.ts";
-import {
-  metadataViewForOverlayState,
-  overlayItemIdentityKey,
-} from "../../components/overlay/overlay-metadata.ts";
+import { overlayItemIdentityKey } from "../../components/overlay/overlay-metadata.ts";
+import { overlayViewModelForState } from "../../components/overlay/overlay-view-model.ts";
 import {
   pausedEpisodePayload,
   playingTrackPayload,
@@ -19,7 +17,7 @@ import {
 
 test("overlay metadata maps a track to its normalized title, artists, and album", () => {
   const state = expectSuccess(parseSpotifyPlaybackPayload(playingTrackPayload));
-  const metadata = metadataViewForOverlayState(state);
+  const metadata = overlayViewModelForState(state).metadata;
 
   assert.equal(metadata.kind, "track");
   if (metadata.kind !== "track") {
@@ -45,7 +43,7 @@ test("overlay metadata maps an episode to its normalized title, show, and publis
   const state = expectSuccess(
     parseSpotifyPlaybackPayload(pausedEpisodePayload),
   );
-  const metadata = metadataViewForOverlayState(state);
+  const metadata = overlayViewModelForState(state).metadata;
 
   assert.equal(metadata.kind, "episode");
   if (metadata.kind !== "episode") {
@@ -94,8 +92,8 @@ test("overlay marquee identity is stable for an item whose normalized title chan
     kind: "playing",
     snapshot: changedSnapshot,
   });
-  const originalMetadata = metadataViewForOverlayState(originalState);
-  const changedMetadata = metadataViewForOverlayState(changedState);
+  const originalMetadata = overlayViewModelForState(originalState).metadata;
+  const changedMetadata = overlayViewModelForState(changedState).metadata;
 
   assert.equal(originalMetadata.kind, "track");
   assert.equal(changedMetadata.kind, "track");

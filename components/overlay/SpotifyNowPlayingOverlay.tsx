@@ -10,11 +10,8 @@ import {
   overlaySemanticHeadingId,
 } from "./OverlaySemanticCompanion.tsx";
 import { OverlaySetupDiagnostic } from "./OverlaySetupDiagnostic.tsx";
-import { semanticViewForOverlayState } from "./overlay-semantics.ts";
-import {
-  controlPlanForOverlayState,
-  overlayUiStateForSnapshot,
-} from "./overlay-state.ts";
+import { overlayUiStateForSnapshot } from "./overlay-state.ts";
+import { overlayViewModelForState } from "./overlay-view-model.ts";
 import { OverlayVisual } from "./OverlayVisual.tsx";
 import { useReducedMotionPreference } from "./reduced-motion.ts";
 
@@ -40,26 +37,24 @@ function SpotifyNowPlayingOverlayContent(): ReactElement {
   );
   const state = overlayUiStateForSnapshot(snapshot);
   const motion = overlayMotionDecisionForPreference(prefersReducedMotion);
-  const semantic = semanticViewForOverlayState(state);
-  const controls = controlPlanForOverlayState(state, geometry.setupMode);
+  const viewModel = overlayViewModelForState(state);
 
   return (
     <main className="m-0 flex w-full flex-col items-start justify-start p-0 font-sans">
       <h1 id={overlaySemanticHeadingId} className="sr-only">
         Spotify now playing
       </h1>
-      <OverlaySemanticCompanion semantic={semantic} />
+      <OverlaySemanticCompanion semantic={viewModel.semantic} />
       <OverlayVisual
         geometry={geometry}
-        metadata={semantic.metadata}
         motion={motion}
-        spotifyLinks={semantic.spotifyLinks}
-        state={state}
+        viewModel={viewModel}
       />
       <OverlaySetupDiagnostic diagnostic={geometry.diagnostic} />
       <OverlayControls
         actions={{ beginAuthorization, logout, retry }}
-        plan={controls}
+        plans={viewModel.controls}
+        setupMode={geometry.setupMode}
       />
     </main>
   );

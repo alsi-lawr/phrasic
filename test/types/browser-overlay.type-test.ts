@@ -1,16 +1,19 @@
 import type { ComponentProps } from "react";
 import type { BrowserPlaybackApplication } from "../../browser/application.ts";
 import SpotifyNowPlayingOverlay from "../../components/overlay/SpotifyNowPlayingOverlay.tsx";
+import { OverlayControls } from "../../components/overlay/OverlayControls.tsx";
 import {
   resolveOverlayGeometry,
   type OverlayDisplayDiagnostic,
   type OverlaySetupMode,
 } from "../../components/overlay/overlay-geometry.ts";
 import { OverlaySetupDiagnostic } from "../../components/overlay/OverlaySetupDiagnostic.tsx";
-import type {
-  OverlayControlPlan,
-  OverlayUiState,
-} from "../../components/overlay/overlay-state.ts";
+import type { OverlayUiState } from "../../components/overlay/overlay-state.ts";
+import {
+  overlayViewModelForState,
+  type OverlayControlPlan,
+  type OverlayViewModel,
+} from "../../components/overlay/overlay-view-model.ts";
 
 declare const application: BrowserPlaybackApplication;
 
@@ -20,6 +23,7 @@ const props: ComponentProps<typeof SpotifyNowPlayingOverlay> = Object.freeze({
 const geometry = resolveOverlayGeometry(new URLSearchParams("width=1920"));
 declare const overlayState: OverlayUiState;
 declare const controlPlan: OverlayControlPlan;
+const viewModel: OverlayViewModel = overlayViewModelForState(overlayState);
 declare const setupMode: OverlaySetupMode;
 declare const displayDiagnostic: OverlayDisplayDiagnostic;
 const noDisplayDiagnostic: OverlayDisplayDiagnostic = Object.freeze({
@@ -31,6 +35,15 @@ const invalidDisplayDiagnostic: OverlayDisplayDiagnostic = Object.freeze({
 });
 const setupDiagnosticProps: ComponentProps<typeof OverlaySetupDiagnostic> =
   Object.freeze({ diagnostic: displayDiagnostic });
+const controlsProps: ComponentProps<typeof OverlayControls> = Object.freeze({
+  actions: Object.freeze({
+    beginAuthorization: (): void => {},
+    logout: (): void => {},
+    retry: (): void => {},
+  }),
+  plans: viewModel.controls,
+  setupMode,
+});
 
 // @ts-expect-error The overlay application prop remains readonly.
 props.application = application;
@@ -58,6 +71,10 @@ geometry.diagnostic = noDisplayDiagnostic;
 setupDiagnosticProps.diagnostic = noDisplayDiagnostic;
 // @ts-expect-error Retry controls are only available together with disconnect controls.
 const invalidControlPlan: OverlayControlPlan = { kind: "retry" };
+// @ts-expect-error Projected overlay state remains immutable.
+viewModel.metadata = viewModel.metadata;
+// @ts-expect-error Overlay controls accept immutable plans.
+controlsProps.plans = viewModel.controls;
 
 function overlayStateKind(state: OverlayUiState): OverlayUiState["kind"] {
   switch (state.kind) {
@@ -94,6 +111,27 @@ function overlayControlPlanKind(
   return unhandledPlan;
 }
 
+function overlayViewModelKind(
+  model: OverlayViewModel,
+): OverlayViewModel["kind"] {
+  switch (model.kind) {
+    case "initializing":
+    case "authorization-required":
+    case "authorizing":
+    case "empty":
+    case "playing":
+    case "paused":
+    case "unsupported":
+    case "reconnecting":
+    case "failure":
+    case "fatal-initialization-failure":
+      return model.kind;
+  }
+
+  const unhandledModel: never = model;
+  return unhandledModel;
+}
+
 function overlayDisplayDiagnosticKind(
   diagnostic: OverlayDisplayDiagnostic,
 ): OverlayDisplayDiagnostic["kind"] {
@@ -117,8 +155,10 @@ void stringDisplayDiagnostic;
 void invalidControlPlan;
 void overlayStateKind(overlayState);
 void overlayControlPlanKind(controlPlan);
+void overlayViewModelKind(viewModel);
 void overlayDisplayDiagnosticKind(displayDiagnostic);
 void noDisplayDiagnostic;
 void invalidDisplayDiagnostic;
 void setupDiagnosticProps;
+void controlsProps;
 void setupMode;
