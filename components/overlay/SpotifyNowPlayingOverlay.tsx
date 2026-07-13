@@ -43,7 +43,7 @@ function SpotifyNowPlayingOverlayContent(): ReactElement {
   const controls = controlPlanForOverlayState(state, geometry.setupMode);
 
   return (
-    <main className="m-0 flex w-full flex-col items-start justify-start p-0">
+    <main className="m-0 flex w-full flex-col items-start justify-start p-0 font-sans">
       <h1 id={overlaySemanticHeadingId} className="sr-only">
         Spotify now playing
       </h1>
