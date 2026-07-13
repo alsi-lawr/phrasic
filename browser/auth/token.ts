@@ -1,4 +1,8 @@
 import type { SpotifyPublicConfiguration } from "../config.ts";
+import type {
+  BrowserRequestDeadline,
+  BrowserRequestDeadlinePort,
+} from "../request-deadline.ts";
 import type { PkceVerifier, SpotifyAuthorizationCode } from "./pkce.ts";
 
 type ParseSuccess<Value> = {
@@ -57,6 +61,9 @@ export type SpotifyAuthJsonReadResult =
     }
   | {
       readonly kind: "invalid-json";
+    }
+  | {
+      readonly kind: "network-failure";
     };
 
 export type SpotifyAuthFetchResponse = {
@@ -77,6 +84,12 @@ export type SpotifyAuthFetchPort = {
   readonly fetch: (
     request: SpotifyAuthFetchRequest,
   ) => Promise<SpotifyAuthFetchResult>;
+};
+
+export type CreateSpotifyAuthFetchPortOptions = {
+  readonly fetchImplementation: typeof globalThis.fetch;
+  readonly requestDeadline: BrowserRequestDeadlinePort;
+  readonly timeoutMilliseconds: number;
 };
 
 export class SpotifyAccessToken {
@@ -231,34 +244,58 @@ export type SpotifyTokenRequestFailure =
     };
 
 export function createSpotifyAuthFetchPort(
-  fetchImplementation: typeof globalThis.fetch,
+  options: CreateSpotifyAuthFetchPortOptions,
 ): SpotifyAuthFetchPort {
   const port: SpotifyAuthFetchPort = {
     async fetch(
       request: SpotifyAuthFetchRequest,
     ): Promise<SpotifyAuthFetchResult> {
       try {
-        const response = await fetchImplementation(request.url, {
-          method: request.method,
-          headers: {
-            "Content-Type": request.contentType,
-          },
-          body: request.body,
+        const deadline = options.requestDeadline.create({
           signal: request.signal,
+          timeoutMilliseconds: options.timeoutMilliseconds,
         });
-        const parsedResponse: SpotifyAuthFetchResponse = Object.freeze({
-          status: response.status,
-          async readJson(): Promise<SpotifyAuthJsonReadResult> {
-            try {
-              const value: unknown = await response.json();
-              return frozenJson(value);
-            } catch {
-              return frozenInvalidJson();
-            }
-          },
-        });
+        try {
+          const response = await options.fetchImplementation(request.url, {
+            method: request.method,
+            headers: {
+              "Content-Type": request.contentType,
+            },
+            body: request.body,
+            signal: deadline.signal,
+          });
+          if (!hasActiveRequestDeadline(deadline)) {
+            deadline.dispose();
+            return frozenNetworkFailure();
+          }
 
-        return frozenFetchResponse(parsedResponse);
+          const parsedResponse: SpotifyAuthFetchResponse = Object.freeze({
+            status: response.status,
+            async readJson(): Promise<SpotifyAuthJsonReadResult> {
+              try {
+                const value: unknown = await response.json();
+                if (!hasActiveRequestDeadline(deadline)) {
+                  return frozenJsonNetworkFailure();
+                }
+
+                return frozenJson(value);
+              } catch {
+                if (!hasActiveRequestDeadline(deadline)) {
+                  return frozenJsonNetworkFailure();
+                }
+
+                return frozenInvalidJson();
+              } finally {
+                deadline.dispose();
+              }
+            },
+          });
+
+          return frozenFetchResponse(parsedResponse);
+        } catch {
+          deadline.dispose();
+          return frozenNetworkFailure();
+        }
       } catch {
         return frozenNetworkFailure();
       }
@@ -475,11 +512,15 @@ async function requestSpotifyToken(options: {
     return frozenTransientFailure();
   }
 
+  const body = await fetched.response.readJson();
+  if (body.kind === "network-failure") {
+    return frozenTransientFailure();
+  }
+
   if (isTransientHttpStatus(fetched.response.status)) {
     return frozenTransientFailure();
   }
 
-  const body = await fetched.response.readJson();
   if (body.kind === "invalid-json") {
     return frozenProviderFailure("invalid-token-response");
   }
@@ -753,6 +794,18 @@ function frozenInvalidJson(): SpotifyAuthJsonReadResult {
   };
 
   return Object.freeze(result);
+}
+
+function frozenJsonNetworkFailure(): SpotifyAuthJsonReadResult {
+  const result: SpotifyAuthJsonReadResult = {
+    kind: "network-failure",
+  };
+
+  return Object.freeze(result);
+}
+
+function hasActiveRequestDeadline(deadline: BrowserRequestDeadline): boolean {
+  return deadline.outcome().kind === "active";
 }
 
 function frozenFetchResponse(

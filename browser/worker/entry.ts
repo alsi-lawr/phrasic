@@ -5,6 +5,11 @@ import {
 } from "../auth/storage.ts";
 import { createSpotifyAuthFetchPort } from "../auth/token.ts";
 import { createSpotifyCurrentlyPlayingPort } from "../providers/spotify.ts";
+import {
+  createBrowserRequestDeadlinePort,
+  spotifyHttpRequestDeadlineMilliseconds,
+  type BrowserRequestDeadlineSchedulerPort,
+} from "../request-deadline.ts";
 import { createPlaybackWorkerFatalInitializationFailure } from "./protocol.ts";
 import {
   createPlaybackWorkerRuntime,
@@ -56,10 +61,17 @@ function createWorkerBootstrap(): WorkerBootstrap {
       },
     });
     const scheduler = nativeWorkerScheduler();
+    const requestDeadline = createBrowserRequestDeadlinePort(
+      nativeRequestDeadlineScheduler(),
+    );
     const runtime = createPlaybackWorkerRuntime({
       auth: Object.freeze({
         crypto: createBrowserPkceCryptoPort(self.crypto),
-        fetch: createSpotifyAuthFetchPort(self.fetch),
+        fetch: createSpotifyAuthFetchPort({
+          fetchImplementation: self.fetch,
+          requestDeadline,
+          timeoutMilliseconds: spotifyHttpRequestDeadlineMilliseconds,
+        }),
         storage: createIndexedDbSpotifyAuthStorage(
           createNativeIndexedDbAuthorizationPort(self.indexedDB),
         ),
@@ -76,13 +88,32 @@ function createWorkerBootstrap(): WorkerBootstrap {
       }),
       events,
       scheduler,
-      spotify: createSpotifyCurrentlyPlayingPort(self.fetch),
+      spotify: createSpotifyCurrentlyPlayingPort({
+        fetchImplementation: self.fetch,
+        requestDeadline,
+        timeoutMilliseconds: spotifyHttpRequestDeadlineMilliseconds,
+      }),
     });
 
     return Object.freeze({ kind: "ready", runtime });
   } catch {
     return Object.freeze({ kind: "unavailable" });
   }
+}
+
+function nativeRequestDeadlineScheduler(): BrowserRequestDeadlineSchedulerPort {
+  const scheduler: BrowserRequestDeadlineSchedulerPort = {
+    schedule(options) {
+      const timer = self.setTimeout(options.run, options.delayMilliseconds);
+      return Object.freeze({
+        cancel(): void {
+          self.clearTimeout(timer);
+        },
+      });
+    },
+  };
+
+  return Object.freeze(scheduler);
 }
 
 function nativeWorkerScheduler(): PlaybackWorkerSchedulerPort {

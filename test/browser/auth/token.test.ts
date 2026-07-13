@@ -5,6 +5,10 @@ import {
   parseSpotifyRefreshTokenResponse,
   type SpotifyAuthFetchRequest,
 } from "../../../browser/auth/token.ts";
+import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";
+import { ManualRequestDeadlineScheduler } from "../request-deadline.fixture.ts";
+
+const testRequestDeadlineMilliseconds = 25;
 
 type CapturedFetchState =
   | {
@@ -23,12 +27,21 @@ type FetchCapture = {
   current: CapturedFetchState;
 };
 
+type AbortableFetchCapture = {
+  latestSignal: AbortSignal | undefined;
+  requestCount: number;
+};
+
 test("browser token fetch uses a form POST without an authorization header", async () => {
   const capture: FetchCapture = {
     current: Object.freeze({ kind: "not-called" }),
   };
-  const fetch = createSpotifyAuthFetchPort(
-    async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const scheduler = new ManualRequestDeadlineScheduler();
+  const authFetch = createSpotifyAuthFetchPort({
+    fetchImplementation: async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
       const body = init?.body;
       if (typeof body !== "string") {
         throw new Error("Expected a string form body.");
@@ -50,18 +63,20 @@ test("browser token fetch uses a form POST without an authorization header", asy
         },
       });
     },
-  );
-  const request: SpotifyAuthFetchRequest = {
-    url: new URL("https://accounts.spotify.com/api/token"),
-    method: "POST",
-    contentType: "application/x-www-form-urlencoded",
-    body: "grant_type=refresh_token&client_id=browser-client-id",
-    signal: new AbortController().signal,
-  };
+    requestDeadline: createBrowserRequestDeadlinePort(scheduler),
+    timeoutMilliseconds: testRequestDeadlineMilliseconds,
+  });
+  const request = tokenRequest(new AbortController().signal);
 
-  const result = await fetch.fetch(request);
+  const result = await authFetch.fetch(request);
 
   assert.equal(result.kind, "response");
+  if (result.kind === "response") {
+    assert.deepEqual(await result.response.readJson(), {
+      kind: "json",
+      value: { access_token: "not-used" },
+    });
+  }
   assert.equal(capture.current.kind, "called");
   if (capture.current.kind === "called") {
     assert.equal(capture.current.url, "https://accounts.spotify.com/api/token");
@@ -73,6 +88,8 @@ test("browser token fetch uses a form POST without an authorization header", asy
     assert.equal(capture.current.authorization, null);
     assert.equal(capture.current.body, request.body);
   }
+  assert.deepEqual(scheduler.activeDelays(), []);
+  assert.equal(scheduler.cancelledDeadlineCount, 1);
 });
 
 test("refresh token payloads keep seconds distinct from milliseconds and reject invalid lifetimes", () => {
@@ -101,6 +118,53 @@ test("refresh token payloads keep seconds distinct from milliseconds and reject 
   });
 });
 
+test("browser token fetch aborts a non-settling request at its injected deadline and cleans it up", async () => {
+  const capture: AbortableFetchCapture = {
+    latestSignal: undefined,
+    requestCount: 0,
+  };
+  const scheduler = new ManualRequestDeadlineScheduler();
+  const authFetch = createSpotifyAuthFetchPort({
+    fetchImplementation: abortableNeverSettlingFetch(capture),
+    requestDeadline: createBrowserRequestDeadlinePort(scheduler),
+    timeoutMilliseconds: testRequestDeadlineMilliseconds,
+  });
+
+  const request = authFetch.fetch(tokenRequest(new AbortController().signal));
+
+  assert.equal(capture.requestCount, 1);
+  assert.deepEqual(scheduler.activeDelays(), [testRequestDeadlineMilliseconds]);
+
+  scheduler.runNextWithDelay(testRequestDeadlineMilliseconds);
+
+  assert.deepEqual(await request, { kind: "network-failure" });
+  assert.equal(capture.latestSignal?.aborted, true);
+  assert.deepEqual(scheduler.activeDelays(), []);
+  assert.equal(scheduler.cancelledDeadlineCount, 1);
+});
+
+test("browser token fetch immediately forwards caller abort and cancels its deadline", async () => {
+  const capture: AbortableFetchCapture = {
+    latestSignal: undefined,
+    requestCount: 0,
+  };
+  const scheduler = new ManualRequestDeadlineScheduler();
+  const authFetch = createSpotifyAuthFetchPort({
+    fetchImplementation: abortableNeverSettlingFetch(capture),
+    requestDeadline: createBrowserRequestDeadlinePort(scheduler),
+    timeoutMilliseconds: testRequestDeadlineMilliseconds,
+  });
+  const caller = new AbortController();
+
+  const request = authFetch.fetch(tokenRequest(caller.signal));
+  caller.abort();
+
+  assert.deepEqual(await request, { kind: "network-failure" });
+  assert.equal(capture.latestSignal?.aborted, true);
+  assert.deepEqual(scheduler.activeDelays(), []);
+  assert.equal(scheduler.cancelledDeadlineCount, 1);
+});
+
 function fetchUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") {
     return input;
@@ -111,6 +175,52 @@ function fetchUrl(input: RequestInfo | URL): string {
   }
 
   return input.url;
+}
+
+function tokenRequest(signal: AbortSignal): SpotifyAuthFetchRequest {
+  return Object.freeze({
+    url: new URL("https://accounts.spotify.com/api/token"),
+    method: "POST",
+    contentType: "application/x-www-form-urlencoded",
+    body: "grant_type=refresh_token&client_id=browser-client-id",
+    signal,
+  });
+}
+
+function abortableNeverSettlingFetch(
+  capture: AbortableFetchCapture,
+): typeof globalThis.fetch {
+  const fetch: typeof globalThis.fetch = (_input, init): Promise<Response> => {
+    const signal = init?.signal;
+    if (signal === undefined || signal === null) {
+      return Promise.reject(new Error("Expected a request deadline signal."));
+    }
+
+    capture.latestSignal = signal;
+    capture.requestCount += 1;
+    return rejectedWhenAborted(signal);
+  };
+
+  return fetch;
+}
+
+function rejectedWhenAborted(signal: AbortSignal): Promise<Response> {
+  return new Promise<void>((resolve): void => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+
+    signal.addEventListener(
+      "abort",
+      (): void => {
+        resolve();
+      },
+      { once: true },
+    );
+  }).then((): never => {
+    throw new Error("Request aborted.");
+  });
 }
 
 function expectFailure(

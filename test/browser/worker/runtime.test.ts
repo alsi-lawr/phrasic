@@ -14,6 +14,7 @@ import {
   type SpotifyRefreshTokenConnectionReadResult,
 } from "../../../browser/auth/storage.ts";
 import {
+  createSpotifyAuthFetchPort,
   SpotifyRefreshToken,
   type SpotifyAuthFetchPort,
   type SpotifyAuthFetchRequest,
@@ -28,16 +29,21 @@ import {
   type PlaybackWorkerRuntime,
   type PlaybackWorkerSchedulerPort,
 } from "../../../browser/worker/runtime.ts";
+import { createSpotifyCurrentlyPlayingPort } from "../../../browser/providers/spotify.ts";
 import type {
   SpotifyCurrentlyPlayingPort,
   SpotifyCurrentlyPlayingRequest,
   SpotifyCurrentlyPlayingResult,
 } from "../../../browser/providers/spotify.ts";
+import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";
 import type { PlaybackWorkerEvent } from "../../../browser/worker/protocol.ts";
 import {
   emptyTrackPayload,
   playingTrackPayload,
 } from "../providers/spotify-payload.fixture.ts";
+import { ManualRequestDeadlineScheduler } from "../request-deadline.fixture.ts";
+
+const testRequestDeadlineMilliseconds = 25;
 
 test("the worker refreshes stored authorization, normalizes playback, and schedules from completion", async () => {
   const fixture = await runtimeFixture({
@@ -299,6 +305,106 @@ test("successful polls wait for completion before scheduling the next five-secon
   assert.equal(spotify.maximumConcurrentRequests, 1);
 });
 
+test("a playback request deadline enters the capped serialized reconnect schedule", async () => {
+  const storage = new MemorySpotifyAuthStorage();
+  await storage.seedRefreshToken("stored-refresh");
+  const clock = new FakeClock(1_000_000);
+  const scheduler = new FakeScheduler(clock);
+  const deadlineScheduler = new ManualRequestDeadlineScheduler();
+  const events: PlaybackWorkerEvent[] = [];
+  const playbackFetch = abortableNeverSettlingFetch();
+  const spotify = createSpotifyCurrentlyPlayingPort({
+    fetchImplementation: playbackFetch.fetchImplementation,
+    requestDeadline: createBrowserRequestDeadlinePort(deadlineScheduler),
+    timeoutMilliseconds: testRequestDeadlineMilliseconds,
+  });
+  const runtime = createRuntime({
+    storage,
+    scheduler,
+    clock,
+    events,
+    authFetch: new QueuedSpotifyAuthFetch([tokenResponse("initial-access")]),
+    spotify,
+  });
+
+  const initialization = runtime.receive(initializeCommand());
+  await waitFor(() => playbackFetch.requestCount === 1);
+
+  assert.deepEqual(deadlineScheduler.activeDelays(), [
+    testRequestDeadlineMilliseconds,
+  ]);
+  deadlineScheduler.runNextWithDelay(testRequestDeadlineMilliseconds);
+  await initialization;
+
+  assert.equal(playbackFetch.latestSignal?.aborted, true);
+  assert.equal(playbackFetch.maximumConcurrentRequests, 1);
+  assert.deepEqual(scheduler.activeDelays(), [1_000]);
+
+  const retry = scheduler.runNextWithDelay(1_000);
+  await waitFor(() => playbackFetch.requestCount === 2);
+
+  assert.equal(playbackFetch.maximumConcurrentRequests, 1);
+  assert.deepEqual(deadlineScheduler.activeDelays(), [
+    testRequestDeadlineMilliseconds,
+  ]);
+  deadlineScheduler.runNextWithDelay(testRequestDeadlineMilliseconds);
+  await retry;
+
+  assert.equal(playbackFetch.maximumConcurrentRequests, 1);
+  assert.deepEqual(scheduler.activeDelays(), [2_000]);
+  assert.equal(deadlineScheduler.cancelledDeadlineCount, 2);
+});
+
+test("a token request deadline enters the capped refresh retry schedule without polling", async () => {
+  const storage = new MemorySpotifyAuthStorage();
+  await storage.seedRefreshToken("stored-refresh");
+  const clock = new FakeClock(1_000_000);
+  const scheduler = new FakeScheduler(clock);
+  const deadlineScheduler = new ManualRequestDeadlineScheduler();
+  const events: PlaybackWorkerEvent[] = [];
+  const tokenFetch = abortableNeverSettlingFetch();
+  const authFetch = createSpotifyAuthFetchPort({
+    fetchImplementation: tokenFetch.fetchImplementation,
+    requestDeadline: createBrowserRequestDeadlinePort(deadlineScheduler),
+    timeoutMilliseconds: testRequestDeadlineMilliseconds,
+  });
+  const spotify = new QueuedSpotifyTransport([]);
+  const runtime = createRuntime({
+    storage,
+    scheduler,
+    clock,
+    events,
+    authFetch,
+    spotify,
+  });
+
+  const initialization = runtime.receive(initializeCommand());
+  await waitFor(() => tokenFetch.requestCount === 1);
+
+  assert.deepEqual(deadlineScheduler.activeDelays(), [
+    testRequestDeadlineMilliseconds,
+  ]);
+  deadlineScheduler.runNextWithDelay(testRequestDeadlineMilliseconds);
+  await initialization;
+
+  assert.equal(tokenFetch.latestSignal?.aborted, true);
+  assert.equal(tokenFetch.maximumConcurrentRequests, 1);
+  assert.equal(lastPlaybackState(events).state.kind, "failure");
+  assert.equal(spotify.requestCount, 0);
+  assert.deepEqual(scheduler.activeDelays(), [1_000]);
+
+  const retry = scheduler.runNextWithDelay(1_000);
+  await waitFor(() => tokenFetch.requestCount === 2);
+
+  assert.equal(tokenFetch.maximumConcurrentRequests, 1);
+  deadlineScheduler.runNextWithDelay(testRequestDeadlineMilliseconds);
+  await retry;
+
+  assert.equal(tokenFetch.maximumConcurrentRequests, 1);
+  assert.deepEqual(scheduler.activeDelays(), [2_000]);
+  assert.equal(deadlineScheduler.cancelledDeadlineCount, 2);
+});
+
 test("the worker refreshes exactly sixty seconds before expiry without starting a second refresh flight", async () => {
   const storage = new MemorySpotifyAuthStorage();
   await storage.seedRefreshToken("stored-refresh");
@@ -419,6 +525,62 @@ test("a persisted PKCE attempt is consumed after reload and never exposes token 
     fixture.events.some((event) => hasTokenShapedEventField(event)),
     false,
   );
+});
+
+test("logout aborts a late token response before it can commit state or rotated storage", async () => {
+  const storage = new MemorySpotifyAuthStorage();
+  await storage.seedRefreshToken("stored-refresh");
+  const clock = new FakeClock(1_000_000);
+  const scheduler = new FakeScheduler(clock);
+  const deadlineScheduler = new ManualRequestDeadlineScheduler();
+  const events: PlaybackWorkerEvent[] = [];
+  const tokenFetch = deferredResponseFetch();
+  const authFetch = createSpotifyAuthFetchPort({
+    fetchImplementation: tokenFetch.fetchImplementation,
+    requestDeadline: createBrowserRequestDeadlinePort(deadlineScheduler),
+    timeoutMilliseconds: testRequestDeadlineMilliseconds,
+  });
+  const runtime = createRuntime({
+    storage,
+    scheduler,
+    clock,
+    events,
+    authFetch,
+    spotify: new QueuedSpotifyTransport([]),
+  });
+
+  const initialization = runtime.receive(initializeCommand());
+  await waitFor(() => tokenFetch.requestCount === 1);
+
+  const logout = runtime.receive({ kind: "logout" });
+  const eventCountAfterLogout = events.length;
+  assert.equal(tokenFetch.latestSignal?.aborted, true);
+  assert.deepEqual(deadlineScheduler.activeDelays(), []);
+
+  tokenFetch.resolve(
+    new Response(
+      JSON.stringify({
+        access_token: "late-access-token",
+        expires_in: 3_600,
+        refresh_token: "late-refresh-token",
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    ),
+  );
+  await initialization;
+  await logout;
+
+  assert.equal(storage.refreshConnectionSaveCount, 1);
+  assert.equal(storage.connectionKind, "missing");
+  assert.deepEqual(scheduler.activeDelays(), []);
+  assert.equal(events.length, eventCountAfterLogout);
+  assert.deepEqual(lastPlaybackState(events).state, {
+    kind: "authorization-required",
+    reason: "not-authorized",
+  });
 });
 
 test("logout aborts an active request, clears memory, and rejects a late playback result", async () => {
@@ -712,6 +874,20 @@ type ScheduledEntry = {
   executed: boolean;
 };
 
+type AbortableHttpFetch = {
+  readonly fetchImplementation: typeof globalThis.fetch;
+  readonly latestSignal: AbortSignal | undefined;
+  readonly maximumConcurrentRequests: number;
+  readonly requestCount: number;
+};
+
+type DeferredResponseHttpFetch = {
+  readonly fetchImplementation: typeof globalThis.fetch;
+  readonly latestSignal: AbortSignal | undefined;
+  readonly requestCount: number;
+  readonly resolve: (response: Response) => void;
+};
+
 async function runtimeFixture(
   options: RuntimeFixtureOptions,
 ): Promise<RuntimeFixture> {
@@ -773,6 +949,104 @@ function createRuntime(
     events,
     scheduler: dependencies.scheduler,
     spotify: dependencies.spotify,
+  });
+}
+
+function abortableNeverSettlingFetch(): AbortableHttpFetch {
+  const observedSignals: AbortSignal[] = [];
+  let activeRequests = 0;
+  let maximumRequests = 0;
+  const fetchImplementation: typeof globalThis.fetch = (
+    _input,
+    init,
+  ): Promise<Response> => {
+    const signal = init?.signal;
+    if (signal === undefined || signal === null) {
+      return Promise.reject(new Error("Expected a request deadline signal."));
+    }
+
+    observedSignals.push(signal);
+    activeRequests += 1;
+    maximumRequests = Math.max(maximumRequests, activeRequests);
+    return rejectedWhenAborted(signal).finally((): void => {
+      activeRequests -= 1;
+    });
+  };
+  const fetch: AbortableHttpFetch = {
+    fetchImplementation,
+    get latestSignal(): AbortSignal | undefined {
+      return observedSignals[observedSignals.length - 1];
+    },
+    get maximumConcurrentRequests(): number {
+      return maximumRequests;
+    },
+    get requestCount(): number {
+      return observedSignals.length;
+    },
+  };
+
+  return Object.freeze(fetch);
+}
+
+function deferredResponseFetch(): DeferredResponseHttpFetch {
+  const observedSignals: AbortSignal[] = [];
+  let resolveResponse: ((response: Response) => void) | undefined;
+  const fetchImplementation: typeof globalThis.fetch = (
+    _input,
+    init,
+  ): Promise<Response> => {
+    const signal = init?.signal;
+    if (signal === undefined || signal === null) {
+      return Promise.reject(new Error("Expected a request deadline signal."));
+    }
+
+    if (resolveResponse !== undefined) {
+      return Promise.reject(new Error("Expected one deferred token request."));
+    }
+
+    observedSignals.push(signal);
+    return new Promise<Response>((resolve): void => {
+      resolveResponse = resolve;
+    });
+  };
+  const fetch: DeferredResponseHttpFetch = {
+    fetchImplementation,
+    get latestSignal(): AbortSignal | undefined {
+      return observedSignals[observedSignals.length - 1];
+    },
+    get requestCount(): number {
+      return observedSignals.length;
+    },
+    resolve(response: Response): void {
+      if (resolveResponse === undefined) {
+        throw new Error("Expected a deferred token response.");
+      }
+
+      const resolve = resolveResponse;
+      resolveResponse = undefined;
+      resolve(response);
+    },
+  };
+
+  return Object.freeze(fetch);
+}
+
+function rejectedWhenAborted(signal: AbortSignal): Promise<Response> {
+  return new Promise<void>((resolve): void => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+
+    signal.addEventListener(
+      "abort",
+      (): void => {
+        resolve();
+      },
+      { once: true },
+    );
+  }).then((): never => {
+    throw new Error("Request aborted.");
   });
 }
 
@@ -904,10 +1178,15 @@ function deterministicCrypto(): BrowserPkceCryptoPort {
 class MemorySpotifyAuthStorage implements SpotifyAuthStoragePort {
   private pendingAttempts: ReadonlyArray<PendingAuthorizationAttempt> =
     Object.freeze([]);
+  private refreshConnectionSaves = 0;
   private storedConnection: StoredConnection = Object.freeze({ kind: "empty" });
 
   get connectionKind(): "found" | "missing" {
     return this.storedConnection.kind === "stored" ? "found" : "missing";
+  }
+
+  get refreshConnectionSaveCount(): number {
+    return this.refreshConnectionSaves;
   }
 
   async seedRefreshToken(value: string): Promise<void> {
@@ -969,6 +1248,7 @@ class MemorySpotifyAuthStorage implements SpotifyAuthStoragePort {
   async saveSpotifyRefreshTokenConnection(
     connection: SpotifyRefreshTokenConnection,
   ): Promise<void> {
+    this.refreshConnectionSaves += 1;
     this.storedConnection = Object.freeze({ kind: "stored", connection });
   }
 

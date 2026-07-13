@@ -1,15 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createSpotifyCurrentlyPlayingPort } from "../../../browser/providers/spotify.ts";
 import { SpotifyAccessToken } from "../../../browser/auth/token.ts";
+import {
+  createSpotifyCurrentlyPlayingPort,
+  type SpotifyCurrentlyPlayingPort,
+} from "../../../browser/providers/spotify.ts";
+import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";
 import {
   pausedEpisodePayload,
   playingTrackPayload,
 } from "./spotify-payload.fixture.ts";
+import { ManualRequestDeadlineScheduler } from "../request-deadline.fixture.ts";
+
+const testRequestDeadlineMilliseconds = 25;
 
 test("the Spotify worker transport normalizes 200 track and episode playback through the episode-capable endpoint", async () => {
   const requests: CapturedFetchRequest[] = [];
-  const transport = createSpotifyCurrentlyPlayingPort(
+  const fixture = transportFixture(
     queuedFetch(
       [
         new Response(JSON.stringify(playingTrackPayload), {
@@ -24,6 +31,7 @@ test("the Spotify worker transport normalizes 200 track and episode playback thr
       requests,
     ),
   );
+  const transport = fixture.transport;
 
   const track = await transport.fetchCurrentlyPlaying({
     accessToken: accessToken("worker-access-token"),
@@ -60,10 +68,11 @@ test("the Spotify worker transport normalizes 200 track and episode playback thr
       authorization: "Bearer worker-access-token",
     },
   ]);
+  assert.equal(fixture.scheduler.cancelledDeadlineCount, 2);
 });
 
 test("the Spotify worker transport keeps non-playback HTTP outcomes provider-safe", async () => {
-  const transport = createSpotifyCurrentlyPlayingPort(
+  const fixture = transportFixture(
     queuedFetch([
       new Response(null, { status: 204 }),
       new Response(null, {
@@ -84,6 +93,7 @@ test("the Spotify worker transport keeps non-playback HTTP outcomes provider-saf
       new Response(null, { status: 418 }),
     ]),
   );
+  const transport = fixture.transport;
   const request = {
     accessToken: accessToken("worker-access-token"),
     signal: new AbortController().signal,
@@ -120,11 +130,10 @@ test("the Spotify worker transport keeps non-playback HTTP outcomes provider-saf
 });
 
 test("the Spotify worker transport maps a rejected fetch to a provider-safe network failure", async () => {
-  const transport = createSpotifyCurrentlyPlayingPort(
-    async (): Promise<Response> => {
-      throw new Error("network failure sentinel");
-    },
-  );
+  const fixture = transportFixture(async (): Promise<Response> => {
+    throw new Error("network failure sentinel");
+  });
+  const transport = fixture.transport;
 
   const result = await transport.fetchCurrentlyPlaying({
     accessToken: accessToken("worker-access-token"),
@@ -134,11 +143,79 @@ test("the Spotify worker transport maps a rejected fetch to a provider-safe netw
   assert.deepEqual(result, { kind: "network-failure" });
 });
 
+test("the Spotify worker transport aborts a non-settling request at its injected deadline and cleans it up", async () => {
+  const capture: AbortableFetchCapture = {
+    latestSignal: undefined,
+    requestCount: 0,
+  };
+  const fixture = transportFixture(abortableNeverSettlingFetch(capture));
+
+  const request = fixture.transport.fetchCurrentlyPlaying({
+    accessToken: accessToken("worker-access-token"),
+    signal: new AbortController().signal,
+  });
+
+  assert.equal(capture.requestCount, 1);
+  assert.deepEqual(fixture.scheduler.activeDelays(), [
+    testRequestDeadlineMilliseconds,
+  ]);
+
+  fixture.scheduler.runNextWithDelay(testRequestDeadlineMilliseconds);
+
+  assert.deepEqual(await request, { kind: "network-failure" });
+  assert.equal(capture.latestSignal?.aborted, true);
+  assert.deepEqual(fixture.scheduler.activeDelays(), []);
+  assert.equal(fixture.scheduler.cancelledDeadlineCount, 1);
+});
+
+test("the Spotify worker transport immediately forwards caller abort and cancels its deadline", async () => {
+  const capture: AbortableFetchCapture = {
+    latestSignal: undefined,
+    requestCount: 0,
+  };
+  const fixture = transportFixture(abortableNeverSettlingFetch(capture));
+  const caller = new AbortController();
+
+  const request = fixture.transport.fetchCurrentlyPlaying({
+    accessToken: accessToken("worker-access-token"),
+    signal: caller.signal,
+  });
+  caller.abort();
+
+  assert.deepEqual(await request, { kind: "network-failure" });
+  assert.equal(capture.latestSignal?.aborted, true);
+  assert.deepEqual(fixture.scheduler.activeDelays(), []);
+  assert.equal(fixture.scheduler.cancelledDeadlineCount, 1);
+});
+
 type CapturedFetchRequest = {
   readonly authorization: string | null;
   readonly method: string | undefined;
   readonly url: string;
 };
+
+type AbortableFetchCapture = {
+  latestSignal: AbortSignal | undefined;
+  requestCount: number;
+};
+
+type SpotifyTransportFixture = {
+  readonly scheduler: ManualRequestDeadlineScheduler;
+  readonly transport: SpotifyCurrentlyPlayingPort;
+};
+
+function transportFixture(
+  fetchImplementation: typeof globalThis.fetch,
+): SpotifyTransportFixture {
+  const scheduler = new ManualRequestDeadlineScheduler();
+  const transport = createSpotifyCurrentlyPlayingPort({
+    fetchImplementation,
+    requestDeadline: createBrowserRequestDeadlinePort(scheduler),
+    timeoutMilliseconds: testRequestDeadlineMilliseconds,
+  });
+
+  return Object.freeze({ scheduler, transport });
+}
 
 function queuedFetch(
   responses: ReadonlyArray<Response>,
@@ -176,6 +253,42 @@ function fetchUrl(input: RequestInfo | URL): string {
   }
 
   return input.url;
+}
+
+function abortableNeverSettlingFetch(
+  capture: AbortableFetchCapture,
+): typeof globalThis.fetch {
+  const fetch: typeof globalThis.fetch = (_input, init): Promise<Response> => {
+    const signal = init?.signal;
+    if (signal === undefined || signal === null) {
+      return Promise.reject(new Error("Expected a request deadline signal."));
+    }
+
+    capture.latestSignal = signal;
+    capture.requestCount += 1;
+    return rejectedWhenAborted(signal);
+  };
+
+  return fetch;
+}
+
+function rejectedWhenAborted(signal: AbortSignal): Promise<Response> {
+  return new Promise<void>((resolve): void => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+
+    signal.addEventListener(
+      "abort",
+      (): void => {
+        resolve();
+      },
+      { once: true },
+    );
+  }).then((): never => {
+    throw new Error("Request aborted.");
+  });
 }
 
 function accessToken(value: string): SpotifyAccessToken {

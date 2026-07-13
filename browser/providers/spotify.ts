@@ -2,8 +2,12 @@ import {
   maximumPlatformTimerDelayMilliseconds,
   type PlaybackState,
 } from "../../domain/playback.ts";
-import { parseSpotifyPlaybackPayload } from "./spotify-payload.ts";
 import type { SpotifyAccessToken } from "../auth/token.ts";
+import type {
+  BrowserRequestDeadline,
+  BrowserRequestDeadlinePort,
+} from "../request-deadline.ts";
+import { parseSpotifyPlaybackPayload } from "./spotify-payload.ts";
 
 const spotifyCurrentlyPlayingEndpoint =
   "https://api.spotify.com/v1/me/player/currently-playing?additional_types=episode";
@@ -68,45 +72,64 @@ export type SpotifyCurrentlyPlayingPort = {
   ) => Promise<SpotifyCurrentlyPlayingResult>;
 };
 
+export type CreateSpotifyCurrentlyPlayingPortOptions = {
+  readonly fetchImplementation: typeof globalThis.fetch;
+  readonly requestDeadline: BrowserRequestDeadlinePort;
+  readonly timeoutMilliseconds: number;
+};
+
 export function createSpotifyCurrentlyPlayingPort(
-  fetchImplementation: typeof globalThis.fetch,
+  options: CreateSpotifyCurrentlyPlayingPortOptions,
 ): SpotifyCurrentlyPlayingPort {
   const port: SpotifyCurrentlyPlayingPort = {
     async fetchCurrentlyPlaying(
       request: SpotifyCurrentlyPlayingRequest,
     ): Promise<SpotifyCurrentlyPlayingResult> {
-      let response: Response;
       try {
-        response = await fetchImplementation(spotifyCurrentlyPlayingEndpoint, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${request.accessToken.toMemoryValue()}`,
-          },
+        const deadline = options.requestDeadline.create({
           signal: request.signal,
+          timeoutMilliseconds: options.timeoutMilliseconds,
         });
-      } catch {
-        return frozenNetworkFailure();
-      }
-
-      switch (response.status) {
-        case 200:
-          return parseSuccessfulPlaybackResponse(response);
-        case 204:
-          return frozenEmptyPlayback();
-        case 401:
-          return frozenUnauthorized();
-        case 403:
-          return frozenPermissionDenied();
-        case 429:
-          return frozenRateLimited(
-            parseSpotifyRetryAfter(response.headers.get("Retry-After")),
+        try {
+          const response = await options.fetchImplementation(
+            spotifyCurrentlyPlayingEndpoint,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${request.accessToken.toMemoryValue()}`,
+              },
+              signal: deadline.signal,
+            },
           );
-        default:
-          if (response.status >= 500 && response.status <= 599) {
-            return frozenServerFailure(response.status);
+          if (!hasActiveRequestDeadline(deadline)) {
+            return frozenNetworkFailure();
           }
 
-          return frozenUnexpectedResponse(response.status);
+          switch (response.status) {
+            case 200:
+              return await parseSuccessfulPlaybackResponse(response, deadline);
+            case 204:
+              return frozenEmptyPlayback();
+            case 401:
+              return frozenUnauthorized();
+            case 403:
+              return frozenPermissionDenied();
+            case 429:
+              return frozenRateLimited(
+                parseSpotifyRetryAfter(response.headers.get("Retry-After")),
+              );
+            default:
+              if (response.status >= 500 && response.status <= 599) {
+                return frozenServerFailure(response.status);
+              }
+
+              return frozenUnexpectedResponse(response.status);
+          }
+        } finally {
+          deadline.dispose();
+        }
+      } catch {
+        return frozenNetworkFailure();
       }
     },
   };
@@ -116,12 +139,21 @@ export function createSpotifyCurrentlyPlayingPort(
 
 async function parseSuccessfulPlaybackResponse(
   response: Response,
+  deadline: BrowserRequestDeadline,
 ): Promise<SpotifyCurrentlyPlayingResult> {
   let payload: unknown;
   try {
     payload = await response.json();
   } catch {
+    if (!hasActiveRequestDeadline(deadline)) {
+      return frozenNetworkFailure();
+    }
+
     return frozenMalformedResponse();
+  }
+
+  if (!hasActiveRequestDeadline(deadline)) {
+    return frozenNetworkFailure();
   }
 
   const parsed = parseSpotifyPlaybackPayload(payload);
@@ -135,6 +167,10 @@ async function parseSuccessfulPlaybackResponse(
   };
 
   return Object.freeze(result);
+}
+
+function hasActiveRequestDeadline(deadline: BrowserRequestDeadline): boolean {
+  return deadline.outcome().kind === "active";
 }
 
 function parseSpotifyRetryAfter(header: string | null): SpotifyRetryAfter {
