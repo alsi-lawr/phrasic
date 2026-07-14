@@ -280,7 +280,7 @@ async function recordFlow() {
   });
 
   await waitForText("Connect Fake Music");
-  await captureFor(1_200);
+  await captureFor(3_000);
   const clicked = await evaluate(
     `(() => { const button = [...document.querySelectorAll('button')].find((candidate) => candidate.textContent === 'Connect Fake Music'); button?.click(); return button !== undefined; })()`,
   );
@@ -289,7 +289,7 @@ async function recordFlow() {
   }
 
   await waitForText("Waiting for Fake Music authorization.");
-  await captureFor(1_200);
+  await captureFor(3_000);
   await post(
     track({
       artwork: "appaloosa-bones.png",

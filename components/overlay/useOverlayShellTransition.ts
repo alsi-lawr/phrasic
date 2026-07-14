@@ -1,9 +1,11 @@
-import { useReducer } from "react";
+import { useEffect, useReducer } from "react";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
 import { overlayAnimationIdentityKey } from "./overlay-identities.ts";
 import type { OverlayMotionDecision } from "./overlay-motion.ts";
 
 export type OverlayShellTransitionPhase = "collapsing" | "opening" | "stable";
+
+const shellTransitionDurationMilliseconds = 1_000;
 
 type OverlayShellTransitionState = {
   readonly phase: OverlayShellTransitionPhase;
@@ -39,6 +41,29 @@ export function useOverlayShellTransition(
   );
   const currentIdentity = overlayAnimationIdentityKey(snapshot);
   const displayedIdentity = overlayAnimationIdentityKey(state.snapshot);
+
+  useEffect(() => {
+    if (motion.kind === "reduced" || state.phase === "stable") {
+      return;
+    }
+
+    const timeout = globalThis.setTimeout(() => {
+      switch (state.phase) {
+        case "collapsing":
+          dispatch({ kind: "show-snapshot", snapshot });
+          return;
+        case "opening":
+          dispatch(
+            currentIdentity === displayedIdentity
+              ? { kind: "finish-opening" }
+              : { kind: "begin-collapse" },
+          );
+          return;
+      }
+    }, shellTransitionDurationMilliseconds);
+
+    return () => globalThis.clearTimeout(timeout);
+  }, [currentIdentity, displayedIdentity, motion.kind, snapshot, state.phase]);
 
   if (
     motion.kind === "reduced" &&
