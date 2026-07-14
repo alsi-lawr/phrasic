@@ -1,5 +1,6 @@
 import {
   AuthorizationAttemptTimestamp,
+  authorizationAttemptLifetimeMilliseconds,
   isPendingAuthorizationAttemptExpired,
   matchesPendingAuthorizationAttemptState,
   parseDisplayReturnConfiguration,
@@ -27,7 +28,6 @@ const databaseVersion = 1;
 const pendingAuthorizationAttemptsStoreName = "pending-authorization-attempts";
 const spotifyConnectionsStoreName = "spotify-connections";
 const spotifyProvider = "spotify";
-const authorizationAttemptLifetimeMilliseconds = 10 * 60 * 1_000;
 
 export type SpotifyPendingAuthorizationAttemptConsumeOptions = {
   readonly state: PkceStateCandidate;
