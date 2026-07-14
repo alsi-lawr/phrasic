@@ -56,7 +56,7 @@ export type DisplayReturnConfigurationParseFailure = {
 };
 
 export type PkceRandomnessPort = {
-  readonly fill: (destination: Uint8Array) => void;
+  readonly fill: (destination: Uint8Array<ArrayBuffer>) => void;
 };
 
 export type PkceSha256Port = {
@@ -395,7 +395,7 @@ export function createBrowserPkceCryptoPort(
   webCrypto: Crypto,
 ): BrowserPkceCryptoPort {
   const randomness: PkceRandomnessPort = Object.freeze({
-    fill(destination: Uint8Array): void {
+    fill(destination: Uint8Array<ArrayBuffer>): void {
       webCrypto.getRandomValues(destination);
     },
   });

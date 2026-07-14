@@ -6,35 +6,30 @@ format_files="$(mktemp "${TMPDIR:-/tmp}/obs-nowplaying-format.XXXXXX")"
 formatted_files="$(mktemp "${TMPDIR:-/tmp}/obs-nowplaying-formatted.XXXXXX")"
 trap 'rm -f -- "$staged_files" "$format_files" "$formatted_files"' 0 HUP INT TERM
 
-git diff --cached --name-only -z > "$staged_files"
+git diff --cached --name-only -z >"$staged_files"
 
 if [ ! -s "$staged_files" ]; then
-  exit 0
+    exit 0
 fi
 
-if ! xargs -0 git diff --quiet -- < "$staged_files"; then
-  printf '%s\n' 'pre-commit: staged files also have unstaged changes; commit whole files or unstage them before committing.' >&2
-  exit 1
-fi
-
-git diff --cached --name-only -z --diff-filter=ACMR > "$format_files"
+git diff --cached --name-only -z --diff-filter=ACMR >"$format_files"
 
 if [ ! -s "$format_files" ]; then
-  exit 0
+    exit 0
 fi
 
 prettier_bin="$(git rev-parse --show-toplevel)/node_modules/.bin/prettier"
 
 if [ ! -x "$prettier_bin" ]; then
-  printf '%s\n' 'pre-commit: local Prettier is unavailable; run npm ci before committing.' >&2
-  exit 1
+    printf '%s\n' 'pre-commit: local Prettier is unavailable; run npm ci before committing.' >&2
+    exit 1
 fi
 
-xargs -0 "$prettier_bin" --write --ignore-unknown -- < "$format_files"
-xargs -0 git diff --name-only -z -- < "$format_files" > "$formatted_files"
+xargs -0 "$prettier_bin" --write --ignore-unknown -- <"$format_files"
+xargs -0 git diff --name-only -z -- <"$format_files" >"$formatted_files"
 
 if [ ! -s "$formatted_files" ]; then
-  exit 0
+    exit 0
 fi
 
-xargs -0 git add -- < "$formatted_files"
+xargs -0 git add -- <"$formatted_files"

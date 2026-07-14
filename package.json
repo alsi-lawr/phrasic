@@ -1,5 +1,5 @@
 {
-  "name": "spotify-nowplaying",
+  "name": "phrasic",
   "version": "2.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "dev": "vite",
     "clean": "rm -rf dist",
     "build": "vite build",
-    "lint": "eslint .",
+    "lint": "oxlint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --project tsconfig.json",
@@ -30,15 +30,11 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
-    "eslint": "^10.7.0",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.3",
-    "globals": "^17.7.0",
     "husky": "^9.1.7",
+    "oxlint": "^1.74.0",
     "prettier": "^3.9.5",
     "tailwindcss": "^4.3.2",
-    "typescript": ">=5.9.3 <6.1.0",
-    "typescript-eslint": "^8.63.0",
+    "typescript": "^7.0.2",
     "vite": "^8.1.4"
   }
 }
