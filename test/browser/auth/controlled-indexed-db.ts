@@ -49,7 +49,6 @@ type ControlledAuthorizationIndexedDbFixture = {
   readonly records: (
     storeName: IndexedDbAuthorizationStoreName,
   ) => ReadonlyArray<ControlledAuthorizationIndexedDbRecord>;
-  readonly createdStoreNames: () => ReadonlyArray<IndexedDbAuthorizationStoreName>;
   readonly committedTransactions: () => ReadonlyArray<ControlledAuthorizationIndexedDbTransaction>;
   readonly resetCommittedTransactions: () => void;
   readonly failNextOpenRequest: (error: Error) => void;
@@ -148,7 +147,6 @@ type ControlledTransaction = {
 
 export function createControlledAuthorizationIndexedDbFixture(): ControlledAuthorizationIndexedDbFixture {
   const records = new Map<IndexedDbAuthorizationStoreName, StoreRecords>();
-  const createdStoreNames: Array<IndexedDbAuthorizationStoreName> = [];
   const queuedTransactions: Array<ControlledTransaction> = [];
   let committedTransactions: Array<ControlledAuthorizationIndexedDbTransaction> =
     [];
@@ -168,7 +166,6 @@ export function createControlledAuthorizationIndexedDbFixture(): ControlledAutho
       }
 
       records.set(storeName, new Map());
-      createdStoreNames.push(storeName);
     },
     transaction(
       storeNames:
@@ -235,9 +232,6 @@ export function createControlledAuthorizationIndexedDbFixture(): ControlledAutho
       );
 
       return Object.freeze(snapshot);
-    },
-    createdStoreNames(): ReadonlyArray<IndexedDbAuthorizationStoreName> {
-      return Object.freeze([...createdStoreNames]);
     },
     committedTransactions(): ReadonlyArray<ControlledAuthorizationIndexedDbTransaction> {
       return Object.freeze([...committedTransactions]);

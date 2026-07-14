@@ -5,19 +5,25 @@ import {
   type PlaybackProviderPort,
   type PlaybackProviderRegistry,
 } from "../../../browser/providers/registry.ts";
-import { createSpotifyPlaybackProvider } from "../../../browser/providers/spotify.ts";
-import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";
 import { ProviderId } from "../../../domain/playback.ts";
-import { ManualRequestDeadlineScheduler } from "../request-deadline.fixture.ts";
 
-test("a Spotify-only registry resolves its sole provider and rejects a distinct provider", () => {
-  const spotify = spotifyPlaybackProvider();
-  const registry = expectRegistry(createPlaybackProviderRegistry([spotify]));
+test("a provider registry resolves registered providers and rejects an unregistered provider", () => {
+  const spotify = playbackProvider("spotify");
+  const alternateSource = playbackProvider("alternate-source");
+  const registry = expectRegistry(
+    createPlaybackProviderRegistry([spotify, alternateSource]),
+  );
 
   const resolvedSpotify = registry.resolve(spotify.providerId);
   assert.equal(resolvedSpotify.kind, "success");
   if (resolvedSpotify.kind === "success") {
     assert.strictEqual(resolvedSpotify.value, spotify);
+  }
+
+  const resolvedAlternateSource = registry.resolve(alternateSource.providerId);
+  assert.equal(resolvedAlternateSource.kind, "success");
+  if (resolvedAlternateSource.kind === "success") {
+    assert.strictEqual(resolvedAlternateSource.value, alternateSource);
   }
 
   const missingProviderId = providerId("unregistered-provider");
@@ -31,8 +37,8 @@ test("a Spotify-only registry resolves its sole provider and rejects a distinct 
 
 test("a provider registry rejects duplicate provider registrations", () => {
   const registration = createPlaybackProviderRegistry([
-    spotifyPlaybackProvider(),
-    spotifyPlaybackProvider(),
+    playbackProvider("spotify"),
+    playbackProvider("spotify"),
   ]);
 
   assert.equal(registration.kind, "failure");
@@ -55,21 +61,15 @@ function expectRegistry(
   throw new Error("Expected a unique playback provider registry.");
 }
 
-function spotifyPlaybackProvider(): PlaybackProviderPort {
-  const fetchImplementation: typeof globalThis.fetch =
-    async (): Promise<Response> => {
-      throw new Error(
-        "The registry test does not issue Spotify playback requests.",
-      );
-    };
+function playbackProvider(value: string): PlaybackProviderPort {
+  const provider: PlaybackProviderPort = {
+    providerId: providerId(value),
+    async fetchCurrentlyPlaying(): Promise<never> {
+      throw new Error("The registry test does not fetch playback.");
+    },
+  };
 
-  return createSpotifyPlaybackProvider({
-    fetchImplementation,
-    requestDeadline: createBrowserRequestDeadlinePort(
-      new ManualRequestDeadlineScheduler(),
-    ),
-    timeoutMilliseconds: 25,
-  });
+  return Object.freeze(provider);
 }
 
 function providerId(value: string): ProviderId {

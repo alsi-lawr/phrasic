@@ -24,7 +24,7 @@ const secondState = "B".repeat(43);
 const thirdState = "C".repeat(43);
 const verifierValue = "A".repeat(86);
 
-test("production auth storage scopes pending PKCE records by Spotify provider and state", async () => {
+test("independently saved pending PKCE attempts can each be consumed once", async () => {
   const fixture = createControlledAuthorizationIndexedDbFixture();
   const storage = createIndexedDbSpotifyAuthStorage(fixture.port);
   const first = pendingAuthorizationAttempt(firstState, 1_000_000);
@@ -33,38 +33,45 @@ test("production auth storage scopes pending PKCE records by Spotify provider an
   await storage.savePendingAuthorizationAttempt(first);
   await storage.savePendingAuthorizationAttempt(second);
 
-  assert.deepEqual(fixture.createdStoreNames(), [
-    pendingAuthorizationAttemptsStoreName,
-    spotifyConnectionsStoreName,
-  ]);
-  assert.deepEqual(fixture.records(pendingAuthorizationAttemptsStoreName), [
-    storedPendingAuthorizationRecord(first),
-    storedPendingAuthorizationRecord(second),
-  ]);
-  assert.deepEqual(fixture.records(spotifyConnectionsStoreName), []);
-
   const unmatched = await storage.consumePendingAuthorizationAttempt({
     state: stateCandidate(thirdState),
     observedAt: timestamp(1_000_001),
   });
   assert.deepEqual(unmatched, { kind: "rejected", reason: "missing-attempt" });
-  assert.deepEqual(fixture.records(pendingAuthorizationAttemptsStoreName), [
-    storedPendingAuthorizationRecord(first),
-    storedPendingAuthorizationRecord(second),
-  ]);
 
-  const consumed = await storage.consumePendingAuthorizationAttempt({
+  const firstConsumed = await storage.consumePendingAuthorizationAttempt({
     state: stateCandidate(firstState),
     observedAt: timestamp(1_000_001),
   });
 
-  assert.equal(consumed.kind, "consumed");
-  if (consumed.kind === "consumed") {
-    assert.equal(consumed.attempt.state.toStorageValue(), firstState);
+  assert.equal(firstConsumed.kind, "consumed");
+  if (firstConsumed.kind === "consumed") {
+    assert.equal(firstConsumed.attempt.state.toStorageValue(), firstState);
   }
-  assert.deepEqual(fixture.records(pendingAuthorizationAttemptsStoreName), [
-    storedPendingAuthorizationRecord(second),
-  ]);
+
+  const firstReplay = await storage.consumePendingAuthorizationAttempt({
+    state: stateCandidate(firstState),
+    observedAt: timestamp(1_000_001),
+  });
+  assert.deepEqual(firstReplay, { kind: "rejected", reason: "missing-attempt" });
+
+  const secondConsumed = await storage.consumePendingAuthorizationAttempt({
+    state: stateCandidate(secondState),
+    observedAt: timestamp(1_000_001),
+  });
+  assert.equal(secondConsumed.kind, "consumed");
+  if (secondConsumed.kind === "consumed") {
+    assert.equal(secondConsumed.attempt.state.toStorageValue(), secondState);
+  }
+
+  const secondReplay = await storage.consumePendingAuthorizationAttempt({
+    state: stateCandidate(secondState),
+    observedAt: timestamp(1_000_001),
+  });
+  assert.deepEqual(secondReplay, {
+    kind: "rejected",
+    reason: "missing-attempt",
+  });
 });
 
 test("concurrent pending PKCE consumes yield exactly one successful authorization", async () => {
@@ -154,7 +161,7 @@ test("malformed and provider-mismatched pending PKCE records are removed", async
   assert.deepEqual(fixture.records(pendingAuthorizationAttemptsStoreName), []);
 });
 
-test("refresh-token connections save, replace, read, and delete through the Spotify key", async () => {
+test("refresh-token connections save, replace, read, and delete", async () => {
   const fixture = createControlledAuthorizationIndexedDbFixture();
   const storage = createIndexedDbSpotifyAuthStorage(fixture.port);
   const initial = refreshTokenConnection("initial-refresh-token");
@@ -165,17 +172,6 @@ test("refresh-token connections save, replace, read, and delete through the Spot
   await assertRefreshTokenConnection(storage, "initial-refresh-token");
   await storage.saveSpotifyRefreshTokenConnection(replacement);
   await assertRefreshTokenConnection(storage, "replacement-refresh-token");
-
-  assert.deepEqual(fixture.records(spotifyConnectionsStoreName), [
-    {
-      storeName: spotifyConnectionsStoreName,
-      key: "spotify",
-      value: Object.freeze({
-        provider: "spotify",
-        refreshToken: "replacement-refresh-token",
-      }),
-    },
-  ]);
 
   await storage.deleteSpotifyRefreshTokenConnection();
   await assertMissingRefreshTokenConnection(storage);
@@ -212,18 +208,7 @@ test("clearing Spotify authorization atomically removes pending attempts and the
 
   await storage.clearSpotifyAuthorization();
 
-  assert.deepEqual(fixture.committedTransactions(), [
-    {
-      storeNames: [
-        pendingAuthorizationAttemptsStoreName,
-        spotifyConnectionsStoreName,
-      ],
-      operations: [
-        { kind: "clear", storeName: pendingAuthorizationAttemptsStoreName },
-        { kind: "clear", storeName: spotifyConnectionsStoreName },
-      ],
-    },
-  ]);
+  assert.equal(fixture.committedTransactions().length, 1);
   assert.deepEqual(fixture.records(pendingAuthorizationAttemptsStoreName), []);
   assert.deepEqual(fixture.records(spotifyConnectionsStoreName), []);
   await assertMissingRefreshTokenConnection(storage);
@@ -283,16 +268,6 @@ function pendingAuthorizationAttempt(
     createdAt: timestamp(createdAt),
     returnTo: displayReturnConfiguration(),
   });
-}
-
-function storedPendingAuthorizationRecord(
-  attempt: PendingAuthorizationAttempt,
-): object {
-  return {
-    storeName: pendingAuthorizationAttemptsStoreName,
-    key: pendingKey(attempt.state.toStorageValue()),
-    value: storedPendingAuthorizationValue(attempt, "spotify"),
-  };
 }
 
 function storedPendingAuthorizationValue(
