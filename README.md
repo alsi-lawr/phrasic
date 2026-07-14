@@ -103,18 +103,19 @@ Create a deployment-specific `config.json`:
 The `/spotify/` path and trailing slash must match exactly. Do not add a client
 secret, tokens, query string, fragment, or additional fields.
 
-### 2. Build and run
+### 2. Run the published image
 
 ```sh
-docker build -t phrasic .
+docker pull alsilawr/phrasic:2.0.0
 
 docker run --rm --publish 127.0.0.1:8080:8080 \
   --mount type=bind,src="$(pwd)/config.json",dst=/srv/config.json,readonly \
-  phrasic
+  alsilawr/phrasic:2.0.0
 ```
 
 The container serves the production build through Caddy on loopback port
-`8080`.
+`8080`. Release tags publish versioned, major/minor, major, and `latest`
+multi-platform images for AMD64 and ARM64.
 
 ### 3. Put it behind HTTPS
 
