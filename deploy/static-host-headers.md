@@ -1,9 +1,9 @@
 # Static-host response header and cache contract
 
-This is a host-agnostic deployment contract. It is **not automatically applied**
-by Vite, this repository, or the generated `dist/` directory. Configure an HTTPS
-static host and any CDN in front of it to emit these response headers for the
-published origin.
+The bundled `Caddyfile` applies this contract in the container deployment.
+Vite and the generated `dist/` directory do not apply it on their own.
+Non-container static hosts and CDNs must reproduce this contract for their
+published responses.
 
 ## Required baseline response headers
 
