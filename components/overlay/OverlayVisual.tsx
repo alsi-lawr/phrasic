@@ -63,11 +63,11 @@ export function OverlayVisual({
           width={shellWidth}
         />
         <g clipPath={`url(#${overlayShellClipPathId})`}>
+          <OverlayArtwork motion={motion} snapshot={displayedSnapshot} />
           <OverlayItemAppearance
             identity={animationIdentityKey}
             motion={motion}
           >
-            <OverlayArtwork motion={motion} snapshot={displayedSnapshot} />
             <OverlayMetadata
               availableWidth={contentSizedShell.availableWidth}
               motion={motion}

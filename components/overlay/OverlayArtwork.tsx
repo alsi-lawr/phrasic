@@ -1,7 +1,13 @@
 import type { ReactElement } from "react";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
-import type { NowPlayingItem, PlaybackState } from "../../domain/playback.ts";
+import {
+  currentPlaybackItem,
+  type LastPlaybackItem,
+  type NowPlayingItem,
+  type PlaybackState,
+} from "../../domain/playback.ts";
 import { FallbackVinyl } from "./FallbackVinyl.tsx";
+import { OverlayItemAppearance } from "./OverlayItemAppearance.tsx";
 import {
   overlayArtworkRoundedClipPathData,
   overlayArtworkClipPathId,
@@ -22,10 +28,45 @@ export function OverlayArtwork({
     <g>
       <ArtworkClipPath />
       <g clipPath={`url(#${overlayArtworkClipPathId})`}>
-        <ArtworkForSnapshot motion={motion} snapshot={snapshot} />
+        <OverlayItemAppearance
+          identity={artworkIdentity(snapshot)}
+          motion={motion}
+        >
+          <ArtworkForSnapshot motion={motion} snapshot={snapshot} />
+        </OverlayItemAppearance>
       </g>
     </g>
   );
+}
+
+function artworkIdentity(snapshot: BrowserPlaybackApplicationSnapshot): string {
+  switch (snapshot.kind) {
+    case "fatal":
+      return "artwork:fallback";
+    case "playback":
+      return lastItemArtworkIdentity(currentPlaybackItem(snapshot.state));
+  }
+
+  return unreachable(snapshot);
+}
+
+function lastItemArtworkIdentity(item: LastPlaybackItem): string {
+  switch (item.kind) {
+    case "available":
+      switch (item.item.artwork.kind) {
+        case "available": {
+          const url = item.item.artwork.url.value;
+          return `artwork:available:${url.length}:${url}`;
+        }
+        case "unavailable":
+          return "artwork:fallback";
+      }
+      return unreachable(item.item.artwork);
+    case "unavailable":
+      return "artwork:fallback";
+  }
+
+  return unreachable(item);
 }
 
 function ArtworkClipPath(): ReactElement {
