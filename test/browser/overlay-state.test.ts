@@ -107,8 +107,14 @@ test("setup controls retain named Spotify navigation and button semantics", () =
   );
 
   assert.match(markup, /<nav[^>]*aria-label="Spotify playback controls"/);
-  assert.match(markup, /<button[^>]*type="button"[^>]*>Reconnect Spotify<\/button>/);
-  assert.match(markup, /<button[^>]*type="button"[^>]*>Disconnect Spotify<\/button>/);
+  assert.match(
+    markup,
+    /<button[^>]*type="button"[^>]*>Reconnect Spotify<\/button>/,
+  );
+  assert.match(
+    markup,
+    /<button[^>]*type="button"[^>]*>Disconnect Spotify<\/button>/,
+  );
 });
 
 type OverlayControlsCase = {

@@ -43,7 +43,9 @@ test("the artwork is full-height, flush left, and clipped at all four corners", 
 });
 
 test("artwork renders current and stale domain artwork while preserving the vinyl fallback", () => {
-  const playing = expectSuccess(parseSpotifyPlaybackPayload(playingTrackPayload));
+  const playing = expectSuccess(
+    parseSpotifyPlaybackPayload(playingTrackPayload),
+  );
   if (playing.kind !== "playing" || playing.snapshot.item.kind !== "track") {
     throw new Error("Expected a playing track state.");
   }

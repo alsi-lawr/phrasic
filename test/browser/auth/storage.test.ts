@@ -52,7 +52,10 @@ test("independently saved pending PKCE attempts can each be consumed once", asyn
     state: stateCandidate(firstState),
     observedAt: timestamp(1_000_001),
   });
-  assert.deepEqual(firstReplay, { kind: "rejected", reason: "missing-attempt" });
+  assert.deepEqual(firstReplay, {
+    kind: "rejected",
+    reason: "missing-attempt",
+  });
 
   const secondConsumed = await storage.consumePendingAuthorizationAttempt({
     state: stateCandidate(secondState),

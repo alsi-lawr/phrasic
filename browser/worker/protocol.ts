@@ -170,11 +170,7 @@ export function parsePlaybackWorkerCommand(
       return source;
     }
 
-    const kind = readRequiredString(
-      source.value,
-      "kind",
-      commandParseFailure,
-    );
+    const kind = readRequiredString(source.value, "kind", commandParseFailure);
     if (kind.kind === "failure") {
       return kind;
     }
@@ -449,11 +445,7 @@ function parseAuthorizationRedirectEvent(
     return exact;
   }
 
-  const url = readRequiredNonEmptyString(
-    exact.value,
-    "url",
-    eventParseFailure,
-  );
+  const url = readRequiredNonEmptyString(exact.value, "url", eventParseFailure);
   if (url.kind === "failure") {
     return url;
   }
@@ -474,11 +466,7 @@ function parseCallbackUrlRestoredEvent(
     return exact;
   }
 
-  const url = readRequiredNonEmptyString(
-    exact.value,
-    "url",
-    eventParseFailure,
-  );
+  const url = readRequiredNonEmptyString(exact.value, "url", eventParseFailure);
   if (url.kind === "failure") {
     return url;
   }
@@ -547,11 +535,7 @@ function parseSafeDiagnosticEvent(
     return operation;
   }
 
-  const codeValue = readRequiredString(
-    exact.value,
-    "code",
-    eventParseFailure,
-  );
+  const codeValue = readRequiredString(exact.value, "code", eventParseFailure);
   if (codeValue.kind === "failure") {
     return codeValue;
   }
@@ -676,11 +660,7 @@ function parseDiagnosticMetadata(
 
   switch (kind.value) {
     case "none": {
-      const exact = parseExactObject(
-        source.value,
-        ["kind"],
-        eventParseFailure,
-      );
+      const exact = parseExactObject(source.value, ["kind"], eventParseFailure);
       if (exact.kind === "failure") {
         return exact;
       }

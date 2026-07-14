@@ -157,10 +157,7 @@ test("the semantic companion renders complete state-aware definitions and polite
         "This browser cannot start Spotify playback. The browser display could not be initialized. A required browser playback capability is unavailable.",
       definitions: [
         ["Playback state", "OVERLAY UNAVAILABLE"],
-        [
-          "Guidance",
-          "A required browser playback capability is unavailable.",
-        ],
+        ["Guidance", "A required browser playback capability is unavailable."],
       ],
       snapshot: Object.freeze({
         kind: "fatal",

@@ -31,7 +31,11 @@ type SemanticDetailsProps = {
 };
 
 function SemanticDetails({ snapshot }: SemanticDetailsProps): ReactElement {
-  return <dl><DefinitionsForSnapshot snapshot={snapshot} /></dl>;
+  return (
+    <dl>
+      <DefinitionsForSnapshot snapshot={snapshot} />
+    </dl>
+  );
 }
 
 type DefinitionsForSnapshotProps = {
@@ -87,7 +91,9 @@ type PlaybackDefinitionsProps = {
   readonly state: PlaybackState;
 };
 
-function PlaybackDefinitions({ state }: PlaybackDefinitionsProps): ReactElement {
+function PlaybackDefinitions({
+  state,
+}: PlaybackDefinitionsProps): ReactElement {
   switch (state.kind) {
     case "initializing":
       return (
@@ -243,7 +249,10 @@ function ItemDefinitions({
           <MetadataDefinition term="Status" value={message} />
           <MetadataDefinition term="Track" value={item.title.value} />
           <MetadataDefinition term="Artists" value={artistNames(item)} />
-          <MetadataDefinition term="Album" value={item.collection.title.value} />
+          <MetadataDefinition
+            term="Album"
+            value={item.collection.title.value}
+          />
           <MetadataDefinition term="Metadata freshness" value={freshness} />
         </>
       );
@@ -370,10 +379,7 @@ function reconnectingAnnouncementMessage(
   return unreachable(state.lastItem);
 }
 
-function itemAnnouncementMessage(
-  prefix: string,
-  item: NowPlayingItem,
-): string {
+function itemAnnouncementMessage(prefix: string, item: NowPlayingItem): string {
   switch (item.kind) {
     case "track":
       return `${prefix} track: ${item.title.value}. Artists: ${artistNames(item)}. Album: ${item.collection.title.value}.`;
@@ -384,7 +390,9 @@ function itemAnnouncementMessage(
   return unreachable(item);
 }
 
-function authorizationRequiredContext(reason: AuthorizationRequiredReason): string {
+function authorizationRequiredContext(
+  reason: AuthorizationRequiredReason,
+): string {
   switch (reason) {
     case "authorization-expired":
       return "Spotify authorization expired.";

@@ -41,11 +41,7 @@ function SpotifyNowPlayingOverlayContent(): ReactElement {
         Spotify now playing
       </h1>
       <OverlaySemanticCompanion snapshot={snapshot} />
-      <OverlayVisual
-        geometry={geometry}
-        motion={motion}
-        snapshot={snapshot}
-      />
+      <OverlayVisual geometry={geometry} motion={motion} snapshot={snapshot} />
       <OverlaySetupDiagnostic diagnostic={geometry.diagnostic} />
       <OverlayControls
         actions={{ beginAuthorization, logout, retry }}

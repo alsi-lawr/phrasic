@@ -15,10 +15,7 @@ test("the overlay setup diagnostic renders static semantic correction guidance",
   );
 
   assert.match(markup, /<section[^>]*role="alert"/);
-  assert.match(
-    markup,
-    /aria-labelledby="overlay-setup-diagnostic-heading"/,
-  );
+  assert.match(markup, /aria-labelledby="overlay-setup-diagnostic-heading"/);
   assert.match(markup, /Overlay setup needs attention/);
   assert.match(
     markup,

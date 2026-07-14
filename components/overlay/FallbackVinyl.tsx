@@ -37,12 +37,7 @@ export function FallbackVinyl({ motion }: FallbackVinylProps): ReactElement {
         r={178}
         className="fill-none stroke-overlay-vinyl-groove stroke-8"
       />
-      <circle
-        cx={540}
-        cy={540}
-        r={128}
-        className="fill-overlay-vinyl-label"
-      />
+      <circle cx={540} cy={540} r={128} className="fill-overlay-vinyl-label" />
       <circle cx={540} cy={540} r={42} className="fill-overlay-vinyl-hub" />
       <circle cx={540} cy={540} r={12} className="fill-overlay-vinyl-disc" />
     </g>

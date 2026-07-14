@@ -620,7 +620,9 @@ function MetadataClipPath({
   );
 }
 
-function authorizationRequiredContext(reason: AuthorizationRequiredReason): string {
+function authorizationRequiredContext(
+  reason: AuthorizationRequiredReason,
+): string {
   switch (reason) {
     case "authorization-expired":
       return "Spotify authorization expired.";

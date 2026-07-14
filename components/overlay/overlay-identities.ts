@@ -93,7 +93,10 @@ function reconnectingLiveAnnouncementKey(
 ): string {
   switch (state.lastItem.kind) {
     case "available":
-      return liveAnnouncementItemIdentityKey("reconnecting", state.lastItem.item);
+      return liveAnnouncementItemIdentityKey(
+        "reconnecting",
+        state.lastItem.item,
+      );
     case "unavailable":
       return "announcement:state:reconnecting";
   }

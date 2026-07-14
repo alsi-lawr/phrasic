@@ -113,7 +113,9 @@ function SpotifyLinksForItem({
     case "track":
       return <TrackSpotifyLinks availableWidth={availableWidth} item={item} />;
     case "episode":
-      return <EpisodeSpotifyLinks availableWidth={availableWidth} item={item} />;
+      return (
+        <EpisodeSpotifyLinks availableWidth={availableWidth} item={item} />
+      );
   }
 
   return unreachable(item);
@@ -161,21 +163,19 @@ function TrackSpotifyLinks({
           line={overlayMetadataLayout.titleLine}
         />
       </VisualSpotifyLink>
-      {creatorLinks.map(
-        ({ creator, providerLink }, index): ReactElement => (
-          <VisualSpotifyLink
-            key={`creator:${providerLink.href}:${creator.name.value}`}
-            href={providerLink.href}
-            label={`OPEN CREATOR ON SPOTIFY: ${creator.name.value}`}
-          >
-            <CreatorLinkRegion
-              availableWidth={availableWidth}
-              precedingText={creatorPrecedingText(item.artists, index)}
-              text={creator.name.value}
-            />
-          </VisualSpotifyLink>
-        ),
-      )}
+      {creatorLinks.map(({ creator, providerLink }, index): ReactElement => (
+        <VisualSpotifyLink
+          key={`creator:${providerLink.href}:${creator.name.value}`}
+          href={providerLink.href}
+          label={`OPEN CREATOR ON SPOTIFY: ${creator.name.value}`}
+        >
+          <CreatorLinkRegion
+            availableWidth={availableWidth}
+            precedingText={creatorPrecedingText(item.artists, index)}
+            text={creator.name.value}
+          />
+        </VisualSpotifyLink>
+      ))}
       <VisualSpotifyLink
         href={albumLink.href}
         label={`OPEN ALBUM ON SPOTIFY: ${item.collection.title.value}`}

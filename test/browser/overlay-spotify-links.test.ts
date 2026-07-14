@@ -78,7 +78,10 @@ test("Spotify destinations render an episode and its show", () => {
     markup,
     /aria-label="OPEN SHOW ON SPOTIFY: Show title \(opens in a new tab\)"/,
   );
-  assert.match(markup, /href="https:\/\/open\.spotify\.com\/episode\/episode-1"/);
+  assert.match(
+    markup,
+    /href="https:\/\/open\.spotify\.com\/episode\/episode-1"/,
+  );
   assert.match(markup, /href="https:\/\/open\.spotify\.com\/show\/show-1"/);
 });
 
@@ -159,12 +162,16 @@ test("missing or non-Spotify child links render no partial destination set", () 
     "",
   );
   assert.equal(
-    renderSpotifyLinks(playbackSnapshot(playingState(trackWithNonSpotifyCreator))),
+    renderSpotifyLinks(
+      playbackSnapshot(playingState(trackWithNonSpotifyCreator)),
+    ),
     "",
   );
 });
 
-function renderSpotifyLinks(snapshot: BrowserPlaybackApplicationSnapshot): string {
+function renderSpotifyLinks(
+  snapshot: BrowserPlaybackApplicationSnapshot,
+): string {
   return renderToStaticMarkup(
     createElement(OverlayVisualSpotifyLinks, {
       availableWidth: 2_400,
