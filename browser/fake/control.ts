@@ -97,10 +97,10 @@ export function parseFakeControlEnvelope(
     return invalidControl();
   }
 
-  return parseCommand(command.value, applicationUrl);
+  return parseFakeControlCommand(command.value, applicationUrl);
 }
 
-function parseCommand(
+export function parseFakeControlCommand(
   input: unknown,
   applicationUrl: URL,
 ): Result<FakeControlCommand, FakeControlParseFailure> {

@@ -186,12 +186,12 @@ export function createFakeMusicProviderRuntime(): FakeMusicProviderRuntime {
           return Object.freeze({ kind: "none" });
         case "set-empty":
           playbackResult = Object.freeze({ kind: "empty" });
-          return Object.freeze({ kind: "playback-changed" });
+          return playbackChangedIfAuthorized();
         case "set-track":
         case "set-episode": {
           const content = playbackFromCommand(command, providerId);
           playbackResult = content;
-          return Object.freeze({ kind: "playback-changed" });
+          return playbackChangedIfAuthorized();
         }
         case "set-unsupported":
           playbackResult = Object.freeze({
@@ -201,10 +201,10 @@ export function createFakeMusicProviderRuntime(): FakeMusicProviderRuntime {
               reason: command.reason,
             }),
           });
-          return Object.freeze({ kind: "playback-changed" });
+          return playbackChangedIfAuthorized();
         case "set-provider-failure":
           playbackResult = playbackFailure(command.failure);
-          return Object.freeze({ kind: "playback-changed" });
+          return playbackChangedIfAuthorized();
         case "set-fatal":
           return Object.freeze({ kind: "fatal", reason: command.reason });
       }
@@ -242,6 +242,12 @@ export function createFakeMusicProviderRuntime(): FakeMusicProviderRuntime {
         reason: "not-authorized",
       }),
     );
+  }
+
+  function playbackChangedIfAuthorized(): FakeControlApplicationResult {
+    return authorizationState.kind === "authorized"
+      ? Object.freeze({ kind: "playback-changed" })
+      : Object.freeze({ kind: "none" });
   }
 
   function resolvePendingAuthorization(result: BeginAuthorizationResult): void {

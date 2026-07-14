@@ -75,7 +75,7 @@ function createPlaybackWorker(): BrowserPlaybackWorker {
       new URL(window.location.href),
     );
     if (control.kind === "success") {
-      worker.postMessage(event.data);
+      worker.postMessage(control.value);
     }
   };
   window.addEventListener("message", forwardControl);

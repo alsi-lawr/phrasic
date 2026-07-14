@@ -9,7 +9,7 @@ import {
   type PlaybackWorkerEventSink,
   type PlaybackWorkerSchedulerPort,
 } from "../worker/runtime.ts";
-import { parseFakeControlEnvelope } from "./control.ts";
+import { parseFakeControlCommand } from "./control.ts";
 import { createFakeMusicProviderRuntime } from "./provider.ts";
 
 const provider = createFakeMusicProviderRuntime();
@@ -66,7 +66,7 @@ if (providers.kind === "failure" || typeof AbortController === "undefined") {
       return;
     }
 
-    const control = parseFakeControlEnvelope(message, applicationUrl);
+    const control = parseFakeControlCommand(message, applicationUrl);
     if (control.kind === "failure" || terminal) {
       return;
     }
