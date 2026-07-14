@@ -24,12 +24,10 @@ import {
 import { createSpotifyAuthorizationProvider } from "../../../browser/auth/spotify-provider.ts";
 import { parseSpotifyPlaybackPayload } from "../../../browser/providers/spotify-payload.ts";
 import {
-  createPlaybackProviderRegistry,
   type PlaybackProviderPort,
-  type PlaybackProviderRegistry,
   type PlaybackProviderRequest,
   type PlaybackProviderResult,
-} from "../../../browser/providers/registry.ts";
+} from "../../../browser/providers/provider.ts";
 import {
   createPlaybackWorkerRuntime,
   type PlaybackWorkerEventSink,
@@ -951,21 +949,9 @@ function createRuntime(
       },
     }),
     events,
-    playbackProviderId: dependencies.spotify.providerId,
-    playbackProviders: playbackProviderRegistry(dependencies.spotify),
+    playbackProvider: dependencies.spotify,
     scheduler: dependencies.scheduler,
   });
-}
-
-function playbackProviderRegistry(
-  provider: PlaybackProviderPort,
-): PlaybackProviderRegistry {
-  const registry = createPlaybackProviderRegistry([provider]);
-  if (registry.kind === "success") {
-    return registry.value;
-  }
-
-  throw new Error("Expected a unique playback provider test registration.");
 }
 
 function spotifyProviderId(): ProviderId {

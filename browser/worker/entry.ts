@@ -5,7 +5,6 @@ import {
 } from "../auth/storage.ts";
 import { createSpotifyAuthFetchPort } from "../auth/token.ts";
 import { createSpotifyAuthorizationProvider } from "../auth/spotify-provider.ts";
-import { createPlaybackProviderRegistry } from "../providers/registry.ts";
 import { createSpotifyPlaybackProvider } from "../providers/spotify.ts";
 import {
   createBrowserRequestDeadlinePort,
@@ -73,12 +72,6 @@ function createWorkerBootstrap(): WorkerBootstrap {
       requestDeadline,
       timeoutMilliseconds: spotifyHttpRequestDeadlineMilliseconds,
     });
-    const playbackProviders = createPlaybackProviderRegistry([
-      spotifyPlaybackProvider,
-    ]);
-    if (playbackProviders.kind === "failure") {
-      return Object.freeze({ kind: "unavailable" });
-    }
     const runtime = createPlaybackWorkerRuntime({
       authorization: createSpotifyAuthorizationProvider({
         crypto: createBrowserPkceCryptoPort(self.crypto),
@@ -102,8 +95,7 @@ function createWorkerBootstrap(): WorkerBootstrap {
         },
       }),
       events,
-      playbackProviderId: spotifyPlaybackProvider.providerId,
-      playbackProviders: playbackProviders.value,
+      playbackProvider: spotifyPlaybackProvider,
       scheduler,
     });
 

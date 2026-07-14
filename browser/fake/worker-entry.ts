@@ -1,4 +1,3 @@
-import { createPlaybackProviderRegistry } from "../providers/registry.ts";
 import {
   createPlaybackWorkerFatalInitializationFailure,
   parsePlaybackWorkerCommand,
@@ -13,9 +12,8 @@ import { parseFakeControlCommand } from "./control.ts";
 import { createFakeMusicProviderRuntime } from "./provider.ts";
 
 const provider = createFakeMusicProviderRuntime();
-const providers = createPlaybackProviderRegistry([provider.playback]);
 
-if (providers.kind === "failure" || typeof AbortController === "undefined") {
+if (typeof AbortController === "undefined") {
   self.postMessage(
     createPlaybackWorkerFatalInitializationFailure(
       "browser-capability-unavailable",
@@ -40,8 +38,7 @@ if (providers.kind === "failure" || typeof AbortController === "undefined") {
       },
     }),
     events,
-    playbackProviderId: provider.playback.providerId,
-    playbackProviders: providers.value,
+    playbackProvider: provider.playback,
     scheduler: nativeWorkerScheduler(),
   });
   let terminal = false;

@@ -11,7 +11,7 @@ import type {
   PlaybackProviderRequest,
   PlaybackProviderResult,
   PlaybackRetryAfter,
-} from "./registry.ts";
+} from "./provider.ts";
 import { parseSpotifyPlaybackPayload } from "./spotify-payload.ts";
 
 const spotifyCurrentlyPlayingEndpoint =

@@ -9,7 +9,7 @@ import type {
 import type {
   PlaybackProviderPort,
   PlaybackProviderResult,
-} from "../providers/registry.ts";
+} from "../providers/provider.ts";
 import {
   Collection,
   Creator,

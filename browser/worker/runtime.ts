@@ -15,13 +15,12 @@ import {
   transitionPlaybackState,
   type PlaybackEvent,
   type PlaybackState,
-  type ProviderId,
 } from "../../domain/playback.ts";
 import { serializePlaybackState } from "./playback-wire.ts";
 import {
-  type PlaybackProviderRegistry,
+  type PlaybackProviderPort,
   type PlaybackProviderResult,
-} from "../providers/registry.ts";
+} from "../providers/provider.ts";
 import {
   createPlaybackWorkerFatalInitializationFailure,
   createPlaybackWorkerSafeDiagnostic,
@@ -75,8 +74,7 @@ export type PlaybackWorkerRuntimePorts = {
   readonly cancellation: PlaybackWorkerCancellationPort;
   readonly clock: PlaybackWorkerClockPort;
   readonly events: PlaybackWorkerEventSink;
-  readonly playbackProviderId: ProviderId;
-  readonly playbackProviders: PlaybackProviderRegistry;
+  readonly playbackProvider: PlaybackProviderPort;
   readonly scheduler: PlaybackWorkerSchedulerPort;
 };
 
@@ -695,16 +693,9 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    const provider = ports.playbackProviders.resolve(ports.playbackProviderId);
-    if (provider.kind === "failure") {
-      emitDiagnostic("playback-poll", "runtime-operation-failed");
-      transitionToFailure(providerFailure("server-error"));
-      return;
-    }
-
     let result: PlaybackProviderResult;
     try {
-      result = await provider.value.fetchCurrentlyPlaying({
+      result = await ports.playbackProvider.fetchCurrentlyPlaying({
         accessToken: accessTokenState.accessToken,
         signal: operation.controller.signal,
       });
