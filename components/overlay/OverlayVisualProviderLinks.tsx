@@ -386,7 +386,7 @@ function selectedProviderLink(
   links: ReadonlyArray<ProviderLink>,
   providerId: string,
 ): ProviderLink | undefined {
-  return links.find((link): boolean => link.providerId.value === providerId);
+  return links.find((link): boolean => link.providerId === providerId);
 }
 
 function providerLabel(presentation: OverlayPresentation): string {

@@ -1,6 +1,7 @@
 import {
   maximumPlatformTimerDelayMilliseconds,
-  ProviderId,
+  parseProviderId,
+  type ProviderId,
 } from "../../domain/playback.ts";
 import type {
   BrowserRequestDeadline,
@@ -200,7 +201,7 @@ function frozenUnexpectedResponse(status: number): PlaybackProviderResult {
 }
 
 function createSpotifyProviderId(): ProviderId {
-  const providerId = ProviderId.create("spotify");
+  const providerId = parseProviderId("spotify");
   if (providerId.kind === "success") {
     return providerId.value;
   }

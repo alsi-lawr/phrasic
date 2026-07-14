@@ -37,7 +37,7 @@ import {
 import { createSpotifyPlaybackProvider } from "../../../browser/providers/spotify.ts";
 import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";
 import type { PlaybackWorkerEvent } from "../../../browser/worker/protocol.ts";
-import { ProviderId } from "../../../domain/playback.ts";
+import { parseProviderId, type ProviderId } from "../../../domain/playback.ts";
 import {
   emptyTrackPayload,
   playingTrackPayload,
@@ -955,7 +955,7 @@ function createRuntime(
 }
 
 function spotifyProviderId(): ProviderId {
-  const providerId = ProviderId.create("spotify");
+  const providerId = parseProviderId("spotify");
   if (providerId.kind === "success") {
     return providerId.value;
   }

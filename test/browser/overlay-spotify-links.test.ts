@@ -11,11 +11,12 @@ import {
   Creator,
   DisplayText,
   PlaybackSnapshot,
-  ProviderId,
   ProviderLink,
   TrackItem,
   transitionPlaybackState,
+  parseProviderId,
   type PlaybackState,
+  type ProviderId,
   type Result,
 } from "../../domain/playback.ts";
 import {
@@ -133,7 +134,7 @@ test("missing or non-Spotify child links render no partial destination set", () 
       title: originalTrack.title,
     }),
   );
-  const anotherProvider = expectSuccess(ProviderId.create("another-provider"));
+  const anotherProvider = expectSuccess(parseProviderId("another-provider"));
   const trackWithNonSpotifyCreator = expectSuccess(
     TrackItem.create({
       artwork: originalTrack.artwork,

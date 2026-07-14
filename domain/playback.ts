@@ -171,76 +171,51 @@ export type PlaybackTransitionError = {
   readonly event: PlaybackEvent["kind"];
 };
 
-export class ProviderId {
-  private readonly rawValue: string;
+declare const providerIdBrand: unique symbol;
+declare const providerItemIdBrand: unique symbol;
+declare const providerCollectionIdBrand: unique symbol;
 
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
+export type ProviderId = string & {
+  readonly [providerIdBrand]: "ProviderId";
+};
+export type ProviderItemId = string & {
+  readonly [providerItemIdBrand]: "ProviderItemId";
+};
+export type ProviderCollectionId = string & {
+  readonly [providerCollectionIdBrand]: "ProviderCollectionId";
+};
+
+export function parseProviderId(
+  input: unknown,
+): Result<ProviderId, ValueValidationError> {
+  const result = validateNonEmptyString("provider-id", input);
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<ProviderId, ValueValidationError> {
-    const result = validateNonEmptyString("provider-id", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new ProviderId(result.value));
-  }
+  return succeeded(result.value as ProviderId);
 }
 
-export class ProviderItemId {
-  private readonly rawValue: string;
-
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
+export function parseProviderItemId(
+  input: unknown,
+): Result<ProviderItemId, ValueValidationError> {
+  const result = validateNonEmptyString("provider-item-id", input);
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<ProviderItemId, ValueValidationError> {
-    const result = validateNonEmptyString("provider-item-id", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new ProviderItemId(result.value));
-  }
+  return succeeded(result.value as ProviderItemId);
 }
 
-export class ProviderCollectionId {
-  private readonly rawValue: string;
-
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
+export function parseProviderCollectionId(
+  input: unknown,
+): Result<ProviderCollectionId, ValueValidationError> {
+  const result = validateNonEmptyString("provider-collection-id", input);
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<ProviderCollectionId, ValueValidationError> {
-    const result = validateNonEmptyString("provider-collection-id", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new ProviderCollectionId(result.value));
-  }
+  return succeeded(result.value as ProviderCollectionId);
 }
 
 export const maximumPlatformTimerDelayMilliseconds = 2_147_483_647;
@@ -809,7 +784,7 @@ function providerLinksError(
   }
 
   const allLinksMatchProvider = links.every(
-    (link: ProviderLink): boolean => link.providerId.value === providerId.value,
+    (link: ProviderLink): boolean => link.providerId === providerId,
   );
   if (!allLinksMatchProvider) {
     return failed(invalidItem(item, "provider-link-provider-mismatch"));

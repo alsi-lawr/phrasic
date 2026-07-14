@@ -11,14 +11,14 @@ import {
   PlaybackPositionMilliseconds,
   PlaybackSnapshot,
   providerFailure,
-  ProviderCollectionId,
-  ProviderId,
-  ProviderItemId,
   ProviderLink,
   Show,
   TrackItem,
   transitionPlaybackState,
   unavailableOriginalArtwork,
+  parseProviderCollectionId,
+  parseProviderId,
+  parseProviderItemId,
   type AuthorizationRequiredReason,
   type ArtworkUnavailableReason,
   type LastPlaybackItem,
@@ -538,14 +538,12 @@ function deserializePlaybackWireItem(
 function deserializePlaybackWireTrackItem(
   item: PlaybackWireTrackItem,
 ): Result<NowPlayingItem, PlaybackWireDeserializationFailure> {
-  const providerId = deserializeDomainResult(
-    ProviderId.create(item.providerId),
-  );
+  const providerId = deserializeDomainResult(parseProviderId(item.providerId));
   if (providerId.kind === "failure") {
     return providerId;
   }
 
-  const itemId = deserializeDomainResult(ProviderItemId.create(item.itemId));
+  const itemId = deserializeDomainResult(parseProviderItemId(item.itemId));
   if (itemId.kind === "failure") {
     return itemId;
   }
@@ -591,14 +589,12 @@ function deserializePlaybackWireTrackItem(
 function deserializePlaybackWireEpisodeItem(
   item: PlaybackWireEpisodeItem,
 ): Result<NowPlayingItem, PlaybackWireDeserializationFailure> {
-  const providerId = deserializeDomainResult(
-    ProviderId.create(item.providerId),
-  );
+  const providerId = deserializeDomainResult(parseProviderId(item.providerId));
   if (providerId.kind === "failure") {
     return providerId;
   }
 
-  const itemId = deserializeDomainResult(ProviderItemId.create(item.itemId));
+  const itemId = deserializeDomainResult(parseProviderItemId(item.itemId));
   if (itemId.kind === "failure") {
     return itemId;
   }
@@ -675,9 +671,7 @@ function deserializePlaybackWireCreator(
 function deserializePlaybackWireCollection(
   collection: PlaybackWireCollection,
 ): Result<Collection, PlaybackWireDeserializationFailure> {
-  const id = deserializeDomainResult(
-    ProviderCollectionId.create(collection.id),
-  );
+  const id = deserializeDomainResult(parseProviderCollectionId(collection.id));
   if (id.kind === "failure") {
     return id;
   }
@@ -704,7 +698,7 @@ function deserializePlaybackWireCollection(
 function deserializePlaybackWireShow(
   show: PlaybackWireShow,
 ): Result<Show, PlaybackWireDeserializationFailure> {
-  const id = deserializeDomainResult(ProviderCollectionId.create(show.id));
+  const id = deserializeDomainResult(parseProviderCollectionId(show.id));
   if (id.kind === "failure") {
     return id;
   }
@@ -761,7 +755,7 @@ function deserializePlaybackWireLinks(
   const deserialized: ProviderLink[] = [];
   for (const link of links) {
     const providerId = deserializeDomainResult(
-      ProviderId.create(link.providerId),
+      parseProviderId(link.providerId),
     );
     if (providerId.kind === "failure") {
       return providerId;
@@ -842,12 +836,12 @@ function serializePlaybackItem(item: NowPlayingItem): PlaybackWireItem {
     case "track": {
       const wireItem: PlaybackWireTrackItem = {
         kind: "track",
-        providerId: item.providerId.value,
-        itemId: item.itemId.value,
+        providerId: item.providerId,
+        itemId: item.itemId,
         title: item.title.value,
         artists: freezeArray(item.artists.map(serializePlaybackCreator)),
         collection: Object.freeze({
-          id: item.collection.id.value,
+          id: item.collection.id,
           title: item.collection.title.value,
           links: serializePlaybackLinks(item.collection.links),
         }),
@@ -859,11 +853,11 @@ function serializePlaybackItem(item: NowPlayingItem): PlaybackWireItem {
     case "episode": {
       const wireItem: PlaybackWireEpisodeItem = {
         kind: "episode",
-        providerId: item.providerId.value,
-        itemId: item.itemId.value,
+        providerId: item.providerId,
+        itemId: item.itemId,
         title: item.title.value,
         show: Object.freeze({
-          id: item.show.id.value,
+          id: item.show.id,
           title: item.show.title.value,
           publisher: item.show.publisher.value,
           links: serializePlaybackLinks(item.show.links),
@@ -892,7 +886,7 @@ function serializePlaybackLinks(
   return freezeArray(
     links.map((link): PlaybackWireLink =>
       Object.freeze({
-        providerId: link.providerId.value,
+        providerId: link.providerId,
         href: link.href,
       }),
     ),

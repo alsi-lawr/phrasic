@@ -19,17 +19,18 @@ import {
   PlaybackDurationMilliseconds,
   PlaybackPositionMilliseconds,
   PlaybackSnapshot,
-  ProviderCollectionId,
-  ProviderId,
-  ProviderItemId,
   ProviderLink,
   Show,
   TrackItem,
   availableOriginalArtwork,
+  parseProviderCollectionId,
+  parseProviderId,
+  parseProviderItemId,
   unavailableOriginalArtwork,
   type NowPlayingItem,
   type OriginalArtwork,
   type PlaybackState,
+  type ProviderId,
 } from "../../domain/playback.ts";
 import type {
   FakeControlCommand,
@@ -324,9 +325,9 @@ function trackFromCommand(
 ):
   | { readonly kind: "success"; readonly value: NowPlayingItem }
   | { readonly kind: "failure" } {
-  const itemId = ProviderItemId.create(command.itemId);
+  const itemId = parseProviderItemId(command.itemId);
   const title = DisplayText.create(command.title);
-  const collectionId = ProviderCollectionId.create(command.collectionId);
+  const collectionId = parseProviderCollectionId(command.collectionId);
   const collectionTitle = DisplayText.create(command.collectionTitle);
   const itemLink = providerLink(providerId, command.itemUrl);
   const collectionLink = providerLink(providerId, command.collectionUrl);
@@ -369,9 +370,9 @@ function episodeFromCommand(
 ):
   | { readonly kind: "success"; readonly value: NowPlayingItem }
   | { readonly kind: "failure" } {
-  const itemId = ProviderItemId.create(command.itemId);
+  const itemId = parseProviderItemId(command.itemId);
   const title = DisplayText.create(command.title);
-  const showId = ProviderCollectionId.create(command.showId);
+  const showId = parseProviderCollectionId(command.showId);
   const showTitle = DisplayText.create(command.showTitle);
   const publisher = DisplayText.create(command.publisher);
   const itemLink = providerLink(providerId, command.itemUrl);
@@ -513,7 +514,7 @@ function playbackFailure(failure: FakeProviderFailure): PlaybackProviderResult {
 }
 
 function validatedProviderId(): ProviderId {
-  const providerId = ProviderId.create("fake");
+  const providerId = parseProviderId("fake");
   if (providerId.kind === "failure") {
     throw new Error("The Fake Music provider identifier is invalid.");
   }

@@ -8,19 +8,20 @@ import {
   PlaybackDurationMilliseconds,
   PlaybackPositionMilliseconds,
   PlaybackSnapshot,
-  ProviderCollectionId,
-  ProviderId,
-  ProviderItemId,
   ProviderLink,
   Show,
   TrackItem,
   unavailableOriginalArtwork,
+  parseProviderCollectionId,
+  parseProviderId,
+  parseProviderItemId,
   type ArtworkUnavailableReason,
   type ItemConstructionError,
   type NowPlayingItem,
   type OriginalArtwork,
   type PlaybackSnapshotError,
   type PlaybackState,
+  type ProviderId,
   type Result,
   type ValueValidationError,
 } from "../../domain/playback.ts";
@@ -266,7 +267,7 @@ function parseTrackItem(
   }
 
   const itemId = mapValueValidation(
-    ProviderItemId.create(itemIdValue.value),
+    parseProviderItemId(itemIdValue.value),
     "$.item.id",
   );
   if (itemId.kind === "failure") {
@@ -351,7 +352,7 @@ function parseEpisodeItem(
   }
 
   const itemId = mapValueValidation(
-    ProviderItemId.create(itemIdValue.value),
+    parseProviderItemId(itemIdValue.value),
     "$.item.id",
   );
   if (itemId.kind === "failure") {
@@ -477,7 +478,7 @@ function parseCollection(
   }
 
   const collectionId = mapValueValidation(
-    ProviderCollectionId.create(collectionIdValue.value),
+    parseProviderCollectionId(collectionIdValue.value),
     "$.item.album.id",
   );
   if (collectionId.kind === "failure") {
@@ -531,7 +532,7 @@ function parseShow(
   }
 
   const showId = mapValueValidation(
-    ProviderCollectionId.create(showIdValue.value),
+    parseProviderCollectionId(showIdValue.value),
     "$.item.show.id",
   );
   if (showId.kind === "failure") {
@@ -760,7 +761,7 @@ function parseSpotifyProviderId(): Result<
   ProviderId,
   SpotifyPlaybackParseFailure
 > {
-  return mapValueValidation(ProviderId.create("spotify"), "$");
+  return mapValueValidation(parseProviderId("spotify"), "$");
 }
 
 function parseObject(

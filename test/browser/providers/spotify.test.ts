@@ -67,7 +67,7 @@ test("the Spotify playback provider normalizes 200 track and episode playback th
     },
   ]);
   assert.equal(fixture.scheduler.cancelledDeadlineCount, 2);
-  assert.equal(provider.providerId.value, "spotify");
+  assert.equal(provider.providerId, "spotify");
 });
 
 test("the Spotify playback provider keeps non-playback HTTP outcomes provider-safe", async () => {
