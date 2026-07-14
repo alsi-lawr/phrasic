@@ -151,9 +151,7 @@ function parseAuthorizationResolution(
     return invalidControl();
   }
 
-  return succeeded(
-    Object.freeze({ kind: "resolve-authorization", decision: decision.value }),
-  );
+  return succeeded({ kind: "resolve-authorization", decision: decision.value });
 }
 
 function parseNoArgumentCommand(
@@ -166,8 +164,8 @@ function parseNoArgumentCommand(
   }
 
   return kind === "expire-authorization"
-    ? succeeded(Object.freeze({ kind: "expire-authorization" }))
-    : succeeded(Object.freeze({ kind: "set-empty" }));
+    ? succeeded({ kind: "expire-authorization" })
+    : succeeded({ kind: "set-empty" });
 }
 
 function parseTrackCommand(
@@ -220,20 +218,18 @@ function parseTrackCommand(
     return invalidControl();
   }
 
-  return succeeded(
-    Object.freeze({
-      kind: "set-track",
-      playback: playback.value,
-      itemId: itemId.value,
-      title: title.value,
-      itemUrl: itemUrl.value,
-      artworkUrl: artworkUrl.value,
-      creators: creators.value,
-      collectionId: collectionId.value,
-      collectionTitle: collectionTitle.value,
-      collectionUrl: collectionUrl.value,
-    }),
-  );
+  return succeeded({
+    kind: "set-track",
+    playback: playback.value,
+    itemId: itemId.value,
+    title: title.value,
+    itemUrl: itemUrl.value,
+    artworkUrl: artworkUrl.value,
+    creators: creators.value,
+    collectionId: collectionId.value,
+    collectionTitle: collectionTitle.value,
+    collectionUrl: collectionUrl.value,
+  });
 }
 
 function parseEpisodeCommand(
@@ -283,20 +279,18 @@ function parseEpisodeCommand(
     return invalidControl();
   }
 
-  return succeeded(
-    Object.freeze({
-      kind: "set-episode",
-      playback: playback.value,
-      itemId: itemId.value,
-      title: title.value,
-      itemUrl: itemUrl.value,
-      artworkUrl: artworkUrl.value,
-      showId: showId.value,
-      showTitle: showTitle.value,
-      publisher: publisher.value,
-      showUrl: showUrl.value,
-    }),
-  );
+  return succeeded({
+    kind: "set-episode",
+    playback: playback.value,
+    itemId: itemId.value,
+    title: title.value,
+    itemUrl: itemUrl.value,
+    artworkUrl: artworkUrl.value,
+    showId: showId.value,
+    showTitle: showTitle.value,
+    publisher: publisher.value,
+    showUrl: showUrl.value,
+  });
 }
 
 function parseUnsupportedCommand(
@@ -316,9 +310,7 @@ function parseUnsupportedCommand(
     case "advertisement":
     case "local-item":
     case "unknown-item-type":
-      return succeeded(
-        Object.freeze({ kind: "set-unsupported", reason: reason.value }),
-      );
+      return succeeded({ kind: "set-unsupported", reason: reason.value });
     default:
       return invalidControl();
   }
@@ -342,9 +334,7 @@ function parseProviderFailureCommand(
     return failure;
   }
 
-  return succeeded(
-    Object.freeze({ kind: "set-provider-failure", failure: failure.value }),
-  );
+  return succeeded({ kind: "set-provider-failure", failure: failure.value });
 }
 
 function parseProviderFailure(
@@ -366,9 +356,7 @@ function parseProviderFailure(
     case "permission-denied":
     case "unauthorized": {
       const exact = exactObject(source.value, ["kind"]);
-      return exact.kind === "failure"
-        ? exact
-        : succeeded(Object.freeze({ kind: kind.value }));
+      return exact.kind === "failure" ? exact : succeeded({ kind: kind.value });
     }
     case "rate-limited":
       return parseRateLimitedFailure(source.value);
@@ -395,9 +383,7 @@ function parseRateLimitedFailure(
   }
 
   if (retryAfter.value === null) {
-    return succeeded(
-      Object.freeze({ kind: "rate-limited", retryAfterMilliseconds: null }),
-    );
+    return succeeded({ kind: "rate-limited", retryAfterMilliseconds: null });
   }
 
   if (
@@ -409,12 +395,10 @@ function parseRateLimitedFailure(
     return invalidControl();
   }
 
-  return succeeded(
-    Object.freeze({
-      kind: "rate-limited",
-      retryAfterMilliseconds: retryAfter.value,
-    }),
-  );
+  return succeeded({
+    kind: "rate-limited",
+    retryAfterMilliseconds: retryAfter.value,
+  });
 }
 
 function parseStatusFailure(
@@ -439,7 +423,7 @@ function parseStatusFailure(
     return invalidControl();
   }
 
-  return succeeded(Object.freeze({ kind, status: status.value }));
+  return succeeded({ kind, status: status.value });
 }
 
 function parseFatalCommand(
@@ -459,7 +443,7 @@ function parseFatalCommand(
     return invalidControl();
   }
 
-  return succeeded(Object.freeze({ kind: "set-fatal", reason: reason.value }));
+  return succeeded({ kind: "set-fatal", reason: reason.value });
 }
 
 function trackCreatorsProperty(
@@ -492,16 +476,14 @@ function trackCreatorsProperty(
       return invalidControl();
     }
 
-    creators.push(
-      Object.freeze({
-        creatorId: creatorId.value,
-        name: name.value,
-        url: url.value,
-      }),
-    );
+    creators.push({
+      creatorId: creatorId.value,
+      name: name.value,
+      url: url.value,
+    });
   }
 
-  return succeeded(Object.freeze(creators));
+  return succeeded(creators);
 }
 
 function playbackProperty(
@@ -625,12 +607,12 @@ function dataProperty(
 }
 
 function succeeded<Value>(value: Value): Result<Value, never> {
-  return Object.freeze({ kind: "success", value });
+  return { kind: "success", value };
 }
 
 function invalidControl(): Result<never, FakeControlParseFailure> {
-  return Object.freeze({
+  return {
     kind: "failure",
-    error: Object.freeze({ kind: "invalid-fake-control" }),
-  });
+    error: { kind: "invalid-fake-control" },
+  };
 }

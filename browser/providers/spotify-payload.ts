@@ -470,7 +470,7 @@ function parseCreators(
     } satisfies Creator);
   }
 
-  return succeeded(Object.freeze(creators));
+  return succeeded(creators);
 }
 
 function parseCollection(
@@ -879,7 +879,7 @@ function emptyPlaybackState(): PlaybackState {
   const state = {
     kind: "empty",
   } satisfies PlaybackState;
-  return Object.freeze(state);
+  return state;
 }
 
 function playingPlaybackState(snapshot: PlaybackSnapshot): PlaybackState {
@@ -887,7 +887,7 @@ function playingPlaybackState(snapshot: PlaybackSnapshot): PlaybackState {
     kind: "playing",
     snapshot,
   } satisfies PlaybackState;
-  return Object.freeze(state);
+  return state;
 }
 
 function pausedPlaybackState(snapshot: PlaybackSnapshot): PlaybackState {
@@ -895,7 +895,7 @@ function pausedPlaybackState(snapshot: PlaybackSnapshot): PlaybackState {
     kind: "paused",
     snapshot,
   } satisfies PlaybackState;
-  return Object.freeze(state);
+  return state;
 }
 
 function unsupportedPlaybackState(
@@ -905,7 +905,7 @@ function unsupportedPlaybackState(
     kind: "unsupported",
     reason,
   } satisfies PlaybackState;
-  return Object.freeze(state);
+  return state;
 }
 
 function parseFailure(
@@ -917,7 +917,7 @@ function parseFailure(
     path,
     code,
   };
-  return Object.freeze(failure);
+  return failure;
 }
 
 function isUnknownJsonObject(input: unknown): input is UnknownJsonObject {
@@ -932,20 +932,20 @@ function succeeded<Value>(value: Value): {
   readonly kind: "success";
   readonly value: Value;
 } {
-  return Object.freeze({
+  return {
     kind: "success",
     value,
-  });
+  };
 }
 
 function failed<Failure>(error: Failure): {
   readonly kind: "failure";
   readonly error: Failure;
 } {
-  return Object.freeze({
+  return {
     kind: "failure",
     error,
-  });
+  };
 }
 
 function assertNever(value: never): never {

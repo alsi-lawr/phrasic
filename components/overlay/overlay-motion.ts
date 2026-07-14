@@ -9,12 +9,12 @@ export type OverlayMotionDecision =
 export const overlayItemAppearanceDurationSeconds = 2;
 export const overlayItemAppearanceKeySpline = "0.42 0 0.58 1";
 
-const enabledMotionDecision = Object.freeze({
+const enabledMotionDecision = {
   kind: "enabled",
-} satisfies OverlayMotionDecision);
-const reducedMotionDecision = Object.freeze({
+} satisfies OverlayMotionDecision;
+const reducedMotionDecision = {
   kind: "reduced",
-} satisfies OverlayMotionDecision);
+} satisfies OverlayMotionDecision;
 
 export function overlayMotionDecisionForPreference(
   prefersReducedMotion: boolean,

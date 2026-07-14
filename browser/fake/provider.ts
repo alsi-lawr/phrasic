@@ -40,16 +40,16 @@ import type {
   FakeTrackCreator,
 } from "./control.ts";
 
-const fakeCredential: PlaybackCredential = Object.freeze({
+const fakeCredential: PlaybackCredential = {
   toMemoryValue(): string {
     return "fake-memory-credential";
   },
-});
-const fakeCredentialLifetime: PlaybackCredentialLifetime = Object.freeze({
+};
+const fakeCredentialLifetime: PlaybackCredentialLifetime = {
   toMilliseconds(): number {
     return 60 * 60 * 1_000;
   },
-});
+};
 
 type PendingAuthorization =
   | { readonly kind: "none" }
@@ -85,32 +85,30 @@ export type FakeMusicProviderRuntime = {
 
 export function createFakeMusicProviderRuntime(): FakeMusicProviderRuntime {
   const providerId = validatedProviderId();
-  let authorizationState: FakeAuthorizationState = Object.freeze({
+  let authorizationState: FakeAuthorizationState = {
     kind: "missing",
-  });
-  let pendingAuthorization: PendingAuthorization = Object.freeze({
+  };
+  let pendingAuthorization: PendingAuthorization = {
     kind: "none",
-  });
-  let playbackResult: PlaybackProviderResult = Object.freeze({ kind: "empty" });
+  };
+  let playbackResult: PlaybackProviderResult = { kind: "empty" };
 
-  const authorizationSession: AuthorizationSessionPort = Object.freeze({
+  const authorizationSession: AuthorizationSessionPort = {
     beginAuthorization(options): Promise<BeginAuthorizationResult> {
       if (pendingAuthorization.kind === "pending") {
-        return Promise.resolve(Object.freeze({ kind: "provider-failure" }));
+        return Promise.resolve({ kind: "provider-failure" });
       }
 
       return new Promise<BeginAuthorizationResult>((resolve): void => {
         const abort = (): void => {
-          resolvePendingAuthorization(
-            Object.freeze({ kind: "transient-failure" }),
-          );
+          resolvePendingAuthorization({ kind: "transient-failure" });
         };
-        pendingAuthorization = Object.freeze({
+        pendingAuthorization = {
           kind: "pending",
           abort,
           resolve,
           signal: options.signal,
-        });
+        };
         options.signal.addEventListener("abort", abort, { once: true });
         if (options.signal.aborted) {
           abort();
@@ -119,7 +117,7 @@ export function createFakeMusicProviderRuntime(): FakeMusicProviderRuntime {
     },
 
     cancelPendingWork(): void {
-      resolvePendingAuthorization(Object.freeze({ kind: "transient-failure" }));
+      resolvePendingAuthorization({ kind: "transient-failure" });
     },
 
     consumeCallback(): Promise<never> {
@@ -139,55 +137,53 @@ export function createFakeMusicProviderRuntime(): FakeMusicProviderRuntime {
     refreshCredential(): Promise<AuthorizationConnectionResult> {
       return Promise.resolve(connectionResult());
     },
-  });
+  };
 
-  const authorization: AuthorizationProviderPort = Object.freeze({
+  const authorization: AuthorizationProviderPort = {
     initialize(options) {
       if (
         options.applicationUrl.pathname !== "/fake/" ||
         !isFakeConfiguration(options.configuration)
       ) {
-        return Object.freeze({
+        return {
           kind: "failure",
-          error: Object.freeze({ kind: "invalid-provider-configuration" }),
-        });
+          error: { kind: "invalid-provider-configuration" },
+        };
       }
 
-      return Object.freeze({ kind: "success", value: authorizationSession });
+      return { kind: "success", value: authorizationSession };
     },
-  });
+  };
 
-  const playback: PlaybackProviderPort = Object.freeze({
+  const playback: PlaybackProviderPort = {
     providerId,
     fetchCurrentlyPlaying(request): Promise<PlaybackProviderResult> {
       if (request.signal.aborted) {
-        return Promise.resolve(Object.freeze({ kind: "network-failure" }));
+        return Promise.resolve({ kind: "network-failure" });
       }
 
       if (authorizationState.kind !== "authorized") {
-        return Promise.resolve(
-          Object.freeze({ kind: "unauthorized", status: 401 }),
-        );
+        return Promise.resolve({ kind: "unauthorized", status: 401 });
       }
 
       return Promise.resolve(playbackResult);
     },
-  });
+  };
 
   const runtime: FakeMusicProviderRuntime = {
     applyControl(command): FakeControlApplicationResult {
       switch (command.kind) {
         case "resolve-authorization":
           resolveAuthorization(command.decision);
-          return Object.freeze({ kind: "none" });
+          return { kind: "none" };
         case "expire-authorization":
           if (authorizationState.kind === "authorized") {
-            authorizationState = Object.freeze({ kind: "expired" });
-            return Object.freeze({ kind: "playback-changed" });
+            authorizationState = { kind: "expired" };
+            return { kind: "playback-changed" };
           }
-          return Object.freeze({ kind: "none" });
+          return { kind: "none" };
         case "set-empty":
-          playbackResult = Object.freeze({ kind: "empty" });
+          playbackResult = { kind: "empty" };
           return playbackChangedIfAuthorized();
         case "set-track":
         case "set-episode": {
@@ -196,19 +192,19 @@ export function createFakeMusicProviderRuntime(): FakeMusicProviderRuntime {
           return playbackChangedIfAuthorized();
         }
         case "set-unsupported":
-          playbackResult = Object.freeze({
+          playbackResult = {
             kind: "playback",
-            state: Object.freeze({
+            state: {
               kind: "unsupported",
               reason: command.reason,
-            }),
-          });
+            },
+          };
           return playbackChangedIfAuthorized();
         case "set-provider-failure":
           playbackResult = playbackFailure(command.failure);
           return playbackChangedIfAuthorized();
         case "set-fatal":
-          return Object.freeze({ kind: "fatal", reason: command.reason });
+          return { kind: "fatal", reason: command.reason };
       }
 
       return unreachable(command);
@@ -218,7 +214,7 @@ export function createFakeMusicProviderRuntime(): FakeMusicProviderRuntime {
     playback,
   };
 
-  return Object.freeze(runtime);
+  return runtime;
 
   function resolveAuthorization(decision: "approved" | "denied"): void {
     if (pendingAuthorization.kind !== "pending") {
@@ -226,30 +222,26 @@ export function createFakeMusicProviderRuntime(): FakeMusicProviderRuntime {
     }
 
     if (decision === "approved") {
-      authorizationState = Object.freeze({ kind: "authorized" });
-      resolvePendingAuthorization(
-        Object.freeze({
-          kind: "connected",
-          credential: fakeCredential,
-          lifetime: fakeCredentialLifetime,
-        }),
-      );
+      authorizationState = { kind: "authorized" };
+      resolvePendingAuthorization({
+        kind: "connected",
+        credential: fakeCredential,
+        lifetime: fakeCredentialLifetime,
+      });
       return;
     }
 
-    authorizationState = Object.freeze({ kind: "missing" });
-    resolvePendingAuthorization(
-      Object.freeze({
-        kind: "authorization-required",
-        reason: "not-authorized",
-      }),
-    );
+    authorizationState = { kind: "missing" };
+    resolvePendingAuthorization({
+      kind: "authorization-required",
+      reason: "not-authorized",
+    });
   }
 
   function playbackChangedIfAuthorized(): FakeControlApplicationResult {
     return authorizationState.kind === "authorized"
-      ? Object.freeze({ kind: "playback-changed" })
-      : Object.freeze({ kind: "none" });
+      ? { kind: "playback-changed" }
+      : { kind: "none" };
   }
 
   function resolvePendingAuthorization(result: BeginAuthorizationResult): void {
@@ -258,7 +250,7 @@ export function createFakeMusicProviderRuntime(): FakeMusicProviderRuntime {
     }
 
     const pending = pendingAuthorization;
-    pendingAuthorization = Object.freeze({ kind: "none" });
+    pendingAuthorization = { kind: "none" };
     pending.signal.removeEventListener("abort", pending.abort);
     pending.resolve(result);
   }
@@ -267,30 +259,30 @@ export function createFakeMusicProviderRuntime(): FakeMusicProviderRuntime {
     const state = authorizationState;
     switch (state.kind) {
       case "authorized":
-        return Object.freeze({
+        return {
           kind: "success",
           credential: fakeCredential,
           lifetime: fakeCredentialLifetime,
-        });
+        };
       case "expired":
-        return Object.freeze({
+        return {
           kind: "authorization-required",
           reason: "authorization-expired",
-        });
+        };
       case "missing":
-        return Object.freeze({
+        return {
           kind: "authorization-required",
           reason: "missing-connection",
-        });
+        };
     }
 
     return unreachable(state);
   }
 
   function reset(): void {
-    resolvePendingAuthorization(Object.freeze({ kind: "transient-failure" }));
-    authorizationState = Object.freeze({ kind: "missing" });
-    playbackResult = Object.freeze({ kind: "empty" });
+    resolvePendingAuthorization({ kind: "transient-failure" });
+    authorizationState = { kind: "missing" };
+    playbackResult = { kind: "empty" };
   }
 }
 
@@ -306,18 +298,18 @@ function playbackFromCommand(
       ? trackFromCommand(command, providerId)
       : episodeFromCommand(command, providerId);
   if (item.kind === "failure") {
-    return Object.freeze({ kind: "malformed-response" });
+    return { kind: "malformed-response" };
   }
 
   const snapshot = fakeSnapshot(item.value);
   if (snapshot.kind === "failure") {
-    return Object.freeze({ kind: "malformed-response" });
+    return { kind: "malformed-response" };
   }
 
-  return Object.freeze({
+  return {
     kind: "playback",
     state: playbackState(command.playback, snapshot.value),
-  });
+  };
 }
 
 function trackFromCommand(
@@ -344,7 +336,7 @@ function trackFromCommand(
     artwork.kind === "failure" ||
     creators.kind === "failure"
   ) {
-    return Object.freeze({ kind: "failure" });
+    return { kind: "failure" };
   }
 
   const track = createTrackItem({
@@ -361,8 +353,8 @@ function trackFromCommand(
     links: [itemLink.value],
   });
   return track.kind === "success"
-    ? Object.freeze({ kind: "success", value: track.value })
-    : Object.freeze({ kind: "failure" });
+    ? { kind: "success", value: track.value }
+    : { kind: "failure" };
 }
 
 function episodeFromCommand(
@@ -389,7 +381,7 @@ function episodeFromCommand(
     showLink.kind === "failure" ||
     artwork.kind === "failure"
   ) {
-    return Object.freeze({ kind: "failure" });
+    return { kind: "failure" };
   }
 
   const episode = createEpisodeItem({
@@ -406,8 +398,8 @@ function episodeFromCommand(
     links: [itemLink.value],
   });
   return episode.kind === "success"
-    ? Object.freeze({ kind: "success", value: episode.value })
-    : Object.freeze({ kind: "failure" });
+    ? { kind: "success", value: episode.value }
+    : { kind: "failure" };
 }
 
 function fakeCreators(
@@ -421,13 +413,13 @@ function fakeCreators(
     const name = parseDisplayText(value.name);
     const link = providerLink(providerId, value.url);
     if (name.kind === "failure" || link.kind === "failure") {
-      return Object.freeze({ kind: "failure" });
+      return { kind: "failure" };
     }
 
     creators.push({ name: name.value, links: [link.value] } satisfies Creator);
   }
 
-  return Object.freeze({ kind: "success", value: Object.freeze(creators) });
+  return { kind: "success", value: creators };
 }
 
 function providerLink(providerId: ProviderId, href: string) {
@@ -440,26 +432,30 @@ function originalArtwork(
   | { readonly kind: "success"; readonly value: OriginalArtwork }
   | { readonly kind: "failure" } {
   if (source === null) {
-    return Object.freeze({
+    return {
       kind: "success",
       value: unavailableOriginalArtwork("provider-did-not-supply-artwork"),
-    });
+    };
   }
 
   const url = parseOriginalArtworkUrl(source);
   return url.kind === "success"
-    ? Object.freeze({
+    ? {
         kind: "success",
         value: availableOriginalArtwork(url.value),
-      })
-    : Object.freeze({ kind: "failure" });
+      }
+    : { kind: "failure" };
 }
 
-function fakeSnapshot(item: NowPlayingItem) {
+function fakeSnapshot(
+  item: NowPlayingItem,
+):
+  | { readonly kind: "success"; readonly value: PlaybackSnapshot }
+  | { readonly kind: "failure" } {
   const position = parsePlaybackPositionMilliseconds(45_000);
   const duration = parsePlaybackDurationMilliseconds(180_000);
   if (position.kind === "failure" || duration.kind === "failure") {
-    return Object.freeze({ kind: "failure" });
+    return { kind: "failure" };
   }
 
   return createPlaybackSnapshot({
@@ -474,41 +470,41 @@ function playbackState(
   snapshot: PlaybackSnapshot,
 ): PlaybackState {
   return mode === "playing"
-    ? Object.freeze({ kind: "playing", snapshot })
-    : Object.freeze({ kind: "paused", snapshot });
+    ? { kind: "playing", snapshot }
+    : { kind: "paused", snapshot };
 }
 
 function playbackFailure(failure: FakeProviderFailure): PlaybackProviderResult {
   switch (failure.kind) {
     case "malformed-response":
     case "network-failure":
-      return Object.freeze({ kind: failure.kind });
+      return { kind: failure.kind };
     case "permission-denied":
-      return Object.freeze({ kind: "permission-denied", status: 403 });
+      return { kind: "permission-denied", status: 403 };
     case "rate-limited":
-      return Object.freeze({
+      return {
         kind: "rate-limited",
         status: 429,
         retryAfter:
           failure.retryAfterMilliseconds === null
-            ? Object.freeze({ kind: "invalid-or-missing" })
-            : Object.freeze({
+            ? { kind: "invalid-or-missing" }
+            : {
                 kind: "valid",
                 delayMilliseconds: failure.retryAfterMilliseconds,
-              }),
-      });
+              },
+      };
     case "server-failure":
-      return Object.freeze({
+      return {
         kind: "server-failure",
         status: failure.status,
-      });
+      };
     case "unauthorized":
-      return Object.freeze({ kind: "unauthorized", status: 401 });
+      return { kind: "unauthorized", status: 401 };
     case "unexpected-response":
-      return Object.freeze({
+      return {
         kind: "unexpected-response",
         status: failure.status,
-      });
+      };
   }
 
   return unreachable(failure);

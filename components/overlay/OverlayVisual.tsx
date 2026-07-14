@@ -129,7 +129,7 @@ function useContentSizedShell(identity: string): ContentSizedShell {
 function initialOverlayTextMeasurements(
   identity: string,
 ): OverlayTextMeasurements {
-  return Object.freeze({ identity, widths: emptyOverlayTextWidths });
+  return { identity, widths: emptyOverlayTextWidths };
 }
 
 function overlayTextMeasurementsReducer(
@@ -146,5 +146,5 @@ function overlayTextMeasurementsReducer(
     return current;
   }
 
-  return Object.freeze({ identity: measurement.identity, widths });
+  return { identity: measurement.identity, widths };
 }

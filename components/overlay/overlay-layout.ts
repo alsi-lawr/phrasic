@@ -17,19 +17,29 @@ export type OverlayTextMeasurementReporter = (
   measurement: OverlayTextMeasurement,
 ) => void;
 
-export const overlayShell = Object.freeze({
+export const overlayShell: Readonly<{
+  height: number;
+  maximumWidth: number;
+  minimumWidth: number;
+  radius: number;
+}> = {
   height: 1_080,
   maximumWidth: 4_725,
   minimumWidth: 1_080,
   radius: 200,
-});
+};
 
-export const overlayArtworkRectangle = Object.freeze({
+export const overlayArtworkRectangle: Readonly<{
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+}> = {
   height: overlayShell.height,
   width: overlayShell.height,
   x: 0,
   y: 0,
-});
+};
 
 export const overlayArtworkClipPathId = "overlay-artwork-rounded-clip";
 export const overlayShellClipPathId = "overlay-shell-clip";
@@ -37,62 +47,62 @@ export const overlayShellClipPathId = "overlay-shell-clip";
 export const overlayArtworkRoundedClipPathData =
   "M 200 0 H 880 A 200 200 0 0 1 1080 200 V 880 A 200 200 0 0 1 880 1080 H 200 A 200 200 0 0 1 0 880 V 200 A 200 200 0 0 1 200 0 Z";
 
-const overlayCreatorLine = Object.freeze({
+const overlayCreatorLine: OverlayTextLineLayout = {
   clipHeight: 250,
   clipPathId: "overlay-metadata-creator-clip",
   clipY: 180,
   line: "creator",
   y: 380,
-} satisfies OverlayTextLineLayout);
-const overlayTitleLine = Object.freeze({
+};
+const overlayTitleLine: OverlayTextLineLayout = {
   clipHeight: 360,
   clipPathId: "overlay-metadata-title-clip",
   clipY: 400,
   line: "title",
   y: 690,
-} satisfies OverlayTextLineLayout);
-const overlayDetailLine = Object.freeze({
+};
+const overlayDetailLine: OverlayTextLineLayout = {
   clipHeight: 110,
   clipPathId: "overlay-metadata-detail-clip",
   clipY: 790,
   line: "detail",
   y: 870,
-} satisfies OverlayTextLineLayout);
-const overlayContextLine = Object.freeze({
+};
+const overlayContextLine: OverlayTextLineLayout = {
   clipHeight: 90,
   clipPathId: "overlay-metadata-context-clip",
   clipY: 930,
   line: "context",
   y: 995,
-} satisfies OverlayTextLineLayout);
-const overlayStatusLabelLine = Object.freeze({
+};
+const overlayStatusLabelLine: OverlayTextLineLayout = {
   clipHeight: 150,
   clipPathId: "overlay-status-label-clip",
   clipY: 260,
   line: "creator",
   y: 370,
-} satisfies OverlayTextLineLayout);
-const overlayStatusTitleLine = Object.freeze({
+};
+const overlayStatusTitleLine: OverlayTextLineLayout = {
   clipHeight: 150,
   clipPathId: "overlay-status-title-clip",
   clipY: 430,
   line: "title",
   y: 540,
-} satisfies OverlayTextLineLayout);
-const overlayStatusDetailLine = Object.freeze({
+};
+const overlayStatusDetailLine: OverlayTextLineLayout = {
   clipHeight: 120,
   clipPathId: "overlay-status-detail-clip",
   clipY: 620,
   line: "detail",
   y: 710,
-} satisfies OverlayTextLineLayout);
-const overlayStatusContextLine = Object.freeze({
+};
+const overlayStatusContextLine: OverlayTextLineLayout = {
   clipHeight: 100,
   clipPathId: "overlay-status-context-clip",
   clipY: 800,
   line: "context",
   y: 875,
-} satisfies OverlayTextLineLayout);
+};
 
 export type OverlayTextLineLayout = {
   readonly clipHeight: number;
@@ -102,7 +112,18 @@ export type OverlayTextLineLayout = {
   readonly y: number;
 };
 
-export const overlayMetadataLayout = Object.freeze({
+export const overlayMetadataLayout: Readonly<{
+  contextLine: OverlayTextLineLayout;
+  creatorLine: OverlayTextLineLayout;
+  detailLine: OverlayTextLineLayout;
+  rightPadding: number;
+  statusContextLine: OverlayTextLineLayout;
+  statusDetailLine: OverlayTextLineLayout;
+  statusLabelLine: OverlayTextLineLayout;
+  statusTitleLine: OverlayTextLineLayout;
+  titleLine: OverlayTextLineLayout;
+  x: number;
+}> = {
   contextLine: overlayContextLine,
   creatorLine: overlayCreatorLine,
   detailLine: overlayDetailLine,
@@ -113,14 +134,14 @@ export const overlayMetadataLayout = Object.freeze({
   statusTitleLine: overlayStatusTitleLine,
   titleLine: overlayTitleLine,
   x: 1_380,
-});
+};
 
-export const emptyOverlayTextWidths: OverlayTextWidths = Object.freeze({
+export const emptyOverlayTextWidths: OverlayTextWidths = {
   context: 0,
   creator: 0,
   detail: 0,
   title: 0,
-});
+};
 
 export function overlayShellWidthForTextWidths(
   textWidths: OverlayTextWidths,
@@ -189,13 +210,13 @@ function updatedTextWidths(
 
   switch (line) {
     case "context":
-      return Object.freeze({ ...textWidths, context: width });
+      return { ...textWidths, context: width };
     case "creator":
-      return Object.freeze({ ...textWidths, creator: width });
+      return { ...textWidths, creator: width };
     case "detail":
-      return Object.freeze({ ...textWidths, detail: width });
+      return { ...textWidths, detail: width };
     case "title":
-      return Object.freeze({ ...textWidths, title: width });
+      return { ...textWidths, title: width };
   }
 
   return unreachable(line);

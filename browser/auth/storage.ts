@@ -233,23 +233,21 @@ export function createIndexedDbSpotifyAuthStorage(
     },
   };
 
-  return Object.freeze(storage);
+  return storage;
 }
 
 function waitForIndexedDbRequest<Value>(
   request: IndexedDbRequestCompletionPort<Value>,
 ): Promise<Value> {
   return new Promise<Value>((resolve, reject) => {
-    request.subscribe(
-      Object.freeze({
-        success(): void {
-          resolve(request.value());
-        },
-        failure(): void {
-          reject(indexedDbFailure("request", request.error()));
-        },
-      }),
-    );
+    request.subscribe({
+      success(): void {
+        resolve(request.value());
+      },
+      failure(): void {
+        reject(indexedDbFailure("request", request.error()));
+      },
+    });
   });
 }
 
@@ -257,16 +255,14 @@ function waitForIndexedDbTransaction(
   transaction: IndexedDbTransactionCompletionPort,
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    transaction.subscribe(
-      Object.freeze({
-        complete(): void {
-          resolve();
-        },
-        failure(): void {
-          reject(indexedDbFailure("transaction", transaction.error()));
-        },
-      }),
-    );
+    transaction.subscribe({
+      complete(): void {
+        resolve();
+      },
+      failure(): void {
+        reject(indexedDbFailure("transaction", transaction.error()));
+      },
+    });
   });
 }
 
@@ -318,21 +314,19 @@ type SpotifyRefreshTokenReadState =
 async function openAuthorizationDatabase(
   indexedDb: IndexedDbAuthorizationPort,
 ): Promise<IndexedDbAuthorizationDatabasePort> {
-  const request = indexedDb.open(
-    Object.freeze({
-      name: databaseName,
-      version: databaseVersion,
-      upgrade(database: IndexedDbAuthorizationDatabasePort): void {
-        if (!database.hasObjectStore(pendingAuthorizationAttemptsStoreName)) {
-          database.createObjectStore(pendingAuthorizationAttemptsStoreName);
-        }
+  const request = indexedDb.open({
+    name: databaseName,
+    version: databaseVersion,
+    upgrade(database: IndexedDbAuthorizationDatabasePort): void {
+      if (!database.hasObjectStore(pendingAuthorizationAttemptsStoreName)) {
+        database.createObjectStore(pendingAuthorizationAttemptsStoreName);
+      }
 
-        if (!database.hasObjectStore(spotifyConnectionsStoreName)) {
-          database.createObjectStore(spotifyConnectionsStoreName);
-        }
-      },
-    }),
-  );
+      if (!database.hasObjectStore(spotifyConnectionsStoreName)) {
+        database.createObjectStore(spotifyConnectionsStoreName);
+      }
+    },
+  });
 
   const database = await waitForIndexedDbRequest(request);
   database.subscribeVersionChange((): void => {
@@ -355,106 +349,16 @@ function consumeStoredPendingAuthorizationAttempt(
         pendingAuthorizationAttemptsStoreName,
       );
       const key = pendingAttemptStorageKey(options.state.toStorageKey());
-      let state: PendingAuthorizationAttemptConsumeState = Object.freeze({
+      let state: PendingAuthorizationAttemptConsumeState = {
         kind: "waiting",
-      });
+      };
 
-      transaction.subscribe(
-        Object.freeze({
-          complete(): void {
-            if (state.kind === "waiting") {
-              reject(
-                new Error(
-                  "IndexedDB pending authorization transaction completed without a result.",
-                ),
-              );
-              return;
-            }
-
-            resolve(state.result);
-          },
-          failure(): void {
-            reject(indexedDbFailure("transaction", transaction.error()));
-          },
-        }),
-      );
-
-      const request = store.get(key);
-      request.subscribe(
-        Object.freeze({
-          success(): void {
-            const storedAttempt = request.value();
-            if (storedAttempt === undefined) {
-              state = frozenPendingAuthorizationAttemptConsumeState(
-                frozenRejectedPendingAttempt("missing-attempt"),
-              );
-              return;
-            }
-
-            store.delete(key);
-            const parsedAttempt =
-              parseStoredPendingAuthorizationAttempt(storedAttempt);
-            if (parsedAttempt.kind === "failure") {
-              state = frozenPendingAuthorizationAttemptConsumeState(
-                parsedAttempt.result,
-              );
-              return;
-            }
-
-            if (
-              !matchesPendingAuthorizationAttemptState({
-                pending: parsedAttempt.value,
-                candidate: options.state,
-              })
-            ) {
-              state = frozenPendingAuthorizationAttemptConsumeState(
-                frozenRejectedPendingAttempt("state-mismatch"),
-              );
-              return;
-            }
-
-            if (
-              isPendingAuthorizationAttemptExpired({
-                pending: parsedAttempt.value,
-                observedAt: options.observedAt,
-              })
-            ) {
-              state = frozenPendingAuthorizationAttemptConsumeState(
-                frozenRejectedPendingAttempt("expired"),
-              );
-              return;
-            }
-
-            state = frozenPendingAuthorizationAttemptConsumeState(
-              frozenConsumedPendingAttempt(parsedAttempt.value),
-            );
-          },
-          failure(): void {
-            reject(indexedDbFailure("request", request.error()));
-          },
-        }),
-      );
-    },
-  );
-}
-
-function readStoredSpotifyRefreshToken(
-  database: IndexedDbAuthorizationDatabasePort,
-): Promise<SpotifyRefreshTokenReadResult> {
-  return new Promise<SpotifyRefreshTokenReadResult>((resolve, reject) => {
-    const transaction = database.transaction(spotifyConnectionsStoreName);
-    const store = transaction.objectStore(spotifyConnectionsStoreName);
-    let state: SpotifyRefreshTokenReadState = Object.freeze({
-      kind: "waiting",
-    });
-
-    transaction.subscribe(
-      Object.freeze({
+      transaction.subscribe({
         complete(): void {
           if (state.kind === "waiting") {
             reject(
               new Error(
-                "IndexedDB Spotify connection transaction completed without a result.",
+                "IndexedDB pending authorization transaction completed without a result.",
               ),
             );
             return;
@@ -465,40 +369,117 @@ function readStoredSpotifyRefreshToken(
         failure(): void {
           reject(indexedDbFailure("transaction", transaction.error()));
         },
-      }),
-    );
+      });
 
-    const request = store.get(spotifyProvider);
-    request.subscribe(
-      Object.freeze({
+      const request = store.get(key);
+      request.subscribe({
         success(): void {
-          const storedRefreshToken = request.value();
-          if (storedRefreshToken === undefined) {
-            state = frozenSpotifyRefreshTokenReadState(
-              frozenMissingRefreshToken(),
+          const storedAttempt = request.value();
+          if (storedAttempt === undefined) {
+            state = pendingAuthorizationAttemptConsumeState(
+              rejectedPendingAttempt("missing-attempt"),
             );
             return;
           }
 
-          const refreshToken =
-            parseStoredSpotifyRefreshToken(storedRefreshToken);
-          if (refreshToken.kind === "failure") {
-            store.delete(spotifyProvider);
-            state = frozenSpotifyRefreshTokenReadState(
-              frozenMissingRefreshToken(),
+          store.delete(key);
+          const parsedAttempt =
+            parseStoredPendingAuthorizationAttempt(storedAttempt);
+          if (parsedAttempt.kind === "failure") {
+            state = pendingAuthorizationAttemptConsumeState(
+              parsedAttempt.result,
             );
             return;
           }
 
-          state = frozenSpotifyRefreshTokenReadState(
-            frozenFoundRefreshToken(refreshToken.value),
+          if (
+            !matchesPendingAuthorizationAttemptState({
+              pending: parsedAttempt.value,
+              candidate: options.state,
+            })
+          ) {
+            state = pendingAuthorizationAttemptConsumeState(
+              rejectedPendingAttempt("state-mismatch"),
+            );
+            return;
+          }
+
+          if (
+            isPendingAuthorizationAttemptExpired({
+              pending: parsedAttempt.value,
+              observedAt: options.observedAt,
+            })
+          ) {
+            state = pendingAuthorizationAttemptConsumeState(
+              rejectedPendingAttempt("expired"),
+            );
+            return;
+          }
+
+          state = pendingAuthorizationAttemptConsumeState(
+            consumedPendingAttempt(parsedAttempt.value),
           );
         },
         failure(): void {
           reject(indexedDbFailure("request", request.error()));
         },
-      }),
-    );
+      });
+    },
+  );
+}
+
+function readStoredSpotifyRefreshToken(
+  database: IndexedDbAuthorizationDatabasePort,
+): Promise<SpotifyRefreshTokenReadResult> {
+  return new Promise<SpotifyRefreshTokenReadResult>((resolve, reject) => {
+    const transaction = database.transaction(spotifyConnectionsStoreName);
+    const store = transaction.objectStore(spotifyConnectionsStoreName);
+    let state: SpotifyRefreshTokenReadState = {
+      kind: "waiting",
+    };
+
+    transaction.subscribe({
+      complete(): void {
+        if (state.kind === "waiting") {
+          reject(
+            new Error(
+              "IndexedDB Spotify connection transaction completed without a result.",
+            ),
+          );
+          return;
+        }
+
+        resolve(state.result);
+      },
+      failure(): void {
+        reject(indexedDbFailure("transaction", transaction.error()));
+      },
+    });
+
+    const request = store.get(spotifyProvider);
+    request.subscribe({
+      success(): void {
+        const storedRefreshToken = request.value();
+        if (storedRefreshToken === undefined) {
+          state = spotifyRefreshTokenReadState(missingRefreshToken());
+          return;
+        }
+
+        const refreshToken = parseStoredSpotifyRefreshToken(storedRefreshToken);
+        if (refreshToken.kind === "failure") {
+          store.delete(spotifyProvider);
+          state = spotifyRefreshTokenReadState(missingRefreshToken());
+          return;
+        }
+
+        state = spotifyRefreshTokenReadState(
+          foundRefreshToken(refreshToken.value),
+        );
+      },
+      failure(): void {
+        reject(indexedDbFailure("request", request.error()));
+      },
+    });
   });
 }
 
@@ -520,7 +501,7 @@ export function createNativeIndexedDbAuthorizationPort(
     },
   };
 
-  return Object.freeze(port);
+  return port;
 }
 
 function nativeIndexedDbAuthorizationOpenRequestCompletionPort(
@@ -544,7 +525,7 @@ function nativeIndexedDbAuthorizationOpenRequestCompletionPort(
       },
     };
 
-  return Object.freeze(port);
+  return port;
 }
 
 function nativeIndexedDbAuthorizationDatabasePort(
@@ -579,7 +560,7 @@ function nativeIndexedDbAuthorizationDatabasePort(
     },
   };
 
-  return Object.freeze(port);
+  return port;
 }
 
 function nativeIndexedDbAuthorizationTransactionPort(
@@ -609,7 +590,7 @@ function nativeIndexedDbAuthorizationTransactionPort(
     },
   };
 
-  return Object.freeze(port);
+  return port;
 }
 
 function nativeIndexedDbAuthorizationObjectStorePort(
@@ -636,7 +617,7 @@ function nativeIndexedDbAuthorizationObjectStorePort(
     },
   };
 
-  return Object.freeze(port);
+  return port;
 }
 
 function nativeIndexedDbRequestCompletionPort(
@@ -659,7 +640,7 @@ function nativeIndexedDbRequestCompletionPort(
     },
   };
 
-  return Object.freeze(port);
+  return port;
 }
 
 function nativeIndexedDbAuthorizationStoreNames(
@@ -697,7 +678,7 @@ function storedPendingAuthorizationAttempt(
     returnTo,
   };
 
-  return Object.freeze(record);
+  return record;
 }
 
 function storedDisplayReturnConfiguration(
@@ -708,7 +689,7 @@ function storedDisplayReturnConfiguration(
     setup: returnTo.setup.kind === "setup-requested",
   };
 
-  return Object.freeze(configuration);
+  return configuration;
 }
 
 function storedSpotifyRefreshToken(
@@ -719,7 +700,7 @@ function storedSpotifyRefreshToken(
     refreshToken: refreshToken.toStorageValue(),
   };
 
-  return Object.freeze(record);
+  return record;
 }
 
 function parseStoredPendingAuthorizationAttempt(
@@ -727,7 +708,7 @@ function parseStoredPendingAuthorizationAttempt(
 ): ParsedStoredPendingAuthorizationAttempt {
   const source = parseStoredObject(input);
   if (source.kind === "failure") {
-    return frozenInvalidStoredPendingAttempt();
+    return invalidStoredPendingAttempt();
   }
 
   if (
@@ -740,16 +721,16 @@ function parseStoredPendingAuthorizationAttempt(
       "verifier",
     ])
   ) {
-    return frozenInvalidStoredPendingAttempt();
+    return invalidStoredPendingAttempt();
   }
 
   const provider = readStoredDataProperty(source.value, "provider");
   if (provider.kind === "failure") {
-    return frozenInvalidStoredPendingAttempt();
+    return invalidStoredPendingAttempt();
   }
 
   if (provider.value !== spotifyProvider) {
-    return frozenProviderMismatchPendingAttempt();
+    return providerMismatchPendingAttempt();
   }
 
   const state = readStoredDataProperty(source.value, "state");
@@ -764,7 +745,7 @@ function parseStoredPendingAuthorizationAttempt(
     expiresAt.kind === "failure" ||
     returnTo.kind === "failure"
   ) {
-    return frozenInvalidStoredPendingAttempt();
+    return invalidStoredPendingAttempt();
   }
 
   const parsedState = PkceState.parse(state.value);
@@ -779,14 +760,14 @@ function parseStoredPendingAuthorizationAttempt(
     parsedExpiresAt.kind === "failure" ||
     parsedReturnTo.kind === "failure"
   ) {
-    return frozenInvalidStoredPendingAttempt();
+    return invalidStoredPendingAttempt();
   }
 
   if (
     parsedCreatedAt.value.toEpochMilliseconds() >
     Number.MAX_SAFE_INTEGER - authorizationAttemptLifetimeMilliseconds
   ) {
-    return frozenInvalidStoredPendingAttempt();
+    return invalidStoredPendingAttempt();
   }
 
   const attempt = PendingAuthorizationAttempt.create({
@@ -799,7 +780,7 @@ function parseStoredPendingAuthorizationAttempt(
     attempt.expiresAt.toEpochMilliseconds() !==
     parsedExpiresAt.value.toEpochMilliseconds()
   ) {
-    return frozenInvalidStoredPendingAttempt();
+    return invalidStoredPendingAttempt();
   }
 
   const result: ParsedStoredPendingAuthorizationAttempt = {
@@ -807,7 +788,7 @@ function parseStoredPendingAuthorizationAttempt(
     value: attempt,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 function parseStoredSpotifyRefreshToken(
@@ -815,26 +796,26 @@ function parseStoredSpotifyRefreshToken(
 ): ParseResult<SpotifyRefreshToken> {
   const source = parseStoredObject(input);
   if (source.kind === "failure") {
-    return frozenParseFailure();
+    return parseFailure();
   }
 
   if (!hasOnlyOwnFields(source.value, ["provider", "refreshToken"])) {
-    return frozenParseFailure();
+    return parseFailure();
   }
 
   const provider = readStoredDataProperty(source.value, "provider");
   const refreshToken = readStoredDataProperty(source.value, "refreshToken");
   if (provider.kind === "failure" || refreshToken.kind === "failure") {
-    return frozenParseFailure();
+    return parseFailure();
   }
 
   if (provider.value !== spotifyProvider) {
-    return frozenParseFailure();
+    return parseFailure();
   }
 
   const parsedRefreshToken = SpotifyRefreshToken.parse(refreshToken.value);
   if (parsedRefreshToken.kind === "failure") {
-    return frozenParseFailure();
+    return parseFailure();
   }
 
   return succeeded(parsedRefreshToken.value);
@@ -842,7 +823,7 @@ function parseStoredSpotifyRefreshToken(
 
 function parseStoredObject(input: unknown): ParseResult<object> {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    return frozenParseFailure();
+    return parseFailure();
   }
 
   return succeeded(input);
@@ -867,7 +848,7 @@ function readStoredDataProperty(
 ): ParseResult<unknown> {
   const descriptor = Object.getOwnPropertyDescriptor(source, fieldName);
   if (descriptor === undefined || !("value" in descriptor)) {
-    return frozenParseFailure();
+    return parseFailure();
   }
 
   return succeeded(descriptor.value);
@@ -878,7 +859,7 @@ function pendingAttemptStorageKey(
 ): readonly [typeof spotifyProvider, string] {
   const key: [typeof spotifyProvider, string] = [spotifyProvider, state];
 
-  return Object.freeze(key);
+  return key;
 }
 
 function indexedDbFailure(
@@ -888,7 +869,7 @@ function indexedDbFailure(
   return new Error(`IndexedDB ${operation} failed.`, { cause });
 }
 
-function frozenConsumedPendingAttempt(
+function consumedPendingAttempt(
   attempt: PendingAuthorizationAttempt,
 ): SpotifyPendingAuthorizationAttemptConsumeResult {
   const result: SpotifyPendingAuthorizationAttemptConsumeResult = {
@@ -896,10 +877,10 @@ function frozenConsumedPendingAttempt(
     attempt,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenPendingAuthorizationAttemptConsumeState(
+function pendingAuthorizationAttemptConsumeState(
   result: SpotifyPendingAuthorizationAttemptConsumeResult,
 ): PendingAuthorizationAttemptConsumeState {
   const state: PendingAuthorizationAttemptConsumeState = {
@@ -907,10 +888,10 @@ function frozenPendingAuthorizationAttemptConsumeState(
     result,
   };
 
-  return Object.freeze(state);
+  return state;
 }
 
-function frozenRejectedPendingAttempt(
+function rejectedPendingAttempt(
   reason: Extract<
     SpotifyPendingAuthorizationAttemptConsumeResult,
     { readonly kind: "rejected" }
@@ -921,28 +902,28 @@ function frozenRejectedPendingAttempt(
     reason,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenInvalidStoredPendingAttempt(): ParsedStoredPendingAuthorizationAttempt {
+function invalidStoredPendingAttempt(): ParsedStoredPendingAuthorizationAttempt {
   const result: ParsedStoredPendingAuthorizationAttempt = {
     kind: "failure",
-    result: frozenRejectedPendingAttempt("invalid-stored-attempt"),
+    result: rejectedPendingAttempt("invalid-stored-attempt"),
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenProviderMismatchPendingAttempt(): ParsedStoredPendingAuthorizationAttempt {
+function providerMismatchPendingAttempt(): ParsedStoredPendingAuthorizationAttempt {
   const result: ParsedStoredPendingAuthorizationAttempt = {
     kind: "failure",
-    result: frozenRejectedPendingAttempt("provider-mismatch"),
+    result: rejectedPendingAttempt("provider-mismatch"),
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenFoundRefreshToken(
+function foundRefreshToken(
   refreshToken: SpotifyRefreshToken,
 ): SpotifyRefreshTokenReadResult {
   const result: SpotifyRefreshTokenReadResult = {
@@ -950,10 +931,10 @@ function frozenFoundRefreshToken(
     refreshToken,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenSpotifyRefreshTokenReadState(
+function spotifyRefreshTokenReadState(
   result: SpotifyRefreshTokenReadResult,
 ): SpotifyRefreshTokenReadState {
   const state: SpotifyRefreshTokenReadState = {
@@ -961,15 +942,15 @@ function frozenSpotifyRefreshTokenReadState(
     result,
   };
 
-  return Object.freeze(state);
+  return state;
 }
 
-function frozenMissingRefreshToken(): SpotifyRefreshTokenReadResult {
+function missingRefreshToken(): SpotifyRefreshTokenReadResult {
   const result: SpotifyRefreshTokenReadResult = {
     kind: "missing",
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 function succeeded<Value>(value: Value): ParseSuccess<Value> {
@@ -978,13 +959,13 @@ function succeeded<Value>(value: Value): ParseSuccess<Value> {
     value,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenParseFailure(): ParseFailure {
+function parseFailure(): ParseFailure {
   const result: ParseFailure = {
     kind: "failure",
   };
 
-  return Object.freeze(result);
+  return result;
 }

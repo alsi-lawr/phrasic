@@ -31,12 +31,12 @@ export function PlaybackWorkerProvider({
     };
   }, [application]);
 
-  const value: PlaybackWorkerContextValue = Object.freeze({
+  const value: PlaybackWorkerContextValue = {
     beginAuthorization: application.beginAuthorization,
     logout: application.logout,
     retry: application.retry,
     snapshot,
-  });
+  };
 
   return (
     <PlaybackWorkerContext.Provider value={value}>

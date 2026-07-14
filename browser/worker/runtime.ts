@@ -36,9 +36,9 @@ import {
 const successfulPollDelayMilliseconds = 5_000;
 const accessTokenRefreshLeadMilliseconds = 60_000;
 const maximumScheduledDelayMilliseconds = maximumPlatformTimerDelayMilliseconds;
-const reconnectDelayMilliseconds: ReadonlyArray<number> = Object.freeze([
+const reconnectDelayMilliseconds: ReadonlyArray<number> = [
   1_000, 2_000, 4_000, 8_000, 16_000, 30_000,
-]);
+];
 
 export type PlaybackWorkerClockPort = {
   readonly now: () => number;
@@ -160,12 +160,12 @@ type CurrentTime =
 export function createPlaybackWorkerRuntime(
   ports: PlaybackWorkerRuntimePorts,
 ): PlaybackWorkerRuntime {
-  let runtimeStatus: RuntimeStatus = frozenAwaitingInitialization();
+  let runtimeStatus: RuntimeStatus = awaitingInitialization();
   let visibility: WorkerVisibility = "visible";
   let playbackState: PlaybackState = initialPlaybackState();
-  let accessTokenState: AccessTokenState = frozenMissingAccessToken();
-  let activeOperation: ActiveOperation = frozenNoActiveOperation();
-  let refreshFlight: RefreshFlight = frozenIdleRefreshFlight();
+  let accessTokenState: AccessTokenState = missingAccessToken();
+  let activeOperation: ActiveOperation = noActiveOperation();
+  let refreshFlight: RefreshFlight = idleRefreshFlight();
   let queuedWork: Promise<void> = Promise.resolve();
   let retryPosition = 0;
   let operationEpoch = 0;
@@ -204,7 +204,7 @@ export function createPlaybackWorkerRuntime(
     },
   };
 
-  return Object.freeze(runtime);
+  return runtime;
 
   function enqueue(work: () => Promise<void>): Promise<void> {
     const next = queuedWork.then(work, work);
@@ -248,7 +248,7 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    runtimeStatus = frozenActiveRuntime(authorization.value);
+    runtimeStatus = activeRuntime(authorization.value);
     playbackState = initialPlaybackState();
     emitPlaybackState();
     await recoverConnection();
@@ -310,7 +310,7 @@ export function createPlaybackWorkerRuntime(
           kind: "authorization-redirect",
           url: result.url,
         };
-        ports.events.emit(Object.freeze(event));
+        ports.events.emit(event);
         return;
       }
       case "connected":
@@ -477,7 +477,7 @@ export function createPlaybackWorkerRuntime(
       kind: "callback-url-restored",
       url,
     };
-    ports.events.emit(Object.freeze(event));
+    ports.events.emit(event);
   }
 
   async function retryConnection(): Promise<void> {
@@ -528,7 +528,7 @@ export function createPlaybackWorkerRuntime(
     }
 
     cancelRuntimeWork();
-    accessTokenState = frozenMissingAccessToken();
+    accessTokenState = missingAccessToken();
     retryPosition = 0;
     transition({ kind: "authorization-required", reason: "not-authorized" });
 
@@ -552,9 +552,9 @@ export function createPlaybackWorkerRuntime(
     }
 
     cancelRuntimeWork();
-    accessTokenState = frozenMissingAccessToken();
+    accessTokenState = missingAccessToken();
     retryPosition = 0;
-    runtimeStatus = frozenDisposedRuntime();
+    runtimeStatus = disposedRuntime();
   }
 
   async function recoverConnection(): Promise<void> {
@@ -642,7 +642,7 @@ export function createPlaybackWorkerRuntime(
         }
         return;
       case "authorization-required":
-        accessTokenState = frozenMissingAccessToken();
+        accessTokenState = missingAccessToken();
         cancelAllSchedules();
         emitDiagnostic("token-refresh", "authorization-required");
         transition({
@@ -686,7 +686,7 @@ export function createPlaybackWorkerRuntime(
         signal: operation.controller.signal,
       });
     } catch {
-      result = frozenNetworkFailure();
+      result = networkFailure();
     }
 
     if (!isCurrentOperation(operation)) {
@@ -727,7 +727,7 @@ export function createPlaybackWorkerRuntime(
         handleRateLimitedPlayback(result);
         return;
       case "permission-denied":
-        accessTokenState = frozenMissingAccessToken();
+        accessTokenState = missingAccessToken();
         cancelAllSchedules();
         emitDiagnostic(
           "playback-poll",
@@ -741,7 +741,7 @@ export function createPlaybackWorkerRuntime(
         return;
       case "unauthorized":
         if (!mayRefreshAfterUnauthorized) {
-          accessTokenState = frozenMissingAccessToken();
+          accessTokenState = missingAccessToken();
           cancelAllSchedules();
           emitDiagnostic(
             "playback-poll",
@@ -821,7 +821,7 @@ export function createPlaybackWorkerRuntime(
         await pollWithCurrentToken(operation, false);
         return;
       case "authorization-required":
-        accessTokenState = frozenMissingAccessToken();
+        accessTokenState = missingAccessToken();
         cancelAllSchedules();
         emitDiagnostic("token-refresh", "authorization-required");
         transition({
@@ -855,11 +855,11 @@ export function createPlaybackWorkerRuntime(
 
     const authorization = activeAuthorization();
     if (authorization.kind === "unavailable") {
-      return frozenUnexpectedRefreshResult();
+      return unexpectedRefreshResult();
     }
 
     const result = requestRefreshConnection(authorization.value, operation);
-    refreshFlight = frozenRunningRefreshFlight(operation.epoch, result);
+    refreshFlight = runningRefreshFlight(operation.epoch, result);
     try {
       return await result;
     } finally {
@@ -867,7 +867,7 @@ export function createPlaybackWorkerRuntime(
         refreshFlight.kind === "running" &&
         refreshFlight.operationEpoch === operation.epoch
       ) {
-        refreshFlight = frozenIdleRefreshFlight();
+        refreshFlight = idleRefreshFlight();
       }
     }
   }
@@ -884,7 +884,7 @@ export function createPlaybackWorkerRuntime(
         ? await authorization.recoverConnection(request)
         : await authorization.refreshCredential(request);
     } catch {
-      return frozenUnexpectedRefreshResult();
+      return unexpectedRefreshResult();
     }
   }
 
@@ -955,7 +955,7 @@ export function createPlaybackWorkerRuntime(
       now.epochMilliseconds,
       expiresAtEpochMilliseconds - accessTokenRefreshLeadMilliseconds,
     );
-    accessTokenState = frozenAvailableAccessToken({
+    accessTokenState = availableAccessToken({
       accessToken,
       expiresAtEpochMilliseconds,
       refreshAtEpochMilliseconds,
@@ -1072,7 +1072,7 @@ export function createPlaybackWorkerRuntime(
       kind: "playback-state",
       state: playbackState,
     };
-    ports.events.emit(Object.freeze(event));
+    ports.events.emit(event);
   }
 
   function schedulePoll(delayMilliseconds: number): void {
@@ -1154,8 +1154,12 @@ export function createPlaybackWorkerRuntime(
       epoch: currentOperationEpoch(),
       controller: ports.cancellation.create(),
     };
-    activeOperation = frozenActiveOperation(operation);
-    return Object.freeze(operation);
+    activeOperation = {
+      kind: "active",
+      epoch: operation.epoch,
+      controller: operation.controller,
+    };
+    return operation;
   }
 
   function operationEpochIncrement(): void {
@@ -1177,7 +1181,7 @@ export function createPlaybackWorkerRuntime(
       activeOperation.controller.abort();
     }
 
-    activeOperation = frozenNoActiveOperation();
+    activeOperation = noActiveOperation();
   }
 
   function finishOperation(operation: RuntimeOperation): void {
@@ -1185,7 +1189,7 @@ export function createPlaybackWorkerRuntime(
       activeOperation.kind === "active" &&
       activeOperation.epoch === operation.epoch
     ) {
-      activeOperation = frozenNoActiveOperation();
+      activeOperation = noActiveOperation();
     }
   }
 
@@ -1201,7 +1205,7 @@ export function createPlaybackWorkerRuntime(
     code: "invalid-public-configuration" | "worker-initialization-failed",
   ): void {
     cancelRuntimeWork();
-    runtimeStatus = frozenFatalRuntime();
+    runtimeStatus = fatalRuntime();
     ports.events.emit(createPlaybackWorkerFatalInitializationFailure(code));
   }
 
@@ -1214,13 +1218,13 @@ export function createPlaybackWorkerRuntime(
         readonly kind: "unavailable";
       } {
     if (runtimeStatus.kind !== "active") {
-      return Object.freeze({ kind: "unavailable" });
+      return { kind: "unavailable" };
     }
 
-    return Object.freeze({
+    return {
       kind: "available",
       value: runtimeStatus.authorization,
-    });
+    };
   }
 
   function readCurrentTime(): CurrentTime {
@@ -1228,14 +1232,14 @@ export function createPlaybackWorkerRuntime(
     try {
       epochMilliseconds = ports.clock.now();
     } catch {
-      return frozenUnavailableCurrentTime();
+      return unavailableCurrentTime();
     }
 
     if (!Number.isSafeInteger(epochMilliseconds) || epochMilliseconds < 0) {
-      return frozenUnavailableCurrentTime();
+      return unavailableCurrentTime();
     }
 
-    return frozenAvailableCurrentTime(epochMilliseconds);
+    return availableCurrentTime(epochMilliseconds);
   }
 
   function isRuntimeActive(): boolean {
@@ -1281,28 +1285,28 @@ function parseApplicationUrl(input: string):
       url.username !== "" ||
       url.password !== ""
     ) {
-      return Object.freeze({ kind: "failure" });
+      return { kind: "failure" };
     }
 
-    return Object.freeze({ kind: "success", value: url });
+    return { kind: "success", value: url };
   } catch {
-    return Object.freeze({ kind: "failure" });
+    return { kind: "failure" };
   }
 }
 
 function httpStatusMetadata(status: number): PlaybackWorkerDiagnosticMetadata {
-  return Object.freeze({ kind: "http-status", status });
+  return { kind: "http-status", status };
 }
 
 function httpStatusAndRetryMetadata(
   status: number,
   retryAfterMilliseconds: number,
 ): PlaybackWorkerDiagnosticMetadata {
-  return Object.freeze({
+  return {
     kind: "http-status-and-retry-after",
     status,
     retryAfterMilliseconds,
-  });
+  };
 }
 
 function isSafeScheduleDelay(delayMilliseconds: number): boolean {
@@ -1331,34 +1335,32 @@ function authorizationRequiredReason(
   return unreachable(reason);
 }
 
-function frozenAwaitingInitialization(): RuntimeStatus {
-  return Object.freeze({ kind: "awaiting-initialization" });
+function awaitingInitialization(): RuntimeStatus {
+  return { kind: "awaiting-initialization" };
 }
 
-function frozenActiveRuntime(
-  authorization: AuthorizationSessionPort,
-): RuntimeStatus {
-  return Object.freeze({ kind: "active", authorization });
+function activeRuntime(authorization: AuthorizationSessionPort): RuntimeStatus {
+  return { kind: "active", authorization };
 }
 
-function frozenDisposedRuntime(): RuntimeStatus {
-  return Object.freeze({ kind: "disposed" });
+function disposedRuntime(): RuntimeStatus {
+  return { kind: "disposed" };
 }
 
-function frozenFatalRuntime(): RuntimeStatus {
-  return Object.freeze({ kind: "fatal" });
+function fatalRuntime(): RuntimeStatus {
+  return { kind: "fatal" };
 }
 
-function frozenMissingAccessToken(): AccessTokenState {
-  return Object.freeze({ kind: "missing" });
+function missingAccessToken(): AccessTokenState {
+  return { kind: "missing" };
 }
 
-function frozenAvailableAccessToken(input: {
+function availableAccessToken(input: {
   readonly accessToken: PlaybackCredential;
   readonly expiresAtEpochMilliseconds: number;
   readonly refreshAtEpochMilliseconds: number;
 }): AccessTokenState {
-  return Object.freeze({ kind: "available", ...input });
+  return { kind: "available", ...input };
 }
 
 function createScheduledTaskSlot(
@@ -1419,46 +1421,38 @@ function createScheduledTaskSlot(
     }
   };
 
-  return Object.freeze({ cancel, isScheduled, schedule });
+  return { cancel, isScheduled, schedule };
 }
 
-function frozenNoActiveOperation(): ActiveOperation {
-  return Object.freeze({ kind: "none" });
+function noActiveOperation(): ActiveOperation {
+  return { kind: "none" };
 }
 
-function frozenActiveOperation(operation: RuntimeOperation): ActiveOperation {
-  return Object.freeze({
-    kind: "active",
-    epoch: operation.epoch,
-    controller: operation.controller,
-  });
+function idleRefreshFlight(): RefreshFlight {
+  return { kind: "idle" };
 }
 
-function frozenIdleRefreshFlight(): RefreshFlight {
-  return Object.freeze({ kind: "idle" });
-}
-
-function frozenRunningRefreshFlight(
+function runningRefreshFlight(
   operationEpoch: number,
   result: Promise<RuntimeRefreshResult>,
 ): RefreshFlight {
-  return Object.freeze({ kind: "running", operationEpoch, result });
+  return { kind: "running", operationEpoch, result };
 }
 
-function frozenAvailableCurrentTime(epochMilliseconds: number): CurrentTime {
-  return Object.freeze({ kind: "available", epochMilliseconds });
+function availableCurrentTime(epochMilliseconds: number): CurrentTime {
+  return { kind: "available", epochMilliseconds };
 }
 
-function frozenUnavailableCurrentTime(): CurrentTime {
-  return Object.freeze({ kind: "unavailable" });
+function unavailableCurrentTime(): CurrentTime {
+  return { kind: "unavailable" };
 }
 
-function frozenUnexpectedRefreshResult(): RuntimeRefreshResult {
-  return Object.freeze({ kind: "unexpected" });
+function unexpectedRefreshResult(): RuntimeRefreshResult {
+  return { kind: "unexpected" };
 }
 
-function frozenNetworkFailure(): PlaybackProviderResult {
-  return Object.freeze({ kind: "network-failure" });
+function networkFailure(): PlaybackProviderResult {
+  return { kind: "network-failure" };
 }
 
 function unreachable(value: never): never {

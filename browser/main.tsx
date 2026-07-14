@@ -27,7 +27,7 @@ createRoot(rootElement).render(
 );
 
 function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
-  return Object.freeze({
+  return {
     createWorker: createPlaybackWorker,
     fetchConfiguration(options) {
       return fetchBrowserConfiguration({
@@ -39,7 +39,7 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
       });
     },
     integration: spotifyBrowserIntegration,
-    location: Object.freeze({
+    location: {
       current(): URL {
         return new URL(window.location.href);
       },
@@ -49,7 +49,7 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
       replace(url: URL): void {
         window.history.replaceState(null, "", `${url.pathname}${url.search}`);
       },
-    }),
+    },
     onPageHide(listener: () => void): () => void {
       window.addEventListener("pagehide", listener, { once: true });
 
@@ -67,7 +67,7 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
     visibility(): "hidden" | "visible" {
       return document.visibilityState === "visible" ? "visible" : "hidden";
     },
-  });
+  };
 }
 
 function createPlaybackWorker(): BrowserPlaybackWorker {
@@ -105,5 +105,5 @@ function createPlaybackWorker(): BrowserPlaybackWorker {
     },
   };
 
-  return Object.freeze(playbackWorker);
+  return playbackWorker;
 }

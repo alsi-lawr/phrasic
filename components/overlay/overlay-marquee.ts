@@ -25,11 +25,12 @@ export type StaticMarqueeTextPresentation =
     };
 
 export const marqueeAnimationDurationSeconds = 20;
-const containedDecision: MarqueeOverflowDecision = Object.freeze({
+const containedDecision: MarqueeOverflowDecision = {
   kind: "contained",
-});
-const naturalStaticMarqueeTextPresentation: StaticMarqueeTextPresentation =
-  Object.freeze({ kind: "natural" });
+};
+const naturalStaticMarqueeTextPresentation: StaticMarqueeTextPresentation = {
+  kind: "natural",
+};
 
 export function marqueeDecisionForTextBounds(
   bounds: SvgTextBounds,
@@ -46,7 +47,7 @@ export function marqueeDecisionForTextBounds(
     travelDistance: bounds.availableWidth + bounds.measuredWidth,
   };
 
-  return Object.freeze(decision);
+  return decision;
 }
 
 export function staticMarqueeTextPresentationFor(
@@ -74,7 +75,7 @@ function shrinkToFitStaticMarqueeTextPresentation(
     textLength: availableWidth,
   };
 
-  return Object.freeze(presentation);
+  return presentation;
 }
 
 function unreachable(value: never): never {

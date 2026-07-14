@@ -28,7 +28,7 @@ createRoot(rootElement).render(
 );
 
 function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
-  return Object.freeze({
+  return {
     createWorker: createPlaybackWorker,
     fetchConfiguration(): Promise<BrowserConfigurationResponse> {
       return Promise.reject(
@@ -36,13 +36,13 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
       );
     },
     integration: fakeBrowserIntegration,
-    location: Object.freeze({
+    location: {
       current(): URL {
         return new URL(window.location.href);
       },
       navigate(): void {},
       replace(): void {},
-    }),
+    },
     onPageHide(listener: () => void): () => void {
       window.addEventListener("pagehide", listener, { once: true });
       return (): void => {
@@ -58,7 +58,7 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
     visibility(): "hidden" | "visible" {
       return document.visibilityState === "visible" ? "visible" : "hidden";
     },
-  });
+  };
 }
 
 function createPlaybackWorker(): BrowserPlaybackWorker {
@@ -109,5 +109,5 @@ function createPlaybackWorker(): BrowserPlaybackWorker {
     },
   };
 
-  return Object.freeze(playbackWorker);
+  return playbackWorker;
 }

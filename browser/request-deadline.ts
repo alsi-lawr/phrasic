@@ -54,7 +54,7 @@ export function createBrowserRequestDeadlinePort(
     },
   };
 
-  return Object.freeze(port);
+  return port;
 }
 
 function createBrowserRequestDeadline(
@@ -66,7 +66,7 @@ function createBrowserRequestDeadline(
   }
 
   const controller = new AbortController();
-  let outcome: BrowserRequestDeadlineOutcome = frozenActiveOutcome();
+  let outcome: BrowserRequestDeadlineOutcome = activeOutcome();
   let scheduledTask: BrowserRequestDeadlineScheduledTask | undefined;
   let observesCallerAbort = false;
 
@@ -87,7 +87,7 @@ function createBrowserRequestDeadline(
       return;
     }
 
-    outcome = frozenCallerAbortedOutcome();
+    outcome = callerAbortedOutcome();
     controller.abort();
     cleanup();
   };
@@ -97,7 +97,7 @@ function createBrowserRequestDeadline(
       return;
     }
 
-    outcome = frozenDeadlineExpiredOutcome();
+    outcome = deadlineExpiredOutcome();
     controller.abort();
     cleanup();
   };
@@ -140,7 +140,7 @@ function createBrowserRequestDeadline(
     signal: controller.signal,
   };
 
-  return Object.freeze(deadline);
+  return deadline;
 }
 
 function isValidTimeoutMilliseconds(timeoutMilliseconds: number): boolean {
@@ -151,14 +151,14 @@ function isValidTimeoutMilliseconds(timeoutMilliseconds: number): boolean {
   );
 }
 
-function frozenActiveOutcome(): BrowserRequestDeadlineOutcome {
-  return Object.freeze({ kind: "active" });
+function activeOutcome(): BrowserRequestDeadlineOutcome {
+  return { kind: "active" };
 }
 
-function frozenCallerAbortedOutcome(): BrowserRequestDeadlineOutcome {
-  return Object.freeze({ kind: "caller-aborted" });
+function callerAbortedOutcome(): BrowserRequestDeadlineOutcome {
+  return { kind: "caller-aborted" };
 }
 
-function frozenDeadlineExpiredOutcome(): BrowserRequestDeadlineOutcome {
-  return Object.freeze({ kind: "deadline-expired" });
+function deadlineExpiredOutcome(): BrowserRequestDeadlineOutcome {
+  return { kind: "deadline-expired" };
 }

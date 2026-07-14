@@ -132,9 +132,9 @@ export type PlaybackWorkerEvent =
   | PlaybackWorkerPlaybackState
   | PlaybackWorkerSafeDiagnostic;
 
-const noDiagnosticMetadata: PlaybackWorkerDiagnosticMetadata = Object.freeze({
+const noDiagnosticMetadata: PlaybackWorkerDiagnosticMetadata = {
   kind: "none",
-});
+};
 
 export function createPlaybackWorkerSafeDiagnostic(options: {
   readonly operation: PlaybackWorkerDiagnosticOperation;
@@ -148,7 +148,7 @@ export function createPlaybackWorkerSafeDiagnostic(options: {
     metadata: sanitizeDiagnosticMetadata(options.metadata),
   };
 
-  return Object.freeze(diagnostic);
+  return diagnostic;
 }
 
 export function noPlaybackWorkerDiagnosticMetadata(): PlaybackWorkerDiagnosticMetadata {
@@ -163,7 +163,7 @@ export function createPlaybackWorkerFatalInitializationFailure(
     code,
   };
 
-  return Object.freeze(failure);
+  return failure;
 }
 
 function sanitizeDiagnosticMetadata(
@@ -177,19 +177,19 @@ function sanitizeDiagnosticMetadata(
         return noPlaybackWorkerDiagnosticMetadata();
       }
 
-      return Object.freeze({
+      return {
         kind: "http-status",
         status: metadata.status,
-      });
+      };
     case "retry-after":
       if (!isSafeRetryAfterMilliseconds(metadata.retryAfterMilliseconds)) {
         return noPlaybackWorkerDiagnosticMetadata();
       }
 
-      return Object.freeze({
+      return {
         kind: "retry-after",
         retryAfterMilliseconds: metadata.retryAfterMilliseconds,
-      });
+      };
     case "http-status-and-retry-after":
       if (
         !isSafeHttpStatus(metadata.status) ||
@@ -198,11 +198,11 @@ function sanitizeDiagnosticMetadata(
         return noPlaybackWorkerDiagnosticMetadata();
       }
 
-      return Object.freeze({
+      return {
         kind: "http-status-and-retry-after",
         status: metadata.status,
         retryAfterMilliseconds: metadata.retryAfterMilliseconds,
-      });
+      };
   }
 
   return noPlaybackWorkerDiagnosticMetadata();

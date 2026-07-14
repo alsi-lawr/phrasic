@@ -97,7 +97,6 @@ export class SpotifyAccessToken {
 
   private constructor(value: string) {
     this.value = value;
-    Object.freeze(this);
   }
 
   static parse(
@@ -120,7 +119,6 @@ export class SpotifyRefreshToken {
 
   private constructor(value: string) {
     this.value = value;
-    Object.freeze(this);
   }
 
   static parse(
@@ -147,7 +145,6 @@ export class SpotifyAccessTokenLifetimeSeconds {
 
   private constructor(value: number) {
     this.value = value;
-    Object.freeze(this);
   }
 
   static parse(
@@ -266,43 +263,43 @@ export function createSpotifyAuthFetchPort(
           });
           if (!hasActiveRequestDeadline(deadline)) {
             deadline.dispose();
-            return frozenNetworkFailure();
+            return networkFailure();
           }
 
-          const parsedResponse: SpotifyAuthFetchResponse = Object.freeze({
+          const parsedResponse: SpotifyAuthFetchResponse = {
             status: response.status,
             async readJson(): Promise<SpotifyAuthJsonReadResult> {
               try {
                 const value: unknown = await response.json();
                 if (!hasActiveRequestDeadline(deadline)) {
-                  return frozenJsonNetworkFailure();
+                  return jsonNetworkFailure();
                 }
 
-                return frozenJson(value);
+                return json(value);
               } catch {
                 if (!hasActiveRequestDeadline(deadline)) {
-                  return frozenJsonNetworkFailure();
+                  return jsonNetworkFailure();
                 }
 
-                return frozenInvalidJson();
+                return invalidJson();
               } finally {
                 deadline.dispose();
               }
             },
-          });
+          };
 
-          return frozenFetchResponse(parsedResponse);
+          return fetchResponse(parsedResponse);
         } catch {
           deadline.dispose();
-          return frozenNetworkFailure();
+          return networkFailure();
         }
       } catch {
-        return frozenNetworkFailure();
+        return networkFailure();
       }
     },
   };
 
-  return Object.freeze(port);
+  return port;
 }
 
 export function parseSpotifyAuthorizationCodeTokenResponse(
@@ -350,7 +347,7 @@ export function parseSpotifyAuthorizationCodeTokenResponse(
     refreshToken: refreshToken.value,
   };
 
-  return succeeded(Object.freeze(response));
+  return succeeded(response);
 }
 
 export function parseSpotifyRefreshTokenResponse(
@@ -386,7 +383,7 @@ export function parseSpotifyRefreshTokenResponse(
     refreshToken: refreshToken.value,
   };
 
-  return succeeded(Object.freeze(response));
+  return succeeded(response);
 }
 
 export async function exchangeSpotifyAuthorizationCode(
@@ -416,7 +413,7 @@ export async function exchangeSpotifyAuthorizationCode(
 
   const parsed = parseSpotifyAuthorizationCodeTokenResponse(response.value);
   if (parsed.kind === "failure") {
-    return frozenProviderFailure("invalid-token-response");
+    return providerFailure("invalid-token-response");
   }
 
   const result: SpotifyAuthorizationCodeExchangeResult = {
@@ -426,7 +423,7 @@ export async function exchangeSpotifyAuthorizationCode(
     refreshToken: parsed.value.refreshToken,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 export async function refreshSpotifyAccessToken(
@@ -454,7 +451,7 @@ export async function refreshSpotifyAccessToken(
 
   const parsed = parseSpotifyRefreshTokenResponse(response.value);
   if (parsed.kind === "failure") {
-    return frozenProviderFailure("invalid-token-response");
+    return providerFailure("invalid-token-response");
   }
 
   const result: SpotifyAccessTokenRefreshResult = {
@@ -464,7 +461,7 @@ export async function refreshSpotifyAccessToken(
     refreshToken: parsed.value.refreshToken,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 type SpotifyTokenResponseFields = {
@@ -493,44 +490,44 @@ async function requestSpotifyToken(options: {
   readonly body: string;
   readonly signal: AbortSignal;
 }): Promise<SpotifyTokenHttpResponse> {
-  const request: SpotifyAuthFetchRequest = Object.freeze({
+  const request: SpotifyAuthFetchRequest = {
     url: new URL(spotifyTokenEndpoint),
     method: "POST",
     contentType: formContentType,
     body: options.body,
     signal: options.signal,
-  });
+  };
 
   let fetched: SpotifyAuthFetchResult;
   try {
     fetched = await options.fetch.fetch(request);
   } catch {
-    return frozenTransientFailure();
+    return transientFailure();
   }
 
   if (fetched.kind === "network-failure") {
-    return frozenTransientFailure();
+    return transientFailure();
   }
 
   const body = await fetched.response.readJson();
   if (body.kind === "network-failure") {
-    return frozenTransientFailure();
+    return transientFailure();
   }
 
   if (isTransientHttpStatus(fetched.response.status)) {
-    return frozenTransientFailure();
+    return transientFailure();
   }
 
   if (body.kind === "invalid-json") {
-    return frozenProviderFailure("invalid-token-response");
+    return providerFailure("invalid-token-response");
   }
 
   if (!isSuccessfulHttpStatus(fetched.response.status)) {
     if (isInvalidGrant(body.value)) {
-      return frozenAuthorizationRequired();
+      return authorizationRequired();
     }
 
-    return frozenProviderFailure("token-request-rejected");
+    return providerFailure("token-request-rejected");
   }
 
   const result: SpotifyTokenHttpResponse = {
@@ -538,7 +535,7 @@ async function requestSpotifyToken(options: {
     value: body.value,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 function parseTokenResponseObject(
@@ -603,7 +600,7 @@ function parseRequiredTokenFields(
     expiresIn: expiresIn.value,
   };
 
-  return succeeded(Object.freeze(fields));
+  return succeeded(fields);
 }
 
 function readRequiredTokenResponseField(
@@ -646,7 +643,7 @@ function readOptionalTokenResponseField(
       kind: "missing",
     };
 
-    return succeeded(Object.freeze(missing));
+    return succeeded(missing);
   }
 
   if (!("value" in descriptor)) {
@@ -664,7 +661,7 @@ function readOptionalTokenResponseField(
     value: descriptor.value,
   };
 
-  return succeeded(Object.freeze(present));
+  return succeeded(present);
 }
 
 function parseRefreshTokenRotation(
@@ -675,7 +672,7 @@ function parseRefreshTokenRotation(
       kind: "refresh-token-retained",
     };
 
-    return succeeded(Object.freeze(retained));
+    return succeeded(retained);
   }
 
   const refreshToken = SpotifyRefreshToken.parse(field.value);
@@ -694,7 +691,7 @@ function parseRefreshTokenRotation(
     refreshToken: refreshToken.value,
   };
 
-  return succeeded(Object.freeze(rotated));
+  return succeeded(rotated);
 }
 
 function isInvalidGrant(input: unknown): boolean {
@@ -752,7 +749,7 @@ function tokenValueFailure(
     code: "expected-non-empty-string",
   };
 
-  return Object.freeze(failure);
+  return failure;
 }
 
 function accessTokenLifetimeFailure(): SpotifyAccessTokenLifetimeParseFailure {
@@ -761,7 +758,7 @@ function accessTokenLifetimeFailure(): SpotifyAccessTokenLifetimeParseFailure {
     code: "expected-positive-safe-integer-seconds",
   };
 
-  return Object.freeze(failure);
+  return failure;
 }
 
 function tokenResponseFailure(
@@ -776,39 +773,39 @@ function tokenResponseFailure(
     code,
   };
 
-  return Object.freeze(failure);
+  return failure;
 }
 
-function frozenJson(value: unknown): SpotifyAuthJsonReadResult {
+function json(value: unknown): SpotifyAuthJsonReadResult {
   const result: SpotifyAuthJsonReadResult = {
     kind: "json",
     value,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenInvalidJson(): SpotifyAuthJsonReadResult {
+function invalidJson(): SpotifyAuthJsonReadResult {
   const result: SpotifyAuthJsonReadResult = {
     kind: "invalid-json",
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenJsonNetworkFailure(): SpotifyAuthJsonReadResult {
+function jsonNetworkFailure(): SpotifyAuthJsonReadResult {
   const result: SpotifyAuthJsonReadResult = {
     kind: "network-failure",
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 function hasActiveRequestDeadline(deadline: BrowserRequestDeadline): boolean {
   return deadline.outcome().kind === "active";
 }
 
-function frozenFetchResponse(
+function fetchResponse(
   response: SpotifyAuthFetchResponse,
 ): SpotifyAuthFetchResult {
   const result: SpotifyAuthFetchResult = {
@@ -816,34 +813,34 @@ function frozenFetchResponse(
     response,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenNetworkFailure(): SpotifyAuthFetchResult {
+function networkFailure(): SpotifyAuthFetchResult {
   const result: SpotifyAuthFetchResult = {
     kind: "network-failure",
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenAuthorizationRequired(): SpotifyTokenRequestFailure {
+function authorizationRequired(): SpotifyTokenRequestFailure {
   const result: SpotifyTokenRequestFailure = {
     kind: "authorization-required",
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenTransientFailure(): SpotifyTokenRequestFailure {
+function transientFailure(): SpotifyTokenRequestFailure {
   const result: SpotifyTokenRequestFailure = {
     kind: "transient-failure",
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenProviderFailure(
+function providerFailure(
   code: Extract<
     SpotifyTokenRequestFailure,
     { readonly kind: "provider-failure" }
@@ -854,7 +851,7 @@ function frozenProviderFailure(
     code,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 function succeeded<Value>(value: Value): ParseSuccess<Value> {
@@ -863,7 +860,7 @@ function succeeded<Value>(value: Value): ParseSuccess<Value> {
     value,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 function failed<Failure>(error: Failure): ParseFailure<Failure> {
@@ -872,5 +869,5 @@ function failed<Failure>(error: Failure): ParseFailure<Failure> {
     error,
   };
 
-  return Object.freeze(result);
+  return result;
 }

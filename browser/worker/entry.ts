@@ -58,17 +58,17 @@ function createWorkerBootstrap(): WorkerBootstrap {
     typeof self.crypto === "undefined" ||
     typeof AbortController === "undefined"
   ) {
-    return Object.freeze({ kind: "unavailable" });
+    return { kind: "unavailable" };
   }
 
   try {
     const fetchImplementation: typeof globalThis.fetch = (input, init) =>
       self.fetch(input, init);
-    const events: PlaybackWorkerEventSink = Object.freeze({
+    const events: PlaybackWorkerEventSink = {
       emit(event): void {
         self.postMessage(event);
       },
-    });
+    };
     const scheduler = nativeWorkerScheduler();
     const requestDeadline = createBrowserRequestDeadlinePort(
       nativeRequestDeadlineScheduler(),
@@ -90,24 +90,24 @@ function createWorkerBootstrap(): WorkerBootstrap {
           createNativeIndexedDbAuthorizationPort(self.indexedDB),
         ),
       }),
-      cancellation: Object.freeze({
+      cancellation: {
         create(): AbortController {
           return new AbortController();
         },
-      }),
-      clock: Object.freeze({
+      },
+      clock: {
         now(): number {
           return Date.now();
         },
-      }),
+      },
       events,
       playbackProvider: spotifyPlaybackProvider,
       scheduler,
     });
 
-    return Object.freeze({ kind: "ready", runtime });
+    return { kind: "ready", runtime };
   } catch {
-    return Object.freeze({ kind: "unavailable" });
+    return { kind: "unavailable" };
   }
 }
 
@@ -115,15 +115,15 @@ function nativeRequestDeadlineScheduler(): BrowserRequestDeadlineSchedulerPort {
   const scheduler: BrowserRequestDeadlineSchedulerPort = {
     schedule(options) {
       const timer = self.setTimeout(options.run, options.delayMilliseconds);
-      return Object.freeze({
+      return {
         cancel(): void {
           self.clearTimeout(timer);
         },
-      });
+      };
     },
   };
 
-  return Object.freeze(scheduler);
+  return scheduler;
 }
 
 function nativeWorkerScheduler(): PlaybackWorkerSchedulerPort {
@@ -132,13 +132,13 @@ function nativeWorkerScheduler(): PlaybackWorkerSchedulerPort {
       const timer = self.setTimeout((): void => {
         void options.run();
       }, options.delayMilliseconds);
-      return Object.freeze({
+      return {
         cancel(): void {
           self.clearTimeout(timer);
         },
-      });
+      };
     },
   };
 
-  return Object.freeze(scheduler);
+  return scheduler;
 }

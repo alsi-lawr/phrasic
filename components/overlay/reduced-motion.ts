@@ -31,7 +31,7 @@ export function reducedMotionPreferenceStoreFor(
     },
   };
 
-  return Object.freeze(store);
+  return store;
 }
 
 export function useReducedMotionPreference(): boolean {
@@ -66,5 +66,5 @@ function browserReducedMotionMediaQuery(): ReducedMotionMediaQuery {
     },
   };
 
-  return Object.freeze(mediaQuery);
+  return mediaQuery;
 }

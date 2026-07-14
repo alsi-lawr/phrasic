@@ -53,39 +53,39 @@ export function createSpotifyPlaybackProvider(
             },
           );
           if (!hasActiveRequestDeadline(deadline)) {
-            return frozenNetworkFailure();
+            return networkFailure();
           }
 
           switch (response.status) {
             case 200:
               return await parseSuccessfulPlaybackResponse(response, deadline);
             case 204:
-              return frozenEmptyPlayback();
+              return emptyPlayback();
             case 401:
-              return frozenUnauthorized();
+              return unauthorized();
             case 403:
-              return frozenPermissionDenied();
+              return permissionDenied();
             case 429:
-              return frozenRateLimited(
+              return rateLimited(
                 parseRetryAfter(response.headers.get("Retry-After")),
               );
             default:
               if (response.status >= 500 && response.status <= 599) {
-                return frozenServerFailure(response.status);
+                return serverFailure(response.status);
               }
 
-              return frozenUnexpectedResponse(response.status);
+              return unexpectedResponse(response.status);
           }
         } finally {
           deadline.dispose();
         }
       } catch {
-        return frozenNetworkFailure();
+        return networkFailure();
       }
     },
   };
 
-  return Object.freeze(provider);
+  return provider;
 }
 
 async function parseSuccessfulPlaybackResponse(
@@ -97,19 +97,19 @@ async function parseSuccessfulPlaybackResponse(
     payload = await response.json();
   } catch {
     if (!hasActiveRequestDeadline(deadline)) {
-      return frozenNetworkFailure();
+      return networkFailure();
     }
 
-    return frozenMalformedResponse();
+    return malformedResponse();
   }
 
   if (!hasActiveRequestDeadline(deadline)) {
-    return frozenNetworkFailure();
+    return networkFailure();
   }
 
   const parsed = parseSpotifyPlaybackPayload(payload);
   if (parsed.kind === "failure") {
-    return frozenMalformedResponse();
+    return malformedResponse();
   }
 
   const result: PlaybackProviderResult = {
@@ -117,7 +117,7 @@ async function parseSuccessfulPlaybackResponse(
     state: parsed.value,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 function hasActiveRequestDeadline(deadline: BrowserRequestDeadline): boolean {
@@ -126,7 +126,7 @@ function hasActiveRequestDeadline(deadline: BrowserRequestDeadline): boolean {
 
 function parseRetryAfter(header: string | null): PlaybackRetryAfter {
   if (header === null || !retryAfterSecondsPattern.test(header)) {
-    return frozenInvalidOrMissingRetryAfter();
+    return invalidOrMissingRetryAfter();
   }
 
   const seconds = Number(header);
@@ -135,7 +135,7 @@ function parseRetryAfter(header: string | null): PlaybackRetryAfter {
     seconds < 0 ||
     seconds > maximumRetryAfterSeconds
   ) {
-    return frozenInvalidOrMissingRetryAfter();
+    return invalidOrMissingRetryAfter();
   }
 
   const retryAfter: PlaybackRetryAfter = {
@@ -143,61 +143,59 @@ function parseRetryAfter(header: string | null): PlaybackRetryAfter {
     delayMilliseconds: seconds * 1_000,
   };
 
-  return Object.freeze(retryAfter);
+  return retryAfter;
 }
 
-function frozenEmptyPlayback(): PlaybackProviderResult {
-  return Object.freeze({ kind: "empty" });
+function emptyPlayback(): PlaybackProviderResult {
+  return { kind: "empty" };
 }
 
-function frozenMalformedResponse(): PlaybackProviderResult {
-  return Object.freeze({ kind: "malformed-response" });
+function malformedResponse(): PlaybackProviderResult {
+  return { kind: "malformed-response" };
 }
 
-function frozenNetworkFailure(): PlaybackProviderResult {
-  return Object.freeze({ kind: "network-failure" });
+function networkFailure(): PlaybackProviderResult {
+  return { kind: "network-failure" };
 }
 
-function frozenInvalidOrMissingRetryAfter(): PlaybackRetryAfter {
-  return Object.freeze({ kind: "invalid-or-missing" });
+function invalidOrMissingRetryAfter(): PlaybackRetryAfter {
+  return { kind: "invalid-or-missing" };
 }
 
-function frozenPermissionDenied(): PlaybackProviderResult {
-  return Object.freeze({ kind: "permission-denied", status: 403 });
+function permissionDenied(): PlaybackProviderResult {
+  return { kind: "permission-denied", status: 403 };
 }
 
-function frozenRateLimited(
-  retryAfter: PlaybackRetryAfter,
-): PlaybackProviderResult {
+function rateLimited(retryAfter: PlaybackRetryAfter): PlaybackProviderResult {
   const result: PlaybackProviderResult = {
     kind: "rate-limited",
     status: 429,
     retryAfter,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenServerFailure(status: number): PlaybackProviderResult {
+function serverFailure(status: number): PlaybackProviderResult {
   const result: PlaybackProviderResult = {
     kind: "server-failure",
     status,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenUnauthorized(): PlaybackProviderResult {
-  return Object.freeze({ kind: "unauthorized", status: 401 });
+function unauthorized(): PlaybackProviderResult {
+  return { kind: "unauthorized", status: 401 };
 }
 
-function frozenUnexpectedResponse(status: number): PlaybackProviderResult {
+function unexpectedResponse(status: number): PlaybackProviderResult {
   const result: PlaybackProviderResult = {
     kind: "unexpected-response",
     status,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 function createSpotifyProviderId(): ProviderId {

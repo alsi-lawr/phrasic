@@ -20,23 +20,23 @@ if (typeof AbortController === "undefined") {
     ),
   );
 } else {
-  const events: PlaybackWorkerEventSink = Object.freeze({
+  const events: PlaybackWorkerEventSink = {
     emit(event: PlaybackWorkerEvent): void {
       self.postMessage(event);
     },
-  });
+  };
   const runtime = createPlaybackWorkerRuntime({
     authorization: provider.authorization,
-    cancellation: Object.freeze({
+    cancellation: {
       create(): AbortController {
         return new AbortController();
       },
-    }),
-    clock: Object.freeze({
+    },
+    clock: {
       now(): number {
         return Date.now();
       },
-    }),
+    },
     events,
     playbackProvider: provider.playback,
     scheduler: nativeWorkerScheduler(),
@@ -92,11 +92,11 @@ if (typeof AbortController === "undefined") {
           case "none":
             return;
           case "playback-changed":
-            await runtime.receive(Object.freeze({ kind: "retry" }));
+            await runtime.receive({ kind: "retry" });
             return;
           case "fatal":
             terminal = true;
-            await runtime.receive(Object.freeze({ kind: "dispose" }));
+            await runtime.receive({ kind: "dispose" });
             provider.dispose();
             self.postMessage(
               createPlaybackWorkerFatalInitializationFailure(
@@ -120,15 +120,15 @@ function nativeWorkerScheduler(): PlaybackWorkerSchedulerPort {
       const timer = self.setTimeout((): void => {
         void options.run();
       }, options.delayMilliseconds);
-      return Object.freeze({
+      return {
         cancel(): void {
           self.clearTimeout(timer);
         },
-      });
+      };
     },
   };
 
-  return Object.freeze(scheduler);
+  return scheduler;
 }
 
 function unreachable(value: never): never {

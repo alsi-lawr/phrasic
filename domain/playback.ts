@@ -304,9 +304,7 @@ export function createProviderLink(
     return result;
   }
 
-  return succeeded(
-    Object.freeze({ providerId: input.providerId, href: result.value }),
-  );
+  return succeeded({ providerId: input.providerId, href: result.value });
 }
 
 export type OriginalArtwork =
@@ -326,7 +324,7 @@ export function availableOriginalArtwork(
     kind: "available",
     url,
   };
-  return Object.freeze(artwork);
+  return artwork;
 }
 
 export function unavailableOriginalArtwork(
@@ -336,7 +334,7 @@ export function unavailableOriginalArtwork(
     kind: "unavailable",
     reason,
   };
-  return Object.freeze(artwork);
+  return artwork;
 }
 
 export type Creator = {
@@ -390,7 +388,7 @@ export function createTrackItem(
     return linksError;
   }
 
-  return succeeded(Object.freeze({ kind: "track", ...input }));
+  return succeeded({ kind: "track", ...input });
 }
 
 export type EpisodeItemInput = {
@@ -424,7 +422,7 @@ export function createEpisodeItem(
     return linksError;
   }
 
-  return succeeded(Object.freeze({ kind: "episode", ...input }));
+  return succeeded({ kind: "episode", ...input });
 }
 
 export type NowPlayingItem = EpisodeItem | TrackItem;
@@ -451,7 +449,7 @@ export function createPlaybackSnapshot(
     });
   }
 
-  return succeeded(Object.freeze({ ...input }));
+  return succeeded({ ...input });
 }
 
 export function authorizationFailure(
@@ -461,7 +459,7 @@ export function authorizationFailure(
     kind: "authorization-failed",
     reason,
   };
-  return Object.freeze(failure);
+  return failure;
 }
 
 export function providerFailure(
@@ -471,11 +469,11 @@ export function providerFailure(
     kind: "provider-failed",
     reason,
   };
-  return Object.freeze(failure);
+  return failure;
 }
 
 export function initialPlaybackState(): PlaybackState {
-  return freezeState({ kind: "initializing" });
+  return { kind: "initializing" };
 }
 
 export function currentPlaybackItem(state: PlaybackState): LastPlaybackItem {
@@ -507,56 +505,36 @@ export function transitionPlaybackState(
     case "authorization-complete":
       return transitionAuthorizationComplete(state, event);
     case "authorization-required":
-      return succeeded(
-        freezeState({
-          kind: "authorization-required",
-          reason: event.reason,
-        }),
-      );
+      return succeeded<PlaybackState>({
+        kind: "authorization-required",
+        reason: event.reason,
+      });
     case "begin-authorization":
       return transitionBeginAuthorization(state, event);
     case "connection-lost":
       return transitionConnectionLost(state, event);
     case "failure":
-      return succeeded(
-        freezeState({
-          kind: "failure",
-          error: event.failure,
-        }),
-      );
+      return succeeded<PlaybackState>({
+        kind: "failure",
+        error: event.failure,
+      });
     case "playback-empty":
-      return transitionFromConnectedState(
-        state,
-        event,
-        freezeState({ kind: "empty" }),
-      );
+      return transitionFromConnectedState(state, event, { kind: "empty" });
     case "playback-paused":
-      return transitionFromConnectedState(
-        state,
-        event,
-        freezeState({
-          kind: "paused",
-          snapshot: event.snapshot,
-        }),
-      );
+      return transitionFromConnectedState(state, event, {
+        kind: "paused",
+        snapshot: event.snapshot,
+      });
     case "playback-playing":
-      return transitionFromConnectedState(
-        state,
-        event,
-        freezeState({
-          kind: "playing",
-          snapshot: event.snapshot,
-        }),
-      );
+      return transitionFromConnectedState(state, event, {
+        kind: "playing",
+        snapshot: event.snapshot,
+      });
     case "playback-unsupported":
-      return transitionFromConnectedState(
-        state,
-        event,
-        freezeState({
-          kind: "unsupported",
-          reason: event.reason,
-        }),
-      );
+      return transitionFromConnectedState(state, event, {
+        kind: "unsupported",
+        reason: event.reason,
+      });
     case "retry":
       return transitionRetry(state, event);
   }
@@ -620,7 +598,7 @@ function invalidValue(
     value,
     reason,
   };
-  return Object.freeze(error);
+  return error;
 }
 
 function providerLinksError(
@@ -651,7 +629,7 @@ function invalidItem(
     item,
     reason,
   };
-  return Object.freeze(error);
+  return error;
 }
 
 function transitionAuthorizationAvailable(
@@ -702,7 +680,7 @@ function transitionBeginAuthorization(
 ): Result<PlaybackState, PlaybackTransitionError> {
   switch (state.kind) {
     case "authorization-required":
-      return succeeded(freezeState({ kind: "authorizing" }));
+      return succeeded<PlaybackState>({ kind: "authorizing" });
     case "initializing":
     case "authorizing":
     case "empty":
@@ -778,7 +756,7 @@ function transitionRetry(
 ): Result<PlaybackState, PlaybackTransitionError> {
   switch (state.kind) {
     case "failure":
-      return succeeded(freezeState({ kind: "initializing" }));
+      return succeeded<PlaybackState>({ kind: "initializing" });
     case "initializing":
     case "authorization-required":
     case "authorizing":
@@ -796,10 +774,10 @@ function transitionRetry(
 function reconnectingState(
   lastItem: LastPlaybackItem,
 ): ReconnectingPlaybackState {
-  return freezeState({
+  return {
     kind: "reconnecting",
     lastItem,
-  });
+  };
 }
 
 function availableLastItem(item: NowPlayingItem): LastPlaybackItem {
@@ -807,14 +785,14 @@ function availableLastItem(item: NowPlayingItem): LastPlaybackItem {
     kind: "available",
     item,
   };
-  return Object.freeze(lastItem);
+  return lastItem;
 }
 
 export function unavailableLastPlaybackItem(): LastPlaybackItem {
   const lastItem: LastPlaybackItem = {
     kind: "unavailable",
   };
-  return Object.freeze(lastItem);
+  return lastItem;
 }
 
 function invalidTransition(
@@ -826,11 +804,7 @@ function invalidTransition(
     state: state.kind,
     event: event.kind,
   };
-  return failed(Object.freeze(error));
-}
-
-function freezeState<State extends PlaybackState>(state: State): State {
-  return Object.freeze(state);
+  return failed(error);
 }
 
 function succeeded<Value>(value: Value): {
@@ -844,7 +818,7 @@ function succeeded<Value>(value: Value): {
     kind: "success",
     value,
   };
-  return Object.freeze(result);
+  return result;
 }
 
 function failed<Failure>(error: Failure): {
@@ -858,7 +832,7 @@ function failed<Failure>(error: Failure): {
     kind: "failure",
     error,
   };
-  return Object.freeze(result);
+  return result;
 }
 
 function assertNever(value: never): never {
