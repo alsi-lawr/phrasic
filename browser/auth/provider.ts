@@ -64,7 +64,8 @@ export type AuthorizationConnectionResult =
     }
   | {
       readonly kind: "authorization-required";
-      readonly reason: "invalid-credentials" | "missing-connection";
+      readonly reason:
+        "authorization-expired" | "invalid-credentials" | "missing-connection";
     }
   | {
       readonly kind: "transient-failure";
@@ -85,6 +86,10 @@ export type BeginAuthorizationResult =
     }
   | {
       readonly kind: "authorization-denied";
+    }
+  | {
+      readonly kind: "authorization-required";
+      readonly reason: "not-authorized";
     }
   | {
       readonly kind: "transient-failure";

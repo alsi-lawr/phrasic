@@ -347,6 +347,10 @@ export function createPlaybackWorkerRuntime(
           reason: "authorization-denied",
         });
         return;
+      case "authorization-required":
+        emitDiagnostic("authorization", "authorization-denied");
+        transition({ kind: "authorization-required", reason: result.reason });
+        return;
       case "transient-failure":
         emitDiagnostic("authorization", "authorization-transient-failure");
         transitionToFailure(providerFailure("network"));
@@ -659,10 +663,7 @@ export function createPlaybackWorkerRuntime(
         emitDiagnostic("token-refresh", "authorization-required");
         transition({
           kind: "authorization-required",
-          reason:
-            refreshed.reason === "invalid-credentials"
-              ? "authorization-revoked"
-              : "not-authorized",
+          reason: authorizationRequiredReason(refreshed.reason),
         });
         return;
       case "transient-failure":
@@ -848,10 +849,7 @@ export function createPlaybackWorkerRuntime(
         emitDiagnostic("token-refresh", "authorization-required");
         transition({
           kind: "authorization-required",
-          reason:
-            refreshed.reason === "invalid-credentials"
-              ? "authorization-revoked"
-              : "not-authorized",
+          reason: authorizationRequiredReason(refreshed.reason),
         });
         return;
       case "transient-failure":
@@ -1413,6 +1411,24 @@ function isSafeScheduleDelay(delayMilliseconds: number): boolean {
     delayMilliseconds >= 0 &&
     delayMilliseconds <= maximumScheduledDelayMilliseconds
   );
+}
+
+function authorizationRequiredReason(
+  reason: Extract<
+    AuthorizationConnectionResult,
+    { readonly kind: "authorization-required" }
+  >["reason"],
+): "authorization-expired" | "authorization-revoked" | "not-authorized" {
+  switch (reason) {
+    case "authorization-expired":
+      return "authorization-expired";
+    case "invalid-credentials":
+      return "authorization-revoked";
+    case "missing-connection":
+      return "not-authorized";
+  }
+
+  return unreachable(reason);
 }
 
 function frozenAwaitingInitialization(): RuntimeStatus {

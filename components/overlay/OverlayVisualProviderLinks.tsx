@@ -408,5 +408,5 @@ function creatorPrecedingText(
 }
 
 function unreachable(value: never): never {
-  throw new Error(`Unexpected visible Spotify link: ${String(value)}`);
+  throw new Error(`Unexpected visible provider link: ${String(value)}`);
 }
