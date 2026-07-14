@@ -45,6 +45,7 @@ import {
   type PlaybackProviderResult,
 } from "../providers/registry.ts";
 import {
+  createPlaybackWorkerFatalInitializationFailure,
   createPlaybackWorkerSafeDiagnostic,
   noPlaybackWorkerDiagnosticMetadata,
   parsePlaybackWorkerCommand,
@@ -1363,13 +1364,7 @@ export function createPlaybackWorkerRuntime(
   ): void {
     cancelRuntimeWork();
     runtimeStatus = frozenFatalRuntime();
-    ports.events.emit(createFatalInitializationEvent(code));
-  }
-
-  function createFatalInitializationEvent(
-    code: "invalid-public-configuration" | "worker-initialization-failed",
-  ): PlaybackWorkerEvent {
-    return Object.freeze({ kind: "fatal-initialization-failure", code });
+    ports.events.emit(createPlaybackWorkerFatalInitializationFailure(code));
   }
 
   function activeConfiguration():

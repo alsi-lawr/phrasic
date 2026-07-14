@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   deserializePlaybackWireState,
-  failurePlaybackWireState,
   parsePlaybackWireState,
   serializePlaybackState,
   type PlaybackWireState,
@@ -24,88 +23,7 @@ import {
   playingTrackPayload,
 } from "../providers/spotify-payload.fixture.ts";
 
-test("the worker wire serializes and validates every emitted playback state", () => {
-  const playing = wireState(playingTrackPayload);
-  const paused = wireState(pausedEpisodePayload);
-  const empty = wireState(emptyTrackPayload);
-  const unsupported = wireState(advertisementPayload);
-  const failure = failurePlaybackWireState(providerFailure("network"));
-
-  const cases: ReadonlyArray<{
-    readonly state: PlaybackWireState;
-    readonly kind: PlaybackWireState["kind"];
-  }> = [
-    { state: playing, kind: "playing" },
-    { state: paused, kind: "paused" },
-    { state: empty, kind: "empty" },
-    { state: unsupported, kind: "unsupported" },
-    { state: failure, kind: "failure" },
-  ];
-
-  for (const scenario of cases) {
-    const parsed = expectSuccess(parsePlaybackWireState(scenario.state));
-    assert.equal(parsed.kind, scenario.kind);
-  }
-});
-
-test("the worker wire preserves every lifecycle state without relabeling it as malformed", () => {
-  const initializing = initialPlaybackState();
-  const authorizationRequired = expectSuccess(
-    transitionPlaybackState(initializing, {
-      kind: "authorization-required",
-      reason: "not-authorized",
-    }),
-  );
-  const authorizing = expectSuccess(
-    transitionPlaybackState(authorizationRequired, {
-      kind: "begin-authorization",
-    }),
-  );
-  const reconnecting = expectSuccess(
-    transitionPlaybackState(authorizing, {
-      kind: "authorization-complete",
-    }),
-  );
-
-  const cases: ReadonlyArray<{
-    readonly state: PlaybackState;
-    readonly expected: PlaybackWireState;
-  }> = [
-    {
-      state: initializing,
-      expected: { kind: "initializing" },
-    },
-    {
-      state: authorizationRequired,
-      expected: {
-        kind: "authorization-required",
-        reason: "not-authorized",
-      },
-    },
-    {
-      state: authorizing,
-      expected: { kind: "authorizing" },
-    },
-    {
-      state: reconnecting,
-      expected: {
-        kind: "reconnecting",
-        lastItem: { kind: "unavailable" },
-      },
-    },
-  ];
-
-  for (const scenario of cases) {
-    const serialized = serializePlaybackState(scenario.state);
-    assert.deepEqual(serialized, scenario.expected);
-    assert.deepEqual(
-      expectSuccess(parsePlaybackWireState(serialized)),
-      serialized,
-    );
-  }
-});
-
-test("validated wire states deserialize to trusted playback states", () => {
+test("the worker wire round-trips every lifecycle state through parsing and deserialization", () => {
   const initializing = initialPlaybackState();
   const authorizationRequired = expectSuccess(
     transitionPlaybackState(initializing, {
@@ -163,11 +81,13 @@ test("validated wire states deserialize to trusted playback states", () => {
   ];
 
   for (const state of states) {
-    const wire = serializePlaybackState(state);
-    const deserialized = expectSuccess(deserializePlaybackWireState(wire));
+    const serialized = serializePlaybackState(state);
+    const parsed = expectSuccess(parsePlaybackWireState(serialized));
+    const deserialized = expectSuccess(deserializePlaybackWireState(parsed));
 
+    assert.deepEqual(parsed, serialized);
     assert.equal(deserialized.kind, state.kind);
-    assert.deepEqual(serializePlaybackState(deserialized), wire);
+    assert.deepEqual(serializePlaybackState(deserialized), parsed);
   }
 });
 

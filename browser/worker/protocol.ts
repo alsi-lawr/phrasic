@@ -157,10 +157,6 @@ export type PlaybackWorkerEventParseFailure = {
   readonly code: WorkerProtocolParseCode;
 };
 
-type FailureFactory<Failure> = {
-  readonly create: (code: WorkerProtocolParseCode) => Failure;
-};
-
 const noDiagnosticMetadata: PlaybackWorkerDiagnosticMetadata = Object.freeze({
   kind: "none",
 });
@@ -168,38 +164,38 @@ const noDiagnosticMetadata: PlaybackWorkerDiagnosticMetadata = Object.freeze({
 export function parsePlaybackWorkerCommand(
   input: unknown,
 ): Result<PlaybackWorkerCommand, PlaybackWorkerCommandParseFailure> {
-  const failures: FailureFactory<PlaybackWorkerCommandParseFailure> = {
-    create: commandParseFailure,
-  };
-
   try {
-    const source = parseObject(input, failures);
+    const source = parseObject(input, commandParseFailure);
     if (source.kind === "failure") {
       return source;
     }
 
-    const kind = readRequiredString(source.value, "kind", failures);
+    const kind = readRequiredString(
+      source.value,
+      "kind",
+      commandParseFailure,
+    );
     if (kind.kind === "failure") {
       return kind;
     }
 
     switch (kind.value) {
       case "initialize":
-        return parseInitializeCommand(source.value, failures);
+        return parseInitializeCommand(source.value);
       case "begin-authorization":
-        return parseBeginAuthorizationCommand(source.value, failures);
+        return parseBeginAuthorizationCommand(source.value);
       case "consume-callback":
-        return parseConsumeCallbackCommand(source.value, failures);
+        return parseConsumeCallbackCommand(source.value);
       case "retry":
-        return parseNoArgumentCommand(source.value, "retry", failures);
+        return parseNoArgumentCommand(source.value, "retry");
       case "visibility-change":
-        return parseVisibilityChangeCommand(source.value, failures);
+        return parseVisibilityChangeCommand(source.value);
       case "logout":
-        return parseNoArgumentCommand(source.value, "logout", failures);
+        return parseNoArgumentCommand(source.value, "logout");
       case "dispose":
-        return parseNoArgumentCommand(source.value, "dispose", failures);
+        return parseNoArgumentCommand(source.value, "dispose");
       default:
-        return failed(failures.create("invalid-kind"));
+        return failed(commandParseFailure("invalid-kind"));
     }
   } catch {
     return failed(commandParseFailure("expected-object"));
@@ -228,34 +224,30 @@ export function noPlaybackWorkerDiagnosticMetadata(): PlaybackWorkerDiagnosticMe
 export function parsePlaybackWorkerEvent(
   input: unknown,
 ): Result<PlaybackWorkerEvent, PlaybackWorkerEventParseFailure> {
-  const failures: FailureFactory<PlaybackWorkerEventParseFailure> = {
-    create: eventParseFailure,
-  };
-
   try {
-    const source = parseObject(input, failures);
+    const source = parseObject(input, eventParseFailure);
     if (source.kind === "failure") {
       return source;
     }
 
-    const kind = readRequiredString(source.value, "kind", failures);
+    const kind = readRequiredString(source.value, "kind", eventParseFailure);
     if (kind.kind === "failure") {
       return kind;
     }
 
     switch (kind.value) {
       case "authorization-redirect":
-        return parseAuthorizationRedirectEvent(source.value, failures);
+        return parseAuthorizationRedirectEvent(source.value);
       case "callback-url-restored":
-        return parseCallbackUrlRestoredEvent(source.value, failures);
+        return parseCallbackUrlRestoredEvent(source.value);
       case "playback-state":
-        return parsePlaybackStateEvent(source.value, failures);
+        return parsePlaybackStateEvent(source.value);
       case "safe-diagnostic":
-        return parseSafeDiagnosticEvent(source.value, failures);
+        return parseSafeDiagnosticEvent(source.value);
       case "fatal-initialization-failure":
-        return parseFatalInitializationFailureEvent(source.value, failures);
+        return parseFatalInitializationFailureEvent(source.value);
       default:
-        return failed(failures.create("invalid-kind"));
+        return failed(eventParseFailure("invalid-kind"));
     }
   } catch {
     return failed(eventParseFailure("expected-object"));
@@ -275,12 +267,11 @@ export function createPlaybackWorkerFatalInitializationFailure(
 
 function parseInitializeCommand(
   source: object,
-  failures: FailureFactory<PlaybackWorkerCommandParseFailure>,
 ): Result<PlaybackWorkerInitializeCommand, PlaybackWorkerCommandParseFailure> {
   const exact = parseExactObject(
     source,
     ["kind", "applicationUrl", "configuration"],
-    failures,
+    commandParseFailure,
   );
   if (exact.kind === "failure") {
     return exact;
@@ -289,7 +280,7 @@ function parseInitializeCommand(
   const applicationUrl = readRequiredNonEmptyString(
     exact.value,
     "applicationUrl",
-    failures,
+    commandParseFailure,
   );
   if (applicationUrl.kind === "failure") {
     return applicationUrl;
@@ -298,7 +289,7 @@ function parseInitializeCommand(
   const configuration = readRequiredDataProperty(
     exact.value,
     "configuration",
-    failures,
+    commandParseFailure,
   );
   if (configuration.kind === "failure") {
     return configuration;
@@ -315,17 +306,24 @@ function parseInitializeCommand(
 
 function parseBeginAuthorizationCommand(
   source: object,
-  failures: FailureFactory<PlaybackWorkerCommandParseFailure>,
 ): Result<
   PlaybackWorkerBeginAuthorizationCommand,
   PlaybackWorkerCommandParseFailure
 > {
-  const exact = parseExactObject(source, ["kind", "returnTo"], failures);
+  const exact = parseExactObject(
+    source,
+    ["kind", "returnTo"],
+    commandParseFailure,
+  );
   if (exact.kind === "failure") {
     return exact;
   }
 
-  const returnTo = readRequiredDataProperty(exact.value, "returnTo", failures);
+  const returnTo = readRequiredDataProperty(
+    exact.value,
+    "returnTo",
+    commandParseFailure,
+  );
   if (returnTo.kind === "failure") {
     return returnTo;
   }
@@ -340,12 +338,15 @@ function parseBeginAuthorizationCommand(
 
 function parseConsumeCallbackCommand(
   source: object,
-  failures: FailureFactory<PlaybackWorkerCommandParseFailure>,
 ): Result<
   PlaybackWorkerConsumeCallbackCommand,
   PlaybackWorkerCommandParseFailure
 > {
-  const exact = parseExactObject(source, ["kind", "callbackUrl"], failures);
+  const exact = parseExactObject(
+    source,
+    ["kind", "callbackUrl"],
+    commandParseFailure,
+  );
   if (exact.kind === "failure") {
     return exact;
   }
@@ -353,7 +354,7 @@ function parseConsumeCallbackCommand(
   const callbackUrl = readRequiredNonEmptyString(
     exact.value,
     "callbackUrl",
-    failures,
+    commandParseFailure,
   );
   if (callbackUrl.kind === "failure") {
     return callbackUrl;
@@ -370,14 +371,13 @@ function parseConsumeCallbackCommand(
 function parseNoArgumentCommand(
   source: object,
   kind: "dispose" | "logout" | "retry",
-  failures: FailureFactory<PlaybackWorkerCommandParseFailure>,
 ): Result<
   | PlaybackWorkerDisposeCommand
   | PlaybackWorkerLogoutCommand
   | PlaybackWorkerRetryCommand,
   PlaybackWorkerCommandParseFailure
 > {
-  const exact = parseExactObject(source, ["kind"], failures);
+  const exact = parseExactObject(source, ["kind"], commandParseFailure);
   if (exact.kind === "failure") {
     return exact;
   }
@@ -397,22 +397,29 @@ function parseNoArgumentCommand(
     }
   }
 
-  return failed(failures.create("invalid-kind"));
+  return failed(commandParseFailure("invalid-kind"));
 }
 
 function parseVisibilityChangeCommand(
   source: object,
-  failures: FailureFactory<PlaybackWorkerCommandParseFailure>,
 ): Result<
   PlaybackWorkerVisibilityChangeCommand,
   PlaybackWorkerCommandParseFailure
 > {
-  const exact = parseExactObject(source, ["kind", "visibility"], failures);
+  const exact = parseExactObject(
+    source,
+    ["kind", "visibility"],
+    commandParseFailure,
+  );
   if (exact.kind === "failure") {
     return exact;
   }
 
-  const visibility = readRequiredString(exact.value, "visibility", failures);
+  const visibility = readRequiredString(
+    exact.value,
+    "visibility",
+    commandParseFailure,
+  );
   if (visibility.kind === "failure") {
     return visibility;
   }
@@ -427,23 +434,26 @@ function parseVisibilityChangeCommand(
       return succeeded(Object.freeze(command));
     }
     default:
-      return failed(failures.create("invalid-value"));
+      return failed(commandParseFailure("invalid-value"));
   }
 }
 
 function parseAuthorizationRedirectEvent(
   source: object,
-  failures: FailureFactory<PlaybackWorkerEventParseFailure>,
 ): Result<
   PlaybackWorkerAuthorizationRedirect,
   PlaybackWorkerEventParseFailure
 > {
-  const exact = parseExactObject(source, ["kind", "url"], failures);
+  const exact = parseExactObject(source, ["kind", "url"], eventParseFailure);
   if (exact.kind === "failure") {
     return exact;
   }
 
-  const url = readRequiredNonEmptyString(exact.value, "url", failures);
+  const url = readRequiredNonEmptyString(
+    exact.value,
+    "url",
+    eventParseFailure,
+  );
   if (url.kind === "failure") {
     return url;
   }
@@ -458,14 +468,17 @@ function parseAuthorizationRedirectEvent(
 
 function parseCallbackUrlRestoredEvent(
   source: object,
-  failures: FailureFactory<PlaybackWorkerEventParseFailure>,
 ): Result<PlaybackWorkerCallbackUrlRestored, PlaybackWorkerEventParseFailure> {
-  const exact = parseExactObject(source, ["kind", "url"], failures);
+  const exact = parseExactObject(source, ["kind", "url"], eventParseFailure);
   if (exact.kind === "failure") {
     return exact;
   }
 
-  const url = readRequiredNonEmptyString(exact.value, "url", failures);
+  const url = readRequiredNonEmptyString(
+    exact.value,
+    "url",
+    eventParseFailure,
+  );
   if (url.kind === "failure") {
     return url;
   }
@@ -480,21 +493,24 @@ function parseCallbackUrlRestoredEvent(
 
 function parsePlaybackStateEvent(
   source: object,
-  failures: FailureFactory<PlaybackWorkerEventParseFailure>,
 ): Result<PlaybackWorkerPlaybackState, PlaybackWorkerEventParseFailure> {
-  const exact = parseExactObject(source, ["kind", "state"], failures);
+  const exact = parseExactObject(source, ["kind", "state"], eventParseFailure);
   if (exact.kind === "failure") {
     return exact;
   }
 
-  const stateValue = readRequiredDataProperty(exact.value, "state", failures);
+  const stateValue = readRequiredDataProperty(
+    exact.value,
+    "state",
+    eventParseFailure,
+  );
   if (stateValue.kind === "failure") {
     return stateValue;
   }
 
   const state = parsePlaybackWireState(stateValue.value);
   if (state.kind === "failure") {
-    return failed(failures.create("invalid-value"));
+    return failed(eventParseFailure("invalid-value"));
   }
 
   const event: PlaybackWorkerPlaybackState = {
@@ -507,33 +523,40 @@ function parsePlaybackStateEvent(
 
 function parseSafeDiagnosticEvent(
   source: object,
-  failures: FailureFactory<PlaybackWorkerEventParseFailure>,
 ): Result<PlaybackWorkerSafeDiagnostic, PlaybackWorkerEventParseFailure> {
   const exact = parseExactObject(
     source,
     ["kind", "operation", "code", "metadata"],
-    failures,
+    eventParseFailure,
   );
   if (exact.kind === "failure") {
     return exact;
   }
 
-  const operationValue = readRequiredString(exact.value, "operation", failures);
+  const operationValue = readRequiredString(
+    exact.value,
+    "operation",
+    eventParseFailure,
+  );
   if (operationValue.kind === "failure") {
     return operationValue;
   }
 
-  const operation = parseDiagnosticOperation(operationValue.value, failures);
+  const operation = parseDiagnosticOperation(operationValue.value);
   if (operation.kind === "failure") {
     return operation;
   }
 
-  const codeValue = readRequiredString(exact.value, "code", failures);
+  const codeValue = readRequiredString(
+    exact.value,
+    "code",
+    eventParseFailure,
+  );
   if (codeValue.kind === "failure") {
     return codeValue;
   }
 
-  const code = parseDiagnosticCode(codeValue.value, failures);
+  const code = parseDiagnosticCode(codeValue.value);
   if (code.kind === "failure") {
     return code;
   }
@@ -541,13 +564,13 @@ function parseSafeDiagnosticEvent(
   const metadataValue = readRequiredDataProperty(
     exact.value,
     "metadata",
-    failures,
+    eventParseFailure,
   );
   if (metadataValue.kind === "failure") {
     return metadataValue;
   }
 
-  const metadata = parseDiagnosticMetadata(metadataValue.value, failures);
+  const metadata = parseDiagnosticMetadata(metadataValue.value);
   if (metadata.kind === "failure") {
     return metadata;
   }
@@ -563,17 +586,16 @@ function parseSafeDiagnosticEvent(
 
 function parseFatalInitializationFailureEvent(
   source: object,
-  failures: FailureFactory<PlaybackWorkerEventParseFailure>,
 ): Result<
   PlaybackWorkerFatalInitializationFailure,
   PlaybackWorkerEventParseFailure
 > {
-  const exact = parseExactObject(source, ["kind", "code"], failures);
+  const exact = parseExactObject(source, ["kind", "code"], eventParseFailure);
   if (exact.kind === "failure") {
     return exact;
   }
 
-  const code = readRequiredString(exact.value, "code", failures);
+  const code = readRequiredString(exact.value, "code", eventParseFailure);
   if (code.kind === "failure") {
     return code;
   }
@@ -586,13 +608,12 @@ function parseFatalInitializationFailureEvent(
         createPlaybackWorkerFatalInitializationFailure(code.value),
       );
     default:
-      return failed(failures.create("invalid-value"));
+      return failed(eventParseFailure("invalid-value"));
   }
 }
 
 function parseDiagnosticOperation(
   value: string,
-  failures: FailureFactory<PlaybackWorkerEventParseFailure>,
 ): Result<PlaybackWorkerDiagnosticOperation, PlaybackWorkerEventParseFailure> {
   switch (value) {
     case "authorization":
@@ -604,13 +625,12 @@ function parseDiagnosticOperation(
     case "token-refresh":
       return succeeded(value);
     default:
-      return failed(failures.create("invalid-value"));
+      return failed(eventParseFailure("invalid-value"));
   }
 }
 
 function parseDiagnosticCode(
   value: string,
-  failures: FailureFactory<PlaybackWorkerEventParseFailure>,
 ): Result<PlaybackWorkerDiagnosticCode, PlaybackWorkerEventParseFailure> {
   switch (value) {
     case "authorization-denied":
@@ -637,27 +657,30 @@ function parseDiagnosticCode(
     case "unsupported-playback-result":
       return succeeded(value);
     default:
-      return failed(failures.create("invalid-value"));
+      return failed(eventParseFailure("invalid-value"));
   }
 }
 
 function parseDiagnosticMetadata(
   input: unknown,
-  failures: FailureFactory<PlaybackWorkerEventParseFailure>,
 ): Result<PlaybackWorkerDiagnosticMetadata, PlaybackWorkerEventParseFailure> {
-  const source = parseObject(input, failures);
+  const source = parseObject(input, eventParseFailure);
   if (source.kind === "failure") {
     return source;
   }
 
-  const kind = readRequiredString(source.value, "kind", failures);
+  const kind = readRequiredString(source.value, "kind", eventParseFailure);
   if (kind.kind === "failure") {
     return kind;
   }
 
   switch (kind.value) {
     case "none": {
-      const exact = parseExactObject(source.value, ["kind"], failures);
+      const exact = parseExactObject(
+        source.value,
+        ["kind"],
+        eventParseFailure,
+      );
       if (exact.kind === "failure") {
         return exact;
       }
@@ -668,7 +691,7 @@ function parseDiagnosticMetadata(
       const exact = parseExactObject(
         source.value,
         ["kind", "status"],
-        failures,
+        eventParseFailure,
       );
       if (exact.kind === "failure") {
         return exact;
@@ -677,7 +700,7 @@ function parseDiagnosticMetadata(
       const status = readRequiredSafeHttpStatus(
         exact.value,
         "status",
-        failures,
+        eventParseFailure,
       );
       if (status.kind === "failure") {
         return status;
@@ -693,7 +716,7 @@ function parseDiagnosticMetadata(
       const exact = parseExactObject(
         source.value,
         ["kind", "retryAfterMilliseconds"],
-        failures,
+        eventParseFailure,
       );
       if (exact.kind === "failure") {
         return exact;
@@ -702,7 +725,7 @@ function parseDiagnosticMetadata(
       const retryAfterMilliseconds = readRequiredRetryAfterMilliseconds(
         exact.value,
         "retryAfterMilliseconds",
-        failures,
+        eventParseFailure,
       );
       if (retryAfterMilliseconds.kind === "failure") {
         return retryAfterMilliseconds;
@@ -718,7 +741,7 @@ function parseDiagnosticMetadata(
       const exact = parseExactObject(
         source.value,
         ["kind", "status", "retryAfterMilliseconds"],
-        failures,
+        eventParseFailure,
       );
       if (exact.kind === "failure") {
         return exact;
@@ -727,7 +750,7 @@ function parseDiagnosticMetadata(
       const status = readRequiredSafeHttpStatus(
         exact.value,
         "status",
-        failures,
+        eventParseFailure,
       );
       if (status.kind === "failure") {
         return status;
@@ -736,7 +759,7 @@ function parseDiagnosticMetadata(
       const retryAfterMilliseconds = readRequiredRetryAfterMilliseconds(
         exact.value,
         "retryAfterMilliseconds",
-        failures,
+        eventParseFailure,
       );
       if (retryAfterMilliseconds.kind === "failure") {
         return retryAfterMilliseconds;
@@ -750,16 +773,16 @@ function parseDiagnosticMetadata(
       return succeeded(Object.freeze(metadata));
     }
     default:
-      return failed(failures.create("invalid-value"));
+      return failed(eventParseFailure("invalid-value"));
   }
 }
 
 function parseObject<Failure>(
   input: unknown,
-  failures: FailureFactory<Failure>,
+  createFailure: (code: WorkerProtocolParseCode) => Failure,
 ): Result<object, Failure> {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    return failed(failures.create("expected-object"));
+    return failed(createFailure("expected-object"));
   }
 
   return succeeded(input);
@@ -768,17 +791,17 @@ function parseObject<Failure>(
 function parseExactObject<Failure>(
   source: object,
   allowedFields: ReadonlyArray<string>,
-  failures: FailureFactory<Failure>,
+  createFailure: (code: WorkerProtocolParseCode) => Failure,
 ): Result<object, Failure> {
   const fieldNames = Object.getOwnPropertyNames(source);
   for (const fieldName of fieldNames) {
     if (!allowedFields.includes(fieldName)) {
-      return failed(failures.create("unexpected-field"));
+      return failed(createFailure("unexpected-field"));
     }
   }
 
   if (Object.getOwnPropertySymbols(source).length > 0) {
-    return failed(failures.create("unexpected-field"));
+    return failed(createFailure("unexpected-field"));
   }
 
   return succeeded(source);
@@ -787,15 +810,15 @@ function parseExactObject<Failure>(
 function readRequiredDataProperty<Failure>(
   source: object,
   fieldName: string,
-  failures: FailureFactory<Failure>,
+  createFailure: (code: WorkerProtocolParseCode) => Failure,
 ): Result<unknown, Failure> {
   const descriptor = Object.getOwnPropertyDescriptor(source, fieldName);
   if (descriptor === undefined) {
-    return failed(failures.create("missing-value"));
+    return failed(createFailure("missing-value"));
   }
 
   if (!("value" in descriptor)) {
-    return failed(failures.create("expected-data-property"));
+    return failed(createFailure("expected-data-property"));
   }
 
   return succeeded(descriptor.value);
@@ -804,15 +827,15 @@ function readRequiredDataProperty<Failure>(
 function readRequiredString<Failure>(
   source: object,
   fieldName: string,
-  failures: FailureFactory<Failure>,
+  createFailure: (code: WorkerProtocolParseCode) => Failure,
 ): Result<string, Failure> {
-  const value = readRequiredDataProperty(source, fieldName, failures);
+  const value = readRequiredDataProperty(source, fieldName, createFailure);
   if (value.kind === "failure") {
     return value;
   }
 
   if (typeof value.value !== "string") {
-    return failed(failures.create("invalid-value"));
+    return failed(createFailure("invalid-value"));
   }
 
   return succeeded(value.value);
@@ -821,15 +844,15 @@ function readRequiredString<Failure>(
 function readRequiredNonEmptyString<Failure>(
   source: object,
   fieldName: string,
-  failures: FailureFactory<Failure>,
+  createFailure: (code: WorkerProtocolParseCode) => Failure,
 ): Result<string, Failure> {
-  const value = readRequiredString(source, fieldName, failures);
+  const value = readRequiredString(source, fieldName, createFailure);
   if (value.kind === "failure") {
     return value;
   }
 
   if (value.value.trim().length === 0) {
-    return failed(failures.create("expected-non-empty-string"));
+    return failed(createFailure("expected-non-empty-string"));
   }
 
   return value;
@@ -838,9 +861,9 @@ function readRequiredNonEmptyString<Failure>(
 function readRequiredSafeHttpStatus<Failure>(
   source: object,
   fieldName: string,
-  failures: FailureFactory<Failure>,
+  createFailure: (code: WorkerProtocolParseCode) => Failure,
 ): Result<number, Failure> {
-  const value = readRequiredDataProperty(source, fieldName, failures);
+  const value = readRequiredDataProperty(source, fieldName, createFailure);
   if (value.kind === "failure") {
     return value;
   }
@@ -851,7 +874,7 @@ function readRequiredSafeHttpStatus<Failure>(
     value.value < 100 ||
     value.value > 599
   ) {
-    return failed(failures.create("invalid-value"));
+    return failed(createFailure("invalid-value"));
   }
 
   return succeeded(value.value);
@@ -860,9 +883,9 @@ function readRequiredSafeHttpStatus<Failure>(
 function readRequiredRetryAfterMilliseconds<Failure>(
   source: object,
   fieldName: string,
-  failures: FailureFactory<Failure>,
+  createFailure: (code: WorkerProtocolParseCode) => Failure,
 ): Result<number, Failure> {
-  const value = readRequiredDataProperty(source, fieldName, failures);
+  const value = readRequiredDataProperty(source, fieldName, createFailure);
   if (value.kind === "failure") {
     return value;
   }
@@ -873,7 +896,7 @@ function readRequiredRetryAfterMilliseconds<Failure>(
     value.value < 0 ||
     value.value > maximumPlatformTimerDelayMilliseconds
   ) {
-    return failed(failures.create("expected-non-negative-safe-integer"));
+    return failed(createFailure("expected-non-negative-safe-integer"));
   }
 
   return succeeded(value.value);
