@@ -7,6 +7,7 @@ import {
   type PlaybackState,
 } from "../domain/playback.ts";
 import type { BrowserConfigurationResponse } from "./configuration-response.ts";
+import type { AuthorizationReturnTarget } from "./auth/provider.ts";
 import type { BrowserPlaybackIntegration } from "./integrations/browser-integration.ts";
 
 const defaultDisplayWidth = 1_920;
@@ -369,7 +370,9 @@ export function createBrowserPlaybackApplication(
   }
 }
 
-function displayReturnConfiguration(currentUrl: URL): unknown {
+function displayReturnConfiguration(
+  currentUrl: URL,
+): AuthorizationReturnTarget {
   const display = parseDisplayQuery(currentUrl.searchParams);
   const width = displayWidth(display);
   const setup = displaySetupRequested(display);

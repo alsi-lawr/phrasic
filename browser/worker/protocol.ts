@@ -1,8 +1,8 @@
 import {
   maximumPlatformTimerDelayMilliseconds,
   type PlaybackState,
-  type Result,
 } from "../../domain/playback.ts";
+import type { AuthorizationReturnTarget } from "../auth/provider.ts";
 
 export type PlaybackWorkerInitializeCommand = {
   readonly kind: "initialize";
@@ -12,7 +12,7 @@ export type PlaybackWorkerInitializeCommand = {
 
 export type PlaybackWorkerBeginAuthorizationCommand = {
   readonly kind: "begin-authorization";
-  readonly returnTo: unknown;
+  readonly returnTo: AuthorizationReturnTarget;
 };
 
 export type PlaybackWorkerConsumeCallbackCommand = {
@@ -46,21 +46,6 @@ export type PlaybackWorkerCommand =
   | PlaybackWorkerRetryCommand
   | PlaybackWorkerVisibilityChangeCommand;
 
-type WorkerProtocolParseCode =
-  | "expected-data-property"
-  | "expected-non-empty-string"
-  | "expected-non-negative-safe-integer"
-  | "expected-object"
-  | "invalid-kind"
-  | "invalid-value"
-  | "missing-value"
-  | "unexpected-field";
-
-export type PlaybackWorkerCommandParseFailure = {
-  readonly kind: "invalid-playback-worker-command";
-  readonly code: WorkerProtocolParseCode;
-};
-
 export type PlaybackWorkerDiagnosticOperation =
   | "authorization"
   | "command"
@@ -77,8 +62,6 @@ export type PlaybackWorkerDiagnosticCode =
   | "authorization-transient-failure"
   | "command-not-allowed"
   | "invalid-callback-url"
-  | "invalid-command"
-  | "invalid-display-return-configuration"
   | "invalid-public-configuration"
   | "invalid-retry-after"
   | "invalid-runtime-transition"
@@ -153,43 +136,6 @@ const noDiagnosticMetadata: PlaybackWorkerDiagnosticMetadata = Object.freeze({
   kind: "none",
 });
 
-export function parsePlaybackWorkerCommand(
-  input: unknown,
-): Result<PlaybackWorkerCommand, PlaybackWorkerCommandParseFailure> {
-  try {
-    const source = parseObject(input, commandParseFailure);
-    if (source.kind === "failure") {
-      return source;
-    }
-
-    const kind = readRequiredString(source.value, "kind", commandParseFailure);
-    if (kind.kind === "failure") {
-      return kind;
-    }
-
-    switch (kind.value) {
-      case "initialize":
-        return parseInitializeCommand(source.value);
-      case "begin-authorization":
-        return parseBeginAuthorizationCommand(source.value);
-      case "consume-callback":
-        return parseConsumeCallbackCommand(source.value);
-      case "retry":
-        return parseNoArgumentCommand(source.value, "retry");
-      case "visibility-change":
-        return parseVisibilityChangeCommand(source.value);
-      case "logout":
-        return parseNoArgumentCommand(source.value, "logout");
-      case "dispose":
-        return parseNoArgumentCommand(source.value, "dispose");
-      default:
-        return failed(commandParseFailure("invalid-kind"));
-    }
-  } catch {
-    return failed(commandParseFailure("expected-object"));
-  }
-}
-
 export function createPlaybackWorkerSafeDiagnostic(options: {
   readonly operation: PlaybackWorkerDiagnosticOperation;
   readonly code: PlaybackWorkerDiagnosticCode;
@@ -218,260 +164,6 @@ export function createPlaybackWorkerFatalInitializationFailure(
   };
 
   return Object.freeze(failure);
-}
-
-function parseInitializeCommand(
-  source: object,
-): Result<PlaybackWorkerInitializeCommand, PlaybackWorkerCommandParseFailure> {
-  const exact = parseExactObject(
-    source,
-    ["kind", "applicationUrl", "configuration"],
-    commandParseFailure,
-  );
-  if (exact.kind === "failure") {
-    return exact;
-  }
-
-  const applicationUrl = readRequiredNonEmptyString(
-    exact.value,
-    "applicationUrl",
-    commandParseFailure,
-  );
-  if (applicationUrl.kind === "failure") {
-    return applicationUrl;
-  }
-
-  const configuration = readRequiredDataProperty(
-    exact.value,
-    "configuration",
-    commandParseFailure,
-  );
-  if (configuration.kind === "failure") {
-    return configuration;
-  }
-
-  const command: PlaybackWorkerInitializeCommand = {
-    kind: "initialize",
-    applicationUrl: applicationUrl.value,
-    configuration: configuration.value,
-  };
-
-  return succeeded(Object.freeze(command));
-}
-
-function parseBeginAuthorizationCommand(
-  source: object,
-): Result<
-  PlaybackWorkerBeginAuthorizationCommand,
-  PlaybackWorkerCommandParseFailure
-> {
-  const exact = parseExactObject(
-    source,
-    ["kind", "returnTo"],
-    commandParseFailure,
-  );
-  if (exact.kind === "failure") {
-    return exact;
-  }
-
-  const returnTo = readRequiredDataProperty(
-    exact.value,
-    "returnTo",
-    commandParseFailure,
-  );
-  if (returnTo.kind === "failure") {
-    return returnTo;
-  }
-
-  const command: PlaybackWorkerBeginAuthorizationCommand = {
-    kind: "begin-authorization",
-    returnTo: returnTo.value,
-  };
-
-  return succeeded(Object.freeze(command));
-}
-
-function parseConsumeCallbackCommand(
-  source: object,
-): Result<
-  PlaybackWorkerConsumeCallbackCommand,
-  PlaybackWorkerCommandParseFailure
-> {
-  const exact = parseExactObject(
-    source,
-    ["kind", "callbackUrl"],
-    commandParseFailure,
-  );
-  if (exact.kind === "failure") {
-    return exact;
-  }
-
-  const callbackUrl = readRequiredNonEmptyString(
-    exact.value,
-    "callbackUrl",
-    commandParseFailure,
-  );
-  if (callbackUrl.kind === "failure") {
-    return callbackUrl;
-  }
-
-  const command: PlaybackWorkerConsumeCallbackCommand = {
-    kind: "consume-callback",
-    callbackUrl: callbackUrl.value,
-  };
-
-  return succeeded(Object.freeze(command));
-}
-
-function parseNoArgumentCommand(
-  source: object,
-  kind: "dispose" | "logout" | "retry",
-): Result<
-  | PlaybackWorkerDisposeCommand
-  | PlaybackWorkerLogoutCommand
-  | PlaybackWorkerRetryCommand,
-  PlaybackWorkerCommandParseFailure
-> {
-  const exact = parseExactObject(source, ["kind"], commandParseFailure);
-  if (exact.kind === "failure") {
-    return exact;
-  }
-
-  switch (kind) {
-    case "dispose": {
-      const command: PlaybackWorkerDisposeCommand = { kind: "dispose" };
-      return succeeded(Object.freeze(command));
-    }
-    case "logout": {
-      const command: PlaybackWorkerLogoutCommand = { kind: "logout" };
-      return succeeded(Object.freeze(command));
-    }
-    case "retry": {
-      const command: PlaybackWorkerRetryCommand = { kind: "retry" };
-      return succeeded(Object.freeze(command));
-    }
-  }
-
-  return failed(commandParseFailure("invalid-kind"));
-}
-
-function parseVisibilityChangeCommand(
-  source: object,
-): Result<
-  PlaybackWorkerVisibilityChangeCommand,
-  PlaybackWorkerCommandParseFailure
-> {
-  const exact = parseExactObject(
-    source,
-    ["kind", "visibility"],
-    commandParseFailure,
-  );
-  if (exact.kind === "failure") {
-    return exact;
-  }
-
-  const visibility = readRequiredString(
-    exact.value,
-    "visibility",
-    commandParseFailure,
-  );
-  if (visibility.kind === "failure") {
-    return visibility;
-  }
-
-  switch (visibility.value) {
-    case "hidden":
-    case "visible": {
-      const command: PlaybackWorkerVisibilityChangeCommand = {
-        kind: "visibility-change",
-        visibility: visibility.value,
-      };
-      return succeeded(Object.freeze(command));
-    }
-    default:
-      return failed(commandParseFailure("invalid-value"));
-  }
-}
-
-function parseObject<Failure>(
-  input: unknown,
-  createFailure: (code: WorkerProtocolParseCode) => Failure,
-): Result<object, Failure> {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    return failed(createFailure("expected-object"));
-  }
-
-  return succeeded(input);
-}
-
-function parseExactObject<Failure>(
-  source: object,
-  allowedFields: ReadonlyArray<string>,
-  createFailure: (code: WorkerProtocolParseCode) => Failure,
-): Result<object, Failure> {
-  const fieldNames = Object.getOwnPropertyNames(source);
-  for (const fieldName of fieldNames) {
-    if (!allowedFields.includes(fieldName)) {
-      return failed(createFailure("unexpected-field"));
-    }
-  }
-
-  if (Object.getOwnPropertySymbols(source).length > 0) {
-    return failed(createFailure("unexpected-field"));
-  }
-
-  return succeeded(source);
-}
-
-function readRequiredDataProperty<Failure>(
-  source: object,
-  fieldName: string,
-  createFailure: (code: WorkerProtocolParseCode) => Failure,
-): Result<unknown, Failure> {
-  const descriptor = Object.getOwnPropertyDescriptor(source, fieldName);
-  if (descriptor === undefined) {
-    return failed(createFailure("missing-value"));
-  }
-
-  if (!("value" in descriptor)) {
-    return failed(createFailure("expected-data-property"));
-  }
-
-  return succeeded(descriptor.value);
-}
-
-function readRequiredString<Failure>(
-  source: object,
-  fieldName: string,
-  createFailure: (code: WorkerProtocolParseCode) => Failure,
-): Result<string, Failure> {
-  const value = readRequiredDataProperty(source, fieldName, createFailure);
-  if (value.kind === "failure") {
-    return value;
-  }
-
-  if (typeof value.value !== "string") {
-    return failed(createFailure("invalid-value"));
-  }
-
-  return succeeded(value.value);
-}
-
-function readRequiredNonEmptyString<Failure>(
-  source: object,
-  fieldName: string,
-  createFailure: (code: WorkerProtocolParseCode) => Failure,
-): Result<string, Failure> {
-  const value = readRequiredString(source, fieldName, createFailure);
-  if (value.kind === "failure") {
-    return value;
-  }
-
-  if (value.value.trim().length === 0) {
-    return failed(createFailure("expected-non-empty-string"));
-  }
-
-  return value;
 }
 
 function sanitizeDiagnosticMetadata(
@@ -526,23 +218,4 @@ function isSafeRetryAfterMilliseconds(value: number): boolean {
     value >= 0 &&
     value <= maximumPlatformTimerDelayMilliseconds
   );
-}
-
-function commandParseFailure(
-  code: WorkerProtocolParseCode,
-): PlaybackWorkerCommandParseFailure {
-  const failure: PlaybackWorkerCommandParseFailure = {
-    kind: "invalid-playback-worker-command",
-    code,
-  };
-
-  return Object.freeze(failure);
-}
-
-function succeeded<Value>(value: Value): Result<Value, never> {
-  return Object.freeze({ kind: "success", value });
-}
-
-function failed<Failure>(error: Failure): Result<never, Failure> {
-  return Object.freeze({ kind: "failure", error });
 }

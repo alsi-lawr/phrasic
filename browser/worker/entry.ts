@@ -11,7 +11,10 @@ import {
   spotifyHttpRequestDeadlineMilliseconds,
   type BrowserRequestDeadlineSchedulerPort,
 } from "../request-deadline.ts";
-import { createPlaybackWorkerFatalInitializationFailure } from "./protocol.ts";
+import {
+  createPlaybackWorkerFatalInitializationFailure,
+  type PlaybackWorkerCommand,
+} from "./protocol.ts";
 import {
   createPlaybackWorkerRuntime,
   type PlaybackWorkerEventSink,
@@ -32,9 +35,12 @@ const bootstrap = createWorkerBootstrap();
 
 switch (bootstrap.kind) {
   case "ready":
-    self.addEventListener("message", (event: MessageEvent<unknown>): void => {
-      void bootstrap.runtime.receive(event.data);
-    });
+    self.addEventListener(
+      "message",
+      (event: MessageEvent<PlaybackWorkerCommand>): void => {
+        void bootstrap.runtime.receive(event.data);
+      },
+    );
     break;
   case "unavailable":
     self.postMessage(

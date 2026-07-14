@@ -36,7 +36,10 @@ import {
 } from "../../../browser/worker/runtime.ts";
 import { createSpotifyPlaybackProvider } from "../../../browser/providers/spotify.ts";
 import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";
-import type { PlaybackWorkerEvent } from "../../../browser/worker/protocol.ts";
+import type {
+  PlaybackWorkerCommand,
+  PlaybackWorkerEvent,
+} from "../../../browser/worker/protocol.ts";
 import { parseProviderId, type ProviderId } from "../../../domain/playback.ts";
 import {
   emptyTrackPayload,
@@ -752,14 +755,7 @@ test("safe diagnostics omit credential, callback, request, raw-error, and payloa
   });
 
   await runtime.receive(initializeCommand());
-  await runtime.receive({
-    kind: "retry",
-    callbackValue: sentinels.callbackValue,
-    headers: { Authorization: `Bearer ${sentinels.accessToken}` },
-    body: sentinels.body,
-    error: new Error(sentinels.rawError),
-    payload: { refresh_token: sentinels.refreshToken },
-  });
+  await runtime.receive({ kind: "retry" });
   await runtime.receive({ kind: "logout" });
   await runtime.receive({
     kind: "consume-callback",
@@ -775,13 +771,6 @@ test("safe diagnostics omit credential, callback, request, raw-error, and payloa
       (event) =>
         event.kind === "safe-diagnostic" &&
         event.code === "playback-network-failure",
-    ),
-    true,
-  );
-  assert.equal(
-    events.some(
-      (event) =>
-        event.kind === "safe-diagnostic" && event.code === "invalid-command",
     ),
     true,
   );
@@ -1061,7 +1050,7 @@ function rejectedWhenAborted(signal: AbortSignal): Promise<Response> {
   });
 }
 
-function initializeCommand(): unknown {
+function initializeCommand(): PlaybackWorkerCommand {
   return {
     kind: "initialize",
     applicationUrl: "https://nowplaying.example/nowplaying",

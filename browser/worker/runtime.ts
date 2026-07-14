@@ -1,5 +1,4 @@
 import {
-  parseAuthorizationReturnTarget,
   type AuthorizationConnectionResult,
   type AuthorizationProviderPort,
   type AuthorizationSessionPort,
@@ -24,8 +23,8 @@ import {
   createPlaybackWorkerFatalInitializationFailure,
   createPlaybackWorkerSafeDiagnostic,
   noPlaybackWorkerDiagnosticMetadata,
-  parsePlaybackWorkerCommand,
   type PlaybackWorkerBeginAuthorizationCommand,
+  type PlaybackWorkerCommand,
   type PlaybackWorkerConsumeCallbackCommand,
   type PlaybackWorkerDiagnosticCode,
   type PlaybackWorkerDiagnosticMetadata,
@@ -78,7 +77,7 @@ export type PlaybackWorkerRuntimePorts = {
 };
 
 export type PlaybackWorkerRuntime = {
-  readonly receive: (message: unknown) => Promise<void>;
+  readonly receive: (message: PlaybackWorkerCommand) => Promise<void>;
 };
 
 type RuntimeStatus =
@@ -179,35 +178,26 @@ export function createPlaybackWorkerRuntime(
   let operationEpoch = 0;
 
   const runtime: PlaybackWorkerRuntime = {
-    receive(message: unknown): Promise<void> {
-      const command = parsePlaybackWorkerCommand(message);
-      if (command.kind === "failure") {
-        emitDiagnostic("command", "invalid-command");
-        return Promise.resolve();
-      }
-
-      const receivedCommand = command.value;
-      switch (receivedCommand.kind) {
+    receive(message: PlaybackWorkerCommand): Promise<void> {
+      switch (message.kind) {
         case "initialize":
-          return enqueue(() => initialize(receivedCommand));
+          return enqueue(() => initialize(message));
         case "begin-authorization":
-          return enqueue(() => beginAuthorization(receivedCommand));
+          return enqueue(() => beginAuthorization(message));
         case "consume-callback":
           cancelRuntimeWork();
-          return enqueue(() => consumeCallback(receivedCommand));
+          return enqueue(() => consumeCallback(message));
         case "retry":
           cancelRuntimeWork();
           return enqueue(retryConnection);
         case "visibility-change":
-          return receiveVisibilityChange(receivedCommand.visibility);
+          return receiveVisibilityChange(message.visibility);
         case "logout":
           return receiveLogout();
         case "dispose":
           receiveDispose();
           return Promise.resolve();
       }
-
-      return Promise.resolve();
     },
   };
 
@@ -269,12 +259,6 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    const returnTo = parseAuthorizationReturnTarget(command.returnTo);
-    if (returnTo.kind === "failure") {
-      emitDiagnostic("authorization", "invalid-display-return-configuration");
-      return;
-    }
-
     const transitioned = transition({ kind: "begin-authorization" });
     if (!transitioned) {
       return;
@@ -295,7 +279,7 @@ export function createPlaybackWorkerRuntime(
 
       const result = await authorization.value.beginAuthorization({
         nowEpochMilliseconds: now.epochMilliseconds,
-        returnTo: returnTo.value,
+        returnTo: command.returnTo,
         signal: operation.controller.signal,
       });
       if (!isCurrentOperation(operation)) {

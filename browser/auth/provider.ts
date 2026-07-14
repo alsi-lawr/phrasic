@@ -13,49 +13,6 @@ export type AuthorizationReturnTarget = {
   readonly width: number;
 };
 
-export type AuthorizationReturnTargetParseFailure = {
-  readonly kind: "invalid-authorization-return-target";
-};
-
-export function parseAuthorizationReturnTarget(
-  input: unknown,
-): Result<AuthorizationReturnTarget, AuthorizationReturnTargetParseFailure> {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    return invalidReturnTarget();
-  }
-
-  const fields = Object.getOwnPropertyNames(input);
-  if (
-    fields.length !== 2 ||
-    !fields.includes("setup") ||
-    !fields.includes("width") ||
-    Object.getOwnPropertySymbols(input).length !== 0
-  ) {
-    return invalidReturnTarget();
-  }
-
-  const setup = Object.getOwnPropertyDescriptor(input, "setup");
-  const width = Object.getOwnPropertyDescriptor(input, "width");
-  if (
-    setup === undefined ||
-    !("value" in setup) ||
-    typeof setup.value !== "boolean" ||
-    width === undefined ||
-    !("value" in width) ||
-    typeof width.value !== "number" ||
-    !Number.isSafeInteger(width.value) ||
-    width.value < 320 ||
-    width.value > 7_680
-  ) {
-    return invalidReturnTarget();
-  }
-
-  return Object.freeze({
-    kind: "success",
-    value: Object.freeze({ setup: setup.value, width: width.value }),
-  });
-}
-
 export type AuthorizationConnectionResult =
   | {
       readonly kind: "success";
@@ -161,13 +118,3 @@ export type AuthorizationProviderPort = {
     AuthorizationProviderInitializationFailure
   >;
 };
-
-function invalidReturnTarget(): Result<
-  never,
-  AuthorizationReturnTargetParseFailure
-> {
-  return Object.freeze({
-    kind: "failure",
-    error: Object.freeze({ kind: "invalid-authorization-return-target" }),
-  });
-}

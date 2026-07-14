@@ -18,6 +18,20 @@ const initialize: PlaybackWorkerCommand = {
   },
 };
 
+const beginAuthorization: PlaybackWorkerCommand = {
+  kind: "begin-authorization",
+  returnTo: { setup: true, width: 1_280 },
+};
+
+const invalidBeginAuthorization: PlaybackWorkerCommand = {
+  kind: "begin-authorization",
+  returnTo: {
+    setup: true,
+    // @ts-expect-error Worker authorization commands require a numeric display width.
+    width: "1_280",
+  },
+};
+
 const playbackEvent: PlaybackWorkerEvent = {
   kind: "playback-state",
   state: playbackState,
@@ -105,6 +119,8 @@ const rawErrorBearingDiagnostic: PlaybackWorkerSafeDiagnostic = {
 };
 
 void initialize;
+void beginAuthorization;
+void invalidBeginAuthorization;
 void playbackEvent;
 void callbackRestoration;
 void diagnostic;

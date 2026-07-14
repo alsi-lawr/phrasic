@@ -1,6 +1,6 @@
 import {
   createPlaybackWorkerFatalInitializationFailure,
-  parsePlaybackWorkerCommand,
+  type PlaybackWorkerCommand,
   type PlaybackWorkerEvent,
 } from "../worker/protocol.ts";
 import {
@@ -8,7 +8,7 @@ import {
   type PlaybackWorkerEventSink,
   type PlaybackWorkerSchedulerPort,
 } from "../worker/runtime.ts";
-import { parseFakeControlCommand } from "./control.ts";
+import type { FakeControlCommand } from "./control.ts";
 import { createFakeMusicProviderRuntime } from "./provider.ts";
 
 const provider = createFakeMusicProviderRuntime();
@@ -42,54 +42,75 @@ if (typeof AbortController === "undefined") {
     scheduler: nativeWorkerScheduler(),
   });
   let terminal = false;
-  const applicationUrl = new URL("/fake/", self.location.origin);
 
-  self.addEventListener("message", (event: MessageEvent<unknown>): void => {
-    void receive(event.data);
-  });
+  self.addEventListener(
+    "message",
+    (event: MessageEvent<PlaybackWorkerCommand | FakeControlCommand>): void => {
+      void receive(event.data);
+    },
+  );
 
-  async function receive(message: unknown): Promise<void> {
-    const command = parsePlaybackWorkerCommand(message);
-    if (command.kind === "success") {
-      if (terminal) {
+  async function receive(
+    message: PlaybackWorkerCommand | FakeControlCommand,
+  ): Promise<void> {
+    switch (message.kind) {
+      case "initialize":
+      case "begin-authorization":
+      case "consume-callback":
+      case "retry":
+      case "visibility-change":
+      case "logout":
+        if (terminal) {
+          return;
+        }
+
+        await runtime.receive(message);
         return;
-      }
+      case "dispose":
+        if (terminal) {
+          return;
+        }
 
-      await runtime.receive(command.value);
-      if (command.value.kind === "dispose") {
+        await runtime.receive(message);
         provider.dispose();
         terminal = true;
+        return;
+      case "resolve-authorization":
+      case "expire-authorization":
+      case "set-empty":
+      case "set-track":
+      case "set-episode":
+      case "set-unsupported":
+      case "set-provider-failure":
+      case "set-fatal": {
+        if (terminal) {
+          return;
+        }
+
+        const applied = provider.applyControl(message);
+        switch (applied.kind) {
+          case "none":
+            return;
+          case "playback-changed":
+            await runtime.receive(Object.freeze({ kind: "retry" }));
+            return;
+          case "fatal":
+            terminal = true;
+            await runtime.receive(Object.freeze({ kind: "dispose" }));
+            provider.dispose();
+            self.postMessage(
+              createPlaybackWorkerFatalInitializationFailure(
+                applied.reason === "configuration-unavailable"
+                  ? "invalid-public-configuration"
+                  : "browser-capability-unavailable",
+              ),
+            );
+            return;
+        }
+
+        return unreachable(applied);
       }
-      return;
     }
-
-    const control = parseFakeControlCommand(message, applicationUrl);
-    if (control.kind === "failure" || terminal) {
-      return;
-    }
-
-    const applied = provider.applyControl(control.value);
-    switch (applied.kind) {
-      case "none":
-        return;
-      case "playback-changed":
-        await runtime.receive(Object.freeze({ kind: "retry" }));
-        return;
-      case "fatal":
-        terminal = true;
-        await runtime.receive(Object.freeze({ kind: "dispose" }));
-        provider.dispose();
-        self.postMessage(
-          createPlaybackWorkerFatalInitializationFailure(
-            applied.reason === "configuration-unavailable"
-              ? "invalid-public-configuration"
-              : "browser-capability-unavailable",
-          ),
-        );
-        return;
-    }
-
-    return unreachable(applied);
   }
 }
 
