@@ -1,4 +1,4 @@
-import { type ReactElement, useState } from "react";
+import type { ReactElement } from "react";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
 import {
   currentPlaybackItem,
@@ -12,10 +12,7 @@ import {
   overlayArtworkClipPathId,
   overlayArtworkRectangle,
 } from "./overlay-layout.ts";
-import {
-  overlayItemAppearanceDurationSeconds,
-  type OverlayMotionDecision,
-} from "./overlay-motion.ts";
+import type { OverlayMotionDecision } from "./overlay-motion.ts";
 
 type OverlayArtworkProps = {
   readonly motion: OverlayMotionDecision;
@@ -30,102 +27,26 @@ export function OverlayArtwork({
     <g>
       <ArtworkClipPath />
       <g clipPath={`url(#${overlayArtworkClipPathId})`}>
-        <ArtworkCrossfade motion={motion} snapshot={snapshot} />
+        <ArtworkWithFadeIn motion={motion} snapshot={snapshot} />
       </g>
     </g>
   );
 }
 
-type ArtworkLayer = {
-  readonly identity: string;
-  readonly snapshot: BrowserPlaybackApplicationSnapshot;
-};
-
-type ArtworkCrossfadeState =
-  | {
-      readonly current: ArtworkLayer;
-      readonly kind: "single";
-    }
-  | {
-      readonly current: ArtworkLayer;
-      readonly kind: "crossfade";
-      readonly previous: ArtworkLayer;
-    };
-
-function ArtworkCrossfade({
+function ArtworkWithFadeIn({
   motion,
   snapshot,
 }: OverlayArtworkProps): ReactElement {
-  const layer = artworkLayer(snapshot);
-  const [state, setState] = useState<ArtworkCrossfadeState>(() =>
-    Object.freeze({ current: layer, kind: "single" }),
-  );
-
-  if (motion.kind === "reduced") {
-    if (state.kind !== "single" || state.current.identity !== layer.identity) {
-      setState(Object.freeze({ current: layer, kind: "single" }));
-    }
-    return <ArtworkForSnapshot motion={motion} snapshot={snapshot} />;
-  }
-
-  if (state.current.identity !== layer.identity) {
-    setState(
-      Object.freeze({
-        current: layer,
-        kind: "crossfade",
-        previous: state.current,
-      }),
-    );
-  }
-
   return (
-    <g>
-      {state.kind === "single" ? null : (
-        <g key={`outgoing:${state.previous.identity}`}>
-          <ArtworkOpacityAnimation from={1} to={0} />
-          <ArtworkForSnapshot
-            motion={motion}
-            snapshot={state.previous.snapshot}
-          />
-        </g>
-      )}
-      <g key={`incoming:${state.current.identity}`}>
-        {state.kind === "single" ? null : (
-          <ArtworkOpacityAnimation from={0} to={1} />
-        )}
-        <ArtworkForSnapshot motion={motion} snapshot={snapshot} />
-      </g>
+    <g
+      key={artworkIdentity(snapshot)}
+      className={
+        motion.kind === "enabled" ? "animate-artwork-fade-in" : undefined
+      }
+    >
+      <ArtworkForSnapshot motion={motion} snapshot={snapshot} />
     </g>
   );
-}
-
-type ArtworkOpacityAnimationProps = {
-  readonly from: 0 | 1;
-  readonly to: 0 | 1;
-};
-
-function ArtworkOpacityAnimation({
-  from,
-  to,
-}: ArtworkOpacityAnimationProps): ReactElement {
-  const values = from === 1 && to === 0 ? "1;0;0" : "0;0;1";
-
-  return (
-    <animate
-      attributeName="opacity"
-      values={values}
-      keyTimes="0;0.5;1"
-      dur={`${overlayItemAppearanceDurationSeconds}s`}
-      calcMode="linear"
-      fill="freeze"
-    />
-  );
-}
-
-function artworkLayer(
-  snapshot: BrowserPlaybackApplicationSnapshot,
-): ArtworkLayer {
-  return Object.freeze({ identity: artworkIdentity(snapshot), snapshot });
 }
 
 function artworkIdentity(snapshot: BrowserPlaybackApplicationSnapshot): string {

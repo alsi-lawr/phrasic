@@ -36,4 +36,22 @@
   --tracking-overlay-context: 4px;
   --tracking-overlay-detail: 2px;
   --tracking-overlay-normal: 0px;
+
+  --animate-artwork-fade-in: artwork-fade-in 2s ease-in-out forwards;
+  --animate-vinyl-spin: vinyl-spin 2s linear infinite;
+
+  @keyframes artwork-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes vinyl-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
 }
