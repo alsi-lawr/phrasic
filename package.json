@@ -16,7 +16,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --project tsconfig.json",
     "typecheck:browser": "tsc --project tsconfig.browser.json",
-    "test": "node --test \"test/**/*.test.ts\"",
+    "test": "node --loader ./test/tsx-loader.mjs --test \"test/**/*.test.ts\"",
     "prepare": "husky",
     "preview": "vite preview"
   },
