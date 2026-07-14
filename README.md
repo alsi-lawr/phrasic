@@ -8,6 +8,8 @@ Each browser profile has one Spotify connection per deployed origin. The
 application has no application server, client secret, database, playback
 history, or Spotify audio playback or rebroadcasting.
 
+![Fake Music integration demonstrating authorization and playback transitions](docs/fake-music-flow.webp)
+
 ## Build and deploy
 
 Build the container image:
@@ -101,6 +103,9 @@ redistribute Spotify audio.
 Read the repository's [Spotify display policy](docs/spotify-display-policy.md)
 alongside the [Spotify Developer Policy](https://developer.spotify.com/policy)
 and [Spotify Design & Branding Guidelines](https://developer.spotify.com/documentation/design).
+
+For offline overlay testing, use the shipped
+[Fake Music integration](docs/fake-music-integration.md).
 
 ## 2.0 breaking boundary
 
