@@ -9,12 +9,13 @@ import { OverlayVisualProviderLinks } from "../../components/overlay/OverlayVisu
 import {
   Collection,
   Creator,
-  DisplayText,
+  parseDisplayText,
   PlaybackSnapshot,
   ProviderLink,
   TrackItem,
   transitionPlaybackState,
   parseProviderId,
+  type DisplayText,
   type PlaybackState,
   type ProviderId,
   type Result,
@@ -262,7 +263,7 @@ function firstCreator(track: TrackItem): Creator {
 }
 
 function text(value: string): DisplayText {
-  return expectSuccess(DisplayText.create(value));
+  return expectSuccess(parseDisplayText(value));
 }
 
 function expectSuccess<Value, Failure>(result: Result<Value, Failure>): Value {

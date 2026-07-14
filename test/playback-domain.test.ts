@@ -4,12 +4,8 @@ import {
   availableOriginalArtwork,
   Creator,
   Collection,
-  DisplayText,
   EpisodeItem,
   initialPlaybackState,
-  OriginalArtworkUrl,
-  PlaybackDurationMilliseconds,
-  PlaybackPositionMilliseconds,
   PlaybackSnapshot,
   providerFailure,
   ProviderLink,
@@ -17,10 +13,15 @@ import {
   TrackItem,
   transitionPlaybackState,
   unavailableOriginalArtwork,
+  parseDisplayText,
+  parseOriginalArtworkUrl,
+  parsePlaybackDurationMilliseconds,
+  parsePlaybackPositionMilliseconds,
   parseProviderCollectionId,
   parseProviderId,
   parseProviderItemId,
   type OriginalArtwork,
+  type DisplayText,
   type PlaybackState,
   type ProviderId,
   type Result,
@@ -30,25 +31,25 @@ test("validated values reject invalid boundaries and preserve distinct values", 
   const provider = expectSuccess(parseProviderId("spotify"));
   const item = expectSuccess(parseProviderItemId("track-1"));
   const collection = expectSuccess(parseProviderCollectionId("album-1"));
-  const position = expectSuccess(PlaybackPositionMilliseconds.create(1_250));
-  const duration = expectSuccess(PlaybackDurationMilliseconds.create(3_000));
+  const position = expectSuccess(parsePlaybackPositionMilliseconds(1_250));
+  const duration = expectSuccess(parsePlaybackDurationMilliseconds(3_000));
 
   assert.equal(provider, "spotify");
   assert.equal(item, "track-1");
   assert.equal(collection, "album-1");
-  assert.equal(position.value, 1_250);
-  assert.equal(duration.value, 3_000);
+  assert.equal(position, 1_250);
+  assert.equal(duration, 3_000);
   assert.deepEqual(expectFailure(parseProviderId("   ")), {
     kind: "invalid-value",
     value: "provider-id",
     reason: "empty-string",
   });
-  assert.deepEqual(expectFailure(PlaybackPositionMilliseconds.create(-1)), {
+  assert.deepEqual(expectFailure(parsePlaybackPositionMilliseconds(-1)), {
     kind: "invalid-value",
     value: "playback-position-milliseconds",
     reason: "expected-non-negative-integer",
   });
-  assert.deepEqual(expectFailure(OriginalArtworkUrl.create("not a URL")), {
+  assert.deepEqual(expectFailure(parseOriginalArtworkUrl("not a URL")), {
     kind: "invalid-value",
     value: "original-artwork-url",
     reason: "invalid-url",
@@ -60,16 +61,16 @@ test("track and episode items retain their distinct metadata", () => {
   const episode = makeEpisode(availableArtwork());
 
   assert.equal(track.kind, "track");
-  assert.equal(track.title.value, "Track title");
-  assert.equal(track.collection.title.value, "Collection title");
+  assert.equal(track.title, "Track title");
+  assert.equal(track.collection.title, "Collection title");
   assert.deepEqual(
-    track.artists.map((artist: Creator): string => artist.name.value),
+    track.artists.map((artist: Creator): string => artist.name),
     ["Track artist"],
   );
   assert.equal(episode.kind, "episode");
-  assert.equal(episode.title.value, "Episode title");
-  assert.equal(episode.show.title.value, "Show title");
-  assert.equal(episode.show.publisher.value, "Show publisher");
+  assert.equal(episode.title, "Episode title");
+  assert.equal(episode.show.title, "Show title");
+  assert.equal(episode.show.publisher, "Show publisher");
 });
 
 test("unavailable original artwork is explicit", () => {
@@ -136,8 +137,8 @@ test("item construction reports missing creators and mismatched provider links",
 
 test("playback snapshots reject positions beyond their duration", () => {
   const track = makeTrack(availableArtwork());
-  const position = expectSuccess(PlaybackPositionMilliseconds.create(3_001));
-  const duration = expectSuccess(PlaybackDurationMilliseconds.create(3_000));
+  const position = expectSuccess(parsePlaybackPositionMilliseconds(3_001));
+  const duration = expectSuccess(parsePlaybackDurationMilliseconds(3_000));
 
   assert.deepEqual(
     expectFailure(
@@ -296,8 +297,8 @@ function makeSnapshot(): PlaybackSnapshot {
   return expectSuccess(
     PlaybackSnapshot.create({
       item: makeTrack(availableArtwork()),
-      position: expectSuccess(PlaybackPositionMilliseconds.create(1_250)),
-      duration: expectSuccess(PlaybackDurationMilliseconds.create(3_000)),
+      position: expectSuccess(parsePlaybackPositionMilliseconds(1_250)),
+      duration: expectSuccess(parsePlaybackDurationMilliseconds(3_000)),
     }),
   );
 }
@@ -373,13 +374,13 @@ function makeProviderLink(provider: ProviderId, itemId: string): ProviderLink {
 function availableArtwork(): OriginalArtwork {
   return availableOriginalArtwork(
     expectSuccess(
-      OriginalArtworkUrl.create("https://spotify.example/artwork.jpg"),
+      parseOriginalArtworkUrl("https://spotify.example/artwork.jpg"),
     ),
   );
 }
 
 function text(value: string): DisplayText {
-  return expectSuccess(DisplayText.create(value));
+  return expectSuccess(parseDisplayText(value));
 }
 
 function expectSuccess<Value, Failure>(result: Result<Value, Failure>): Value {

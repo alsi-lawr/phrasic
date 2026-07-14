@@ -184,7 +184,7 @@ function TrackProviderLinks({
     <ProviderDestinationNavigation presentation={presentation}>
       <VisualProviderLink
         href={trackLink.href}
-        label={`LISTEN ON ${providerLabel(presentation)}: TRACK — ${item.title.value}`}
+        label={`LISTEN ON ${providerLabel(presentation)}: TRACK — ${item.title}`}
       >
         <ArtworkLinkRegion />
         <MetadataLinkRegion
@@ -194,20 +194,20 @@ function TrackProviderLinks({
       </VisualProviderLink>
       {creatorLinks.map(({ creator, providerLink }, index): ReactElement => (
         <VisualProviderLink
-          key={`creator:${providerLink.href}:${creator.name.value}`}
+          key={`creator:${providerLink.href}:${creator.name}`}
           href={providerLink.href}
-          label={`OPEN CREATOR ON ${providerLabel(presentation)}: ${creator.name.value}`}
+          label={`OPEN CREATOR ON ${providerLabel(presentation)}: ${creator.name}`}
         >
           <CreatorLinkRegion
             availableWidth={availableWidth}
             precedingText={creatorPrecedingText(item.artists, index)}
-            text={creator.name.value}
+            text={creator.name}
           />
         </VisualProviderLink>
       ))}
       <VisualProviderLink
         href={albumLink.href}
-        label={`OPEN ALBUM ON ${providerLabel(presentation)}: ${item.collection.title.value}`}
+        label={`OPEN ALBUM ON ${providerLabel(presentation)}: ${item.collection.title}`}
       >
         <MetadataLinkRegion
           availableWidth={availableWidth}
@@ -242,7 +242,7 @@ function EpisodeProviderLinks({
     <ProviderDestinationNavigation presentation={presentation}>
       <VisualProviderLink
         href={episodeLink.href}
-        label={`LISTEN ON ${providerLabel(presentation)}: EPISODE — ${item.title.value}`}
+        label={`LISTEN ON ${providerLabel(presentation)}: EPISODE — ${item.title}`}
       >
         <ArtworkLinkRegion />
         <MetadataLinkRegion
@@ -252,7 +252,7 @@ function EpisodeProviderLinks({
       </VisualProviderLink>
       <VisualProviderLink
         href={showLink.href}
-        label={`OPEN SHOW ON ${providerLabel(presentation)}: ${item.show.title.value}`}
+        label={`OPEN SHOW ON ${providerLabel(presentation)}: ${item.show.title}`}
       >
         <MetadataLinkRegion
           availableWidth={availableWidth}
@@ -403,7 +403,7 @@ function creatorPrecedingText(
 
   return `${artists
     .slice(0, creatorIndex)
-    .map((artist): string => artist.name.value)
+    .map((artist): string => artist.name)
     .join(", ")}, `;
 }
 

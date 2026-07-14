@@ -2,31 +2,30 @@ import {
   availableOriginalArtwork,
   Collection,
   Creator,
-  DisplayText,
-  OriginalArtworkUrl,
-  PlaybackDurationMilliseconds,
-  PlaybackPositionMilliseconds,
   ProviderLink,
   TrackItem,
+  parseDisplayText,
+  parseOriginalArtworkUrl,
+  parsePlaybackDurationMilliseconds,
+  parsePlaybackPositionMilliseconds,
   parseProviderCollectionId,
   parseProviderId,
   parseProviderItemId,
   type ProviderCollectionId,
   type ProviderId,
   type ProviderItemId,
+  type PlaybackPositionMilliseconds,
   type Result,
 } from "../../domain/playback.ts";
 
 const providerId = expectSuccess(parseProviderId("spotify"));
 const itemId = expectSuccess(parseProviderItemId("track-1"));
 const collectionId = expectSuccess(parseProviderCollectionId("collection-1"));
-const position = expectSuccess(PlaybackPositionMilliseconds.create(1_000));
-const duration = expectSuccess(PlaybackDurationMilliseconds.create(3_000));
-const text = expectSuccess(DisplayText.create("Track title"));
+const position = expectSuccess(parsePlaybackPositionMilliseconds(1_000));
+const duration = expectSuccess(parsePlaybackDurationMilliseconds(3_000));
+const text = expectSuccess(parseDisplayText("Track title"));
 const artwork = availableOriginalArtwork(
-  expectSuccess(
-    OriginalArtworkUrl.create("https://spotify.example/artwork.jpg"),
-  ),
+  expectSuccess(parseOriginalArtworkUrl("https://spotify.example/artwork.jpg")),
 );
 const link = expectSuccess(
   ProviderLink.create({

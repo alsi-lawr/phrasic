@@ -2,16 +2,16 @@ import {
   availableOriginalArtwork,
   Collection,
   Creator,
-  DisplayText,
   EpisodeItem,
-  OriginalArtworkUrl,
-  PlaybackDurationMilliseconds,
-  PlaybackPositionMilliseconds,
   PlaybackSnapshot,
   ProviderLink,
   Show,
   TrackItem,
   unavailableOriginalArtwork,
+  parseDisplayText,
+  parseOriginalArtworkUrl,
+  parsePlaybackDurationMilliseconds,
+  parsePlaybackPositionMilliseconds,
   parseProviderCollectionId,
   parseProviderId,
   parseProviderItemId,
@@ -19,6 +19,9 @@ import {
   type ItemConstructionError,
   type NowPlayingItem,
   type OriginalArtwork,
+  type OriginalArtworkUrl,
+  type PlaybackDurationMilliseconds,
+  type PlaybackPositionMilliseconds,
   type PlaybackSnapshotError,
   type PlaybackState,
   type ProviderId,
@@ -280,7 +283,7 @@ function parseTrackItem(
   }
 
   const title = mapValueValidation(
-    DisplayText.create(titleValue.value),
+    parseDisplayText(titleValue.value),
     "$.item.name",
   );
   if (title.kind === "failure") {
@@ -365,7 +368,7 @@ function parseEpisodeItem(
   }
 
   const title = mapValueValidation(
-    DisplayText.create(titleValue.value),
+    parseDisplayText(titleValue.value),
     "$.item.name",
   );
   if (title.kind === "failure") {
@@ -440,7 +443,7 @@ function parseCreators(
     }
 
     const name = mapValueValidation(
-      DisplayText.create(nameValue.value),
+      parseDisplayText(nameValue.value),
       "$.item.artists[].name",
     );
     if (name.kind === "failure") {
@@ -491,7 +494,7 @@ function parseCollection(
   }
 
   const title = mapValueValidation(
-    DisplayText.create(titleValue.value),
+    parseDisplayText(titleValue.value),
     "$.item.album.name",
   );
   if (title.kind === "failure") {
@@ -545,7 +548,7 @@ function parseShow(
   }
 
   const title = mapValueValidation(
-    DisplayText.create(titleValue.value),
+    parseDisplayText(titleValue.value),
     "$.item.show.name",
   );
   if (title.kind === "failure") {
@@ -562,7 +565,7 @@ function parseShow(
   }
 
   const publisher = mapValueValidation(
-    DisplayText.create(publisherValue.value),
+    parseDisplayText(publisherValue.value),
     "$.item.show.publisher",
   );
   if (publisher.kind === "failure") {
@@ -661,7 +664,7 @@ function parseArtworkUrl(
     return failed("provider-artwork-is-invalid");
   }
 
-  const artworkUrl = OriginalArtworkUrl.create(input["url"]);
+  const artworkUrl = parseOriginalArtworkUrl(input["url"]);
   if (artworkUrl.kind === "failure") {
     return failed("provider-artwork-is-invalid");
   }
@@ -716,7 +719,7 @@ function parsePlaybackPosition(
   }
 
   return mapValueValidation(
-    PlaybackPositionMilliseconds.create(positionValue.value),
+    parsePlaybackPositionMilliseconds(positionValue.value),
     "$.progress_ms",
   );
 }
@@ -730,7 +733,7 @@ function parsePlaybackDuration(
   }
 
   return mapValueValidation(
-    PlaybackDurationMilliseconds.create(durationValue.value),
+    parsePlaybackDurationMilliseconds(durationValue.value),
     "$.item.duration_ms",
   );
 }

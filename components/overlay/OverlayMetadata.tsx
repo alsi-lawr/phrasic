@@ -459,7 +459,7 @@ function TrackMetadata({
         line={overlayMetadataLayout.titleLine}
         motion={motion}
         onTextMeasurement={onTextMeasurement}
-        text={item.title.value}
+        text={item.title}
         textClass="font-overlay-display fill-overlay-title text-overlay-title-size font-normal tracking-overlay-normal"
       />
       <MetadataMarqueeLine
@@ -468,7 +468,7 @@ function TrackMetadata({
         line={overlayMetadataLayout.detailLine}
         motion={motion}
         onTextMeasurement={onTextMeasurement}
-        text={`ALBUM · ${item.collection.title.value}`}
+        text={`ALBUM · ${item.collection.title}`}
         textClass="font-overlay-display fill-overlay-detail text-overlay-detail-size font-medium tracking-overlay-detail"
       />
       <MetadataMarqueeLine
@@ -505,7 +505,7 @@ function EpisodeMetadata({
         line={overlayMetadataLayout.creatorLine}
         motion={motion}
         onTextMeasurement={onTextMeasurement}
-        text={item.show.publisher.value}
+        text={item.show.publisher}
         textClass="font-overlay-display fill-overlay-creator text-overlay-creator-size font-semibold tracking-overlay-normal uppercase"
       />
       <MetadataMarqueeLine
@@ -514,7 +514,7 @@ function EpisodeMetadata({
         line={overlayMetadataLayout.titleLine}
         motion={motion}
         onTextMeasurement={onTextMeasurement}
-        text={item.title.value}
+        text={item.title}
         textClass="font-overlay-display fill-overlay-title text-overlay-title-size font-normal tracking-overlay-normal"
       />
       <MetadataMarqueeLine
@@ -523,7 +523,7 @@ function EpisodeMetadata({
         line={overlayMetadataLayout.detailLine}
         motion={motion}
         onTextMeasurement={onTextMeasurement}
-        text={`SHOW · ${item.show.title.value}`}
+        text={`SHOW · ${item.show.title}`}
         textClass="font-overlay-display fill-overlay-detail text-overlay-detail-size font-medium tracking-overlay-detail"
       />
       <MetadataMarqueeLine
@@ -724,7 +724,7 @@ function providerFailureSubtitle(
 function artistNames(
   item: Extract<NowPlayingItem, { readonly kind: "track" }>,
 ): string {
-  return item.artists.map((artist): string => artist.name.value).join(", ");
+  return item.artists.map((artist): string => artist.name).join(", ");
 }
 
 function providerLabel(presentation: OverlayPresentation): string {

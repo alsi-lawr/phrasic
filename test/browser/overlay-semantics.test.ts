@@ -8,8 +8,8 @@ import { spotifyOverlayPresentation } from "../../browser/providers/spotify-pres
 import { OverlaySemanticCompanion } from "../../components/overlay/OverlaySemanticCompanion.tsx";
 import { overlayLiveAnnouncementKey } from "../../components/overlay/overlay-identities.ts";
 import {
-  DisplayText,
-  PlaybackPositionMilliseconds,
+  parseDisplayText,
+  parsePlaybackPositionMilliseconds,
   PlaybackSnapshot,
   ProviderLink,
   TrackItem,
@@ -201,7 +201,7 @@ test("live announcement keys remain stable across polling and change for item or
       PlaybackSnapshot.create({
         duration: playing.snapshot.duration,
         item: playing.snapshot.item,
-        position: expectSuccess(PlaybackPositionMilliseconds.create(2_000)),
+        position: expectSuccess(parsePlaybackPositionMilliseconds(2_000)),
       }),
     ),
   });
@@ -344,7 +344,7 @@ function changedTrackItem(state: PlaybackState): TrackItem {
       itemId: expectSuccess(parseProviderItemId("track-2")),
       links: state.snapshot.item.links,
       providerId: state.snapshot.item.providerId,
-      title: expectSuccess(DisplayText.create("Second track title")),
+      title: expectSuccess(parseDisplayText("Second track title")),
     }),
   );
 }

@@ -283,12 +283,9 @@ function ItemDefinitions({
         <>
           <MetadataDefinition term="Playback state" value={label} />
           <MetadataDefinition term="Status" value={message} />
-          <MetadataDefinition term="Track" value={item.title.value} />
+          <MetadataDefinition term="Track" value={item.title} />
           <MetadataDefinition term="Artists" value={artistNames(item)} />
-          <MetadataDefinition
-            term="Album"
-            value={item.collection.title.value}
-          />
+          <MetadataDefinition term="Album" value={item.collection.title} />
           <MetadataDefinition term="Metadata freshness" value={freshness} />
         </>
       );
@@ -297,12 +294,9 @@ function ItemDefinitions({
         <>
           <MetadataDefinition term="Playback state" value={label} />
           <MetadataDefinition term="Status" value={message} />
-          <MetadataDefinition term="Episode" value={item.title.value} />
-          <MetadataDefinition term="Show" value={item.show.title.value} />
-          <MetadataDefinition
-            term="Publisher"
-            value={item.show.publisher.value}
-          />
+          <MetadataDefinition term="Episode" value={item.title} />
+          <MetadataDefinition term="Show" value={item.show.title} />
+          <MetadataDefinition term="Publisher" value={item.show.publisher} />
           <MetadataDefinition term="Metadata freshness" value={freshness} />
         </>
       );
@@ -426,9 +420,9 @@ function reconnectingAnnouncementMessage(
 function itemAnnouncementMessage(prefix: string, item: NowPlayingItem): string {
   switch (item.kind) {
     case "track":
-      return `${prefix} track: ${item.title.value}. Artists: ${artistNames(item)}. Album: ${item.collection.title.value}.`;
+      return `${prefix} track: ${item.title}. Artists: ${artistNames(item)}. Album: ${item.collection.title}.`;
     case "episode":
-      return `${prefix} episode: ${item.title.value}. Show: ${item.show.title.value}. Publisher: ${item.show.publisher.value}.`;
+      return `${prefix} episode: ${item.title}. Show: ${item.show.title}. Publisher: ${item.show.publisher}.`;
   }
 
   return unreachable(item);
@@ -517,7 +511,7 @@ function providerFailureSubtitle(
 function artistNames(
   item: Extract<NowPlayingItem, { readonly kind: "track" }>,
 ): string {
-  return item.artists.map((artist): string => artist.name.value).join(", ");
+  return item.artists.map((artist): string => artist.name).join(", ");
 }
 
 function providerLabel(presentation: OverlayPresentation): string {

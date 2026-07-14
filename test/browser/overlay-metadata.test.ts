@@ -12,7 +12,7 @@ import {
 } from "../../components/overlay/overlay-identities.ts";
 import { overlayMotionDecisionForPreference } from "../../components/overlay/overlay-motion.ts";
 import {
-  DisplayText,
+  parseDisplayText,
   PlaybackSnapshot,
   TrackItem,
   type PlaybackState,
@@ -88,7 +88,7 @@ test("marquee identity stays stable for a normalized item whose title changes", 
       itemId: originalTrack.itemId,
       links: originalTrack.links,
       providerId: originalTrack.providerId,
-      title: expectSuccess(DisplayText.create("Updated track title")),
+      title: expectSuccess(parseDisplayText("Updated track title")),
     }),
   );
   const changedState: PlaybackState = Object.freeze({

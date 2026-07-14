@@ -174,6 +174,10 @@ export type PlaybackTransitionError = {
 declare const providerIdBrand: unique symbol;
 declare const providerItemIdBrand: unique symbol;
 declare const providerCollectionIdBrand: unique symbol;
+declare const displayTextBrand: unique symbol;
+declare const originalArtworkUrlBrand: unique symbol;
+declare const playbackPositionMillisecondsBrand: unique symbol;
+declare const playbackDurationMillisecondsBrand: unique symbol;
 
 export type ProviderId = string & {
   readonly [providerIdBrand]: "ProviderId";
@@ -183,6 +187,18 @@ export type ProviderItemId = string & {
 };
 export type ProviderCollectionId = string & {
   readonly [providerCollectionIdBrand]: "ProviderCollectionId";
+};
+export type DisplayText = string & {
+  readonly [displayTextBrand]: "DisplayText";
+};
+export type OriginalArtworkUrl = string & {
+  readonly [originalArtworkUrlBrand]: "OriginalArtworkUrl";
+};
+export type PlaybackPositionMilliseconds = number & {
+  readonly [playbackPositionMillisecondsBrand]: "PlaybackPositionMilliseconds";
+};
+export type PlaybackDurationMilliseconds = number & {
+  readonly [playbackDurationMillisecondsBrand]: "PlaybackDurationMilliseconds";
 };
 
 export function parseProviderId(
@@ -220,106 +236,54 @@ export function parseProviderCollectionId(
 
 export const maximumPlatformTimerDelayMilliseconds = 2_147_483_647;
 
-export class PlaybackPositionMilliseconds {
-  private readonly rawValue: number;
-
-  private constructor(value: number) {
-    this.rawValue = value;
-    Object.freeze(this);
+export function parsePlaybackPositionMilliseconds(
+  input: unknown,
+): Result<PlaybackPositionMilliseconds, ValueValidationError> {
+  const result = validateNonNegativeInteger(
+    "playback-position-milliseconds",
+    input,
+  );
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): number {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<PlaybackPositionMilliseconds, ValueValidationError> {
-    const result = validateNonNegativeInteger(
-      "playback-position-milliseconds",
-      input,
-    );
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new PlaybackPositionMilliseconds(result.value));
-  }
+  return succeeded(result.value as PlaybackPositionMilliseconds);
 }
 
-export class PlaybackDurationMilliseconds {
-  private readonly rawValue: number;
-
-  private constructor(value: number) {
-    this.rawValue = value;
-    Object.freeze(this);
+export function parsePlaybackDurationMilliseconds(
+  input: unknown,
+): Result<PlaybackDurationMilliseconds, ValueValidationError> {
+  const result = validateNonNegativeInteger(
+    "playback-duration-milliseconds",
+    input,
+  );
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): number {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<PlaybackDurationMilliseconds, ValueValidationError> {
-    const result = validateNonNegativeInteger(
-      "playback-duration-milliseconds",
-      input,
-    );
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new PlaybackDurationMilliseconds(result.value));
-  }
+  return succeeded(result.value as PlaybackDurationMilliseconds);
 }
 
-export class DisplayText {
-  private readonly rawValue: string;
-
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
+export function parseDisplayText(
+  input: unknown,
+): Result<DisplayText, ValueValidationError> {
+  const result = validateNonEmptyString("display-text", input);
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<DisplayText, ValueValidationError> {
-    const result = validateNonEmptyString("display-text", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new DisplayText(result.value));
-  }
+  return succeeded(result.value as DisplayText);
 }
 
-export class OriginalArtworkUrl {
-  private readonly rawValue: string;
-
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
+export function parseOriginalArtworkUrl(
+  input: unknown,
+): Result<OriginalArtworkUrl, ValueValidationError> {
+  const result = validateHttpUrl("original-artwork-url", input);
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<OriginalArtworkUrl, ValueValidationError> {
-    const result = validateHttpUrl("original-artwork-url", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new OriginalArtworkUrl(result.value));
-  }
+  return succeeded(result.value as OriginalArtworkUrl);
 }
 
 export type ProviderLinkInput = {
@@ -594,7 +558,7 @@ export class PlaybackSnapshot {
   public static create(
     input: PlaybackSnapshotInput,
   ): Result<PlaybackSnapshot, PlaybackSnapshotError> {
-    if (input.position.value > input.duration.value) {
+    if (input.position > input.duration) {
       return failed({
         kind: "invalid-playback-snapshot",
         reason: "position-exceeds-duration",

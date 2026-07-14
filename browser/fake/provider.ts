@@ -13,16 +13,16 @@ import type {
 import {
   Collection,
   Creator,
-  DisplayText,
   EpisodeItem,
-  OriginalArtworkUrl,
-  PlaybackDurationMilliseconds,
-  PlaybackPositionMilliseconds,
   PlaybackSnapshot,
   ProviderLink,
   Show,
   TrackItem,
   availableOriginalArtwork,
+  parseDisplayText,
+  parseOriginalArtworkUrl,
+  parsePlaybackDurationMilliseconds,
+  parsePlaybackPositionMilliseconds,
   parseProviderCollectionId,
   parseProviderId,
   parseProviderItemId,
@@ -326,9 +326,9 @@ function trackFromCommand(
   | { readonly kind: "success"; readonly value: NowPlayingItem }
   | { readonly kind: "failure" } {
   const itemId = parseProviderItemId(command.itemId);
-  const title = DisplayText.create(command.title);
+  const title = parseDisplayText(command.title);
   const collectionId = parseProviderCollectionId(command.collectionId);
-  const collectionTitle = DisplayText.create(command.collectionTitle);
+  const collectionTitle = parseDisplayText(command.collectionTitle);
   const itemLink = providerLink(providerId, command.itemUrl);
   const collectionLink = providerLink(providerId, command.collectionUrl);
   const artwork = originalArtwork(command.artworkUrl);
@@ -371,10 +371,10 @@ function episodeFromCommand(
   | { readonly kind: "success"; readonly value: NowPlayingItem }
   | { readonly kind: "failure" } {
   const itemId = parseProviderItemId(command.itemId);
-  const title = DisplayText.create(command.title);
+  const title = parseDisplayText(command.title);
   const showId = parseProviderCollectionId(command.showId);
-  const showTitle = DisplayText.create(command.showTitle);
-  const publisher = DisplayText.create(command.publisher);
+  const showTitle = parseDisplayText(command.showTitle);
+  const publisher = parseDisplayText(command.publisher);
   const itemLink = providerLink(providerId, command.itemUrl);
   const showLink = providerLink(providerId, command.showUrl);
   const artwork = originalArtwork(command.artworkUrl);
@@ -417,7 +417,7 @@ function fakeCreators(
   | { readonly kind: "failure" } {
   const creators: Creator[] = [];
   for (const value of source) {
-    const name = DisplayText.create(value.name);
+    const name = parseDisplayText(value.name);
     const link = providerLink(providerId, value.url);
     if (name.kind === "failure" || link.kind === "failure") {
       return Object.freeze({ kind: "failure" });
@@ -445,7 +445,7 @@ function originalArtwork(
     });
   }
 
-  const url = OriginalArtworkUrl.create(source);
+  const url = parseOriginalArtworkUrl(source);
   return url.kind === "success"
     ? Object.freeze({
         kind: "success",
@@ -455,8 +455,8 @@ function originalArtwork(
 }
 
 function fakeSnapshot(item: NowPlayingItem) {
-  const position = PlaybackPositionMilliseconds.create(45_000);
-  const duration = PlaybackDurationMilliseconds.create(180_000);
+  const position = parsePlaybackPositionMilliseconds(45_000);
+  const duration = parsePlaybackDurationMilliseconds(180_000);
   if (position.kind === "failure" || duration.kind === "failure") {
     return Object.freeze({ kind: "failure" });
   }

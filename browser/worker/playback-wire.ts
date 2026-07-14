@@ -3,12 +3,8 @@ import {
   availableOriginalArtwork,
   Collection,
   Creator,
-  DisplayText,
   EpisodeItem,
   initialPlaybackState,
-  OriginalArtworkUrl,
-  PlaybackDurationMilliseconds,
-  PlaybackPositionMilliseconds,
   PlaybackSnapshot,
   providerFailure,
   ProviderLink,
@@ -16,6 +12,10 @@ import {
   TrackItem,
   transitionPlaybackState,
   unavailableOriginalArtwork,
+  parseDisplayText,
+  parseOriginalArtworkUrl,
+  parsePlaybackDurationMilliseconds,
+  parsePlaybackPositionMilliseconds,
   parseProviderCollectionId,
   parseProviderId,
   parseProviderItemId,
@@ -474,14 +474,14 @@ function deserializePlaybackWireSnapshot(
   }
 
   const position = deserializeDomainResult(
-    PlaybackPositionMilliseconds.create(snapshot.positionMilliseconds),
+    parsePlaybackPositionMilliseconds(snapshot.positionMilliseconds),
   );
   if (position.kind === "failure") {
     return position;
   }
 
   const duration = deserializeDomainResult(
-    PlaybackDurationMilliseconds.create(snapshot.durationMilliseconds),
+    parsePlaybackDurationMilliseconds(snapshot.durationMilliseconds),
   );
   if (duration.kind === "failure") {
     return duration;
@@ -500,14 +500,14 @@ function zeroPlaybackSnapshot(
   item: NowPlayingItem,
 ): Result<PlaybackSnapshot, PlaybackWireDeserializationFailure> {
   const position = deserializeDomainResult(
-    PlaybackPositionMilliseconds.create(0),
+    parsePlaybackPositionMilliseconds(0),
   );
   if (position.kind === "failure") {
     return position;
   }
 
   const duration = deserializeDomainResult(
-    PlaybackDurationMilliseconds.create(0),
+    parsePlaybackDurationMilliseconds(0),
   );
   if (duration.kind === "failure") {
     return duration;
@@ -548,7 +548,7 @@ function deserializePlaybackWireTrackItem(
     return itemId;
   }
 
-  const title = deserializeDomainResult(DisplayText.create(item.title));
+  const title = deserializeDomainResult(parseDisplayText(item.title));
   if (title.kind === "failure") {
     return title;
   }
@@ -599,7 +599,7 @@ function deserializePlaybackWireEpisodeItem(
     return itemId;
   }
 
-  const title = deserializeDomainResult(DisplayText.create(item.title));
+  const title = deserializeDomainResult(parseDisplayText(item.title));
   if (title.kind === "failure") {
     return title;
   }
@@ -650,7 +650,7 @@ function deserializePlaybackWireCreators(
 function deserializePlaybackWireCreator(
   creator: PlaybackWireCreator,
 ): Result<Creator, PlaybackWireDeserializationFailure> {
-  const name = deserializeDomainResult(DisplayText.create(creator.name));
+  const name = deserializeDomainResult(parseDisplayText(creator.name));
   if (name.kind === "failure") {
     return name;
   }
@@ -676,7 +676,7 @@ function deserializePlaybackWireCollection(
     return id;
   }
 
-  const title = deserializeDomainResult(DisplayText.create(collection.title));
+  const title = deserializeDomainResult(parseDisplayText(collection.title));
   if (title.kind === "failure") {
     return title;
   }
@@ -703,12 +703,12 @@ function deserializePlaybackWireShow(
     return id;
   }
 
-  const title = deserializeDomainResult(DisplayText.create(show.title));
+  const title = deserializeDomainResult(parseDisplayText(show.title));
   if (title.kind === "failure") {
     return title;
   }
 
-  const publisher = deserializeDomainResult(DisplayText.create(show.publisher));
+  const publisher = deserializeDomainResult(parseDisplayText(show.publisher));
   if (publisher.kind === "failure") {
     return publisher;
   }
@@ -733,9 +733,7 @@ function deserializePlaybackWireArtwork(
 ): Result<OriginalArtwork, PlaybackWireDeserializationFailure> {
   switch (artwork.kind) {
     case "available": {
-      const url = deserializeDomainResult(
-        OriginalArtworkUrl.create(artwork.url),
-      );
+      const url = deserializeDomainResult(parseOriginalArtworkUrl(artwork.url));
       if (url.kind === "failure") {
         return url;
       }
@@ -809,8 +807,8 @@ function serializePlaybackSnapshot(
 ): PlaybackWireSnapshot {
   const snapshot: PlaybackWireSnapshot = {
     item: serializePlaybackItem(state.snapshot.item),
-    positionMilliseconds: state.snapshot.position.value,
-    durationMilliseconds: state.snapshot.duration.value,
+    positionMilliseconds: state.snapshot.position,
+    durationMilliseconds: state.snapshot.duration,
   };
   return Object.freeze(snapshot);
 }
@@ -838,11 +836,11 @@ function serializePlaybackItem(item: NowPlayingItem): PlaybackWireItem {
         kind: "track",
         providerId: item.providerId,
         itemId: item.itemId,
-        title: item.title.value,
+        title: item.title,
         artists: freezeArray(item.artists.map(serializePlaybackCreator)),
         collection: Object.freeze({
           id: item.collection.id,
-          title: item.collection.title.value,
+          title: item.collection.title,
           links: serializePlaybackLinks(item.collection.links),
         }),
         artwork: serializePlaybackArtwork(item.artwork),
@@ -855,11 +853,11 @@ function serializePlaybackItem(item: NowPlayingItem): PlaybackWireItem {
         kind: "episode",
         providerId: item.providerId,
         itemId: item.itemId,
-        title: item.title.value,
+        title: item.title,
         show: Object.freeze({
           id: item.show.id,
-          title: item.show.title.value,
-          publisher: item.show.publisher.value,
+          title: item.show.title,
+          publisher: item.show.publisher,
           links: serializePlaybackLinks(item.show.links),
         }),
         artwork: serializePlaybackArtwork(item.artwork),
@@ -874,7 +872,7 @@ function serializePlaybackItem(item: NowPlayingItem): PlaybackWireItem {
 
 function serializePlaybackCreator(creator: Creator): PlaybackWireCreator {
   const wireCreator: PlaybackWireCreator = {
-    name: creator.name.value,
+    name: creator.name,
     links: serializePlaybackLinks(creator.links),
   };
   return Object.freeze(wireCreator);
@@ -900,7 +898,7 @@ function serializePlaybackArtwork(
     case "available":
       return Object.freeze({
         kind: "available",
-        url: artwork.url.value,
+        url: artwork.url,
       });
     case "unavailable":
       return Object.freeze({
