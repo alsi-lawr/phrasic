@@ -8,6 +8,7 @@ import { type OverlayMotionDecision } from "./overlay-motion.ts";
 import {
   emptyOverlayTextWidths,
   overlayMetadataAvailableWidth,
+  overlayShell,
   overlayShellClipPathId,
   overlayShellWidthForTextWidths,
   overlayTextWidthsWithMeasurement,
@@ -19,6 +20,10 @@ import { OverlayMetadata } from "./OverlayMetadata.tsx";
 import { OverlayShell } from "./OverlayShell.tsx";
 import { OverlayVisualProviderLinks } from "./OverlayVisualProviderLinks.tsx";
 import type { OverlayPresentation } from "./overlay-presentation.ts";
+import {
+  type OverlayShellTransitionPhase,
+  useOverlayShellTransition,
+} from "./useOverlayShellTransition.ts";
 
 type OverlayVisualProps = {
   readonly geometry: OverlayGeometry;
@@ -33,8 +38,14 @@ export function OverlayVisual({
   presentation,
   snapshot,
 }: OverlayVisualProps): ReactElement {
-  const animationIdentityKey = overlayAnimationIdentityKey(snapshot);
+  const shellTransition = useOverlayShellTransition(snapshot, motion);
+  const displayedSnapshot = shellTransition.snapshot;
+  const animationIdentityKey = overlayAnimationIdentityKey(displayedSnapshot);
   const contentSizedShell = useContentSizedShell(animationIdentityKey);
+  const shellWidth = shellWidthForTransition(
+    shellTransition.phase,
+    contentSizedShell.width,
+  );
   const Attribution = presentation.attribution;
 
   return (
@@ -46,31 +57,42 @@ export function OverlayVisual({
         height={geometry.height.value}
         viewBox={geometry.viewBox}
       >
-        <OverlayShell width={contentSizedShell.width} />
+        <OverlayShell
+          motion={motion}
+          onWidthTransitionEnd={shellTransition.completeWidthTransition}
+          width={shellWidth}
+        />
         <g clipPath={`url(#${overlayShellClipPathId})`}>
           <OverlayItemAppearance
             identity={animationIdentityKey}
             motion={motion}
           >
-            <OverlayArtwork motion={motion} snapshot={snapshot} />
+            <OverlayArtwork motion={motion} snapshot={displayedSnapshot} />
             <OverlayMetadata
               availableWidth={contentSizedShell.availableWidth}
               motion={motion}
               onTextMeasurement={contentSizedShell.reportTextMeasurement}
               presentation={presentation}
-              snapshot={snapshot}
+              snapshot={displayedSnapshot}
             />
-            <Attribution shellWidth={contentSizedShell.width} />
+            <Attribution shellWidth={shellWidth} />
           </OverlayItemAppearance>
         </g>
       </svg>
       <OverlayVisualProviderLinks
         availableWidth={contentSizedShell.availableWidth}
         presentation={presentation}
-        snapshot={snapshot}
+        snapshot={displayedSnapshot}
       />
     </div>
   );
+}
+
+function shellWidthForTransition(
+  phase: OverlayShellTransitionPhase,
+  contentWidth: number,
+): number {
+  return phase === "collapsing" ? overlayShell.minimumWidth : contentWidth;
 }
 
 type OverlayTextMeasurements = {

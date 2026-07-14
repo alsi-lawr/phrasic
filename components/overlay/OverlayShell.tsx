@@ -1,11 +1,34 @@
-import type { ReactElement } from "react";
+import type { ReactElement, TransitionEvent } from "react";
 import { overlayShell, overlayShellClipPathId } from "./overlay-layout.ts";
+import type { OverlayMotionDecision } from "./overlay-motion.ts";
 
 type OverlayShellProps = {
+  readonly motion: OverlayMotionDecision;
+  readonly onWidthTransitionEnd: () => void;
   readonly width: number;
 };
 
-export function OverlayShell({ width }: OverlayShellProps): ReactElement {
+const widthTransitionClasses =
+  "transition-[width] duration-1000 ease-[cubic-bezier(0.4,0,0.2,1)]";
+
+export function OverlayShell({
+  motion,
+  onWidthTransitionEnd,
+  width,
+}: OverlayShellProps): ReactElement {
+  const transitionClasses =
+    motion.kind === "enabled" ? widthTransitionClasses : "";
+  const handleTransitionEnd = (
+    event: TransitionEvent<SVGRectElement>,
+  ): void => {
+    if (
+      event.currentTarget === event.target &&
+      event.propertyName === "width"
+    ) {
+      onWidthTransitionEnd();
+    }
+  };
+
   return (
     <>
       <defs>
@@ -17,6 +40,7 @@ export function OverlayShell({ width }: OverlayShellProps): ReactElement {
             height={overlayShell.height}
             rx={overlayShell.radius}
             ry={overlayShell.radius}
+            className={transitionClasses}
           />
         </clipPath>
       </defs>
@@ -27,7 +51,8 @@ export function OverlayShell({ width }: OverlayShellProps): ReactElement {
         height={overlayShell.height}
         rx={overlayShell.radius}
         ry={overlayShell.radius}
-        className="fill-overlay-shell opacity-90"
+        className={`${transitionClasses} fill-overlay-shell opacity-90`}
+        onTransitionEnd={handleTransitionEnd}
       />
     </>
   );
