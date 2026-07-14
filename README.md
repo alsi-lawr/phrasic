@@ -27,11 +27,11 @@ Create a deployment-specific `config.json` beside the command:
 }
 ```
 
-Run the static server on port 8080, mounting that file read-only at its static
-root:
+Run the static server bound to loopback port 8080, mounting that file read-only
+at its static root:
 
 ```sh
-docker run --rm --publish 8080:8080 \
+docker run --rm --publish 127.0.0.1:8080:8080 \
   --mount type=bind,src="$(pwd)/config.json",dst=/srv/config.json,readonly \
   obs-nowplaying
 ```
@@ -42,7 +42,8 @@ and `config.json`. The `/spotify/` path, including its trailing slash, must
 match exactly and have no query string or fragment. The client ID and redirect
 URI are public; do not add tokens, a client secret, or other fields.
 
-For public TLS and routing, an outer Caddy may proxy to the container:
+For public TLS and routing, proxy the loopback-only container through an outer
+Caddy:
 
 ```caddyfile
 overlay.example {
@@ -50,11 +51,10 @@ overlay.example {
 }
 ```
 
-Caddy-to-Caddy is intentional packaging isolation: the outer Caddy owns TLS
-and routing; the container's Caddy owns this app's static files and response
-headers. The bundled Caddyfile applies the [static-host response header and
-cache contract](deploy/static-host-headers.md); non-container static hosts and
-CDNs must reproduce it.
+The outer Caddy owns TLS and routing; the container Caddy serves this app's
+static files and response headers. The bundled Caddyfile applies the
+[static-host response header and cache contract](deploy/static-host-headers.md);
+non-container static hosts and CDNs must reproduce it.
 
 ## Add the overlay to OBS
 
