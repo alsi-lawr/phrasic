@@ -3,13 +3,10 @@ import type {
   ProviderId,
   Result,
 } from "../../domain/playback.ts";
-
-export type PlaybackAccessToken = {
-  readonly toMemoryValue: () => string;
-};
+import type { PlaybackCredential } from "../auth/provider.ts";
 
 export type PlaybackProviderRequest = {
-  readonly accessToken: PlaybackAccessToken;
+  readonly accessToken: PlaybackCredential;
   readonly signal: AbortSignal;
 };
 

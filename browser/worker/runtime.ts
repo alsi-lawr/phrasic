@@ -1,35 +1,13 @@
 import {
-  parseSpotifyPublicConfiguration,
-  type SpotifyPublicConfiguration,
-} from "../config.ts";
-import {
-  buildQueryStrippedDisplayReturnUrl,
-  parseDisplayReturnConfiguration,
-  type BrowserPkceCryptoPort,
-  type DisplayReturnConfiguration,
-} from "../auth/pkce.ts";
-import {
-  beginSpotifyAuthorization,
-  consumeSpotifyAuthorizationCallback,
-  createBrowserAuthClockPort,
-  logoutSpotifyAuthorization,
-  refreshSpotifyConnection,
-  type BrowserAuthClockPort,
-  type ConsumeSpotifyAuthorizationCallbackResult,
-  type RefreshSpotifyConnectionResult,
-} from "../auth/session.ts";
-import {
-  type SpotifyAuthStoragePort,
-  type SpotifyPendingAuthorizationAttemptConsumeOptions,
-  type SpotifyPendingAuthorizationAttemptConsumeResult,
-  type SpotifyRefreshTokenReadResult,
-} from "../auth/storage.ts";
-import {
-  type SpotifyAccessToken,
-  type SpotifyAccessTokenLifetimeSeconds,
-  type SpotifyAuthFetchPort,
-  type SpotifyRefreshToken,
-} from "../auth/token.ts";
+  parseAuthorizationReturnTarget,
+  type AuthorizationConnectionResult,
+  type AuthorizationProviderPort,
+  type AuthorizationSessionPort,
+  type BeginAuthorizationResult,
+  type ConsumeAuthorizationCallbackResult,
+  type PlaybackCredential,
+  type PlaybackCredentialLifetime,
+} from "../auth/provider.ts";
 import {
   initialPlaybackState,
   maximumPlatformTimerDelayMilliseconds,
@@ -88,18 +66,12 @@ export type PlaybackWorkerCancellationPort = {
   readonly create: () => AbortController;
 };
 
-export type PlaybackWorkerAuthPorts = {
-  readonly crypto: BrowserPkceCryptoPort;
-  readonly fetch: SpotifyAuthFetchPort;
-  readonly storage: SpotifyAuthStoragePort;
-};
-
 export type PlaybackWorkerEventSink = {
   readonly emit: (event: PlaybackWorkerEvent) => void;
 };
 
 export type PlaybackWorkerRuntimePorts = {
-  readonly auth: PlaybackWorkerAuthPorts;
+  readonly authorization: AuthorizationProviderPort;
   readonly cancellation: PlaybackWorkerCancellationPort;
   readonly clock: PlaybackWorkerClockPort;
   readonly events: PlaybackWorkerEventSink;
@@ -118,7 +90,7 @@ type RuntimeStatus =
     }
   | {
       readonly kind: "active";
-      readonly configuration: SpotifyPublicConfiguration;
+      readonly authorization: AuthorizationSessionPort;
     }
   | {
       readonly kind: "fatal";
@@ -135,7 +107,7 @@ type AccessTokenState =
     }
   | {
       readonly kind: "available";
-      readonly accessToken: SpotifyAccessToken;
+      readonly accessToken: PlaybackCredential;
       readonly expiresAtEpochMilliseconds: number;
       readonly refreshAtEpochMilliseconds: number;
     };
@@ -176,7 +148,7 @@ type RefreshFlight =
     };
 
 type RuntimeRefreshResult =
-  | RefreshSpotifyConnectionResult
+  | AuthorizationConnectionResult
   | {
       readonly kind: "unexpected";
     };
@@ -270,22 +242,23 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    let configuration;
+    let authorization;
     try {
-      configuration = parseSpotifyPublicConfiguration(command.configuration, {
+      authorization = ports.authorization.initialize({
         applicationUrl: applicationUrl.value,
+        configuration: command.configuration,
       });
     } catch {
       failInitialization("invalid-public-configuration");
       return;
     }
 
-    if (configuration.kind === "failure") {
+    if (authorization.kind === "failure") {
       failInitialization("invalid-public-configuration");
       return;
     }
 
-    runtimeStatus = frozenActiveRuntime(configuration.value);
+    runtimeStatus = frozenActiveRuntime(authorization.value);
     playbackState = initialPlaybackState();
     emitPlaybackState();
     await recoverConnection();
@@ -299,7 +272,7 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    const returnTo = parseDisplayReturnConfiguration(command.returnTo);
+    const returnTo = parseAuthorizationReturnTarget(command.returnTo);
     if (returnTo.kind === "failure") {
       emitDiagnostic("authorization", "invalid-display-return-configuration");
       return;
@@ -310,35 +283,29 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    const authClock = currentBrowserAuthClock();
-    if (authClock.kind === "unavailable") {
+    const now = readCurrentTime();
+    if (now.kind === "unavailable") {
       transitionToFailure(providerFailure("network"));
       return;
     }
 
     const operation = startOperation();
     try {
-      const configuration = activeConfiguration();
-      if (configuration.kind === "unavailable") {
+      const authorization = activeAuthorization();
+      if (authorization.kind === "unavailable") {
         return;
       }
 
-      const redirect = await beginSpotifyAuthorization({
-        configuration: configuration.value,
-        crypto: ports.auth.crypto,
-        clock: authClock.value,
-        storage: cancellationAwareStorage(operation),
+      const result = await authorization.value.beginAuthorization({
+        nowEpochMilliseconds: now.epochMilliseconds,
         returnTo: returnTo.value,
+        signal: operation.controller.signal,
       });
       if (!isCurrentOperation(operation)) {
         return;
       }
 
-      const event: PlaybackWorkerEvent = {
-        kind: "authorization-redirect",
-        url: redirect.url,
-      };
-      ports.events.emit(Object.freeze(event));
+      await handleBeginAuthorization(result, operation);
     } catch {
       if (isCurrentOperation(operation)) {
         emitDiagnostic("authorization", "runtime-operation-failed");
@@ -347,6 +314,53 @@ export function createPlaybackWorkerRuntime(
     } finally {
       finishOperation(operation);
     }
+  }
+
+  async function handleBeginAuthorization(
+    result: BeginAuthorizationResult,
+    operation: RuntimeOperation,
+  ): Promise<void> {
+    switch (result.kind) {
+      case "authorization-redirect": {
+        const event: PlaybackWorkerEvent = {
+          kind: "authorization-redirect",
+          url: result.url,
+        };
+        ports.events.emit(Object.freeze(event));
+        return;
+      }
+      case "connected":
+        if (
+          !transition({ kind: "authorization-complete" }) ||
+          !installAccessToken(result.credential, result.lifetime)
+        ) {
+          return;
+        }
+
+        retryPosition = 0;
+        await pollWithCurrentToken(operation, true);
+        return;
+      case "authorization-denied":
+        emitDiagnostic("authorization", "authorization-denied");
+        transitionToFailure({
+          kind: "authorization-failed",
+          reason: "authorization-denied",
+        });
+        return;
+      case "transient-failure":
+        emitDiagnostic("authorization", "authorization-transient-failure");
+        transitionToFailure(providerFailure("network"));
+        return;
+      case "provider-failure":
+        emitDiagnostic("authorization", "authorization-provider-failure");
+        transitionToFailure({
+          kind: "authorization-failed",
+          reason: "code-exchange-rejected",
+        });
+        return;
+    }
+
+    return unreachable(result);
   }
 
   async function consumeCallback(
@@ -375,26 +389,23 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    const authClock = currentBrowserAuthClock();
-    if (authClock.kind === "unavailable") {
+    const now = readCurrentTime();
+    if (now.kind === "unavailable") {
       transitionToFailure(providerFailure("network"));
       return;
     }
 
     const operation = startOperation();
     try {
-      const configuration = activeConfiguration();
-      if (configuration.kind === "unavailable") {
+      const authorization = activeAuthorization();
+      if (authorization.kind === "unavailable") {
         return;
       }
 
-      const result = await consumeSpotifyAuthorizationCallback({
-        configuration: configuration.value,
+      const result = await authorization.value.consumeCallback({
         callbackUrl,
-        clock: authClock.value,
-        fetch: ports.auth.fetch,
+        nowEpochMilliseconds: now.epochMilliseconds,
         signal: operation.controller.signal,
-        storage: cancellationAwareStorage(operation),
       });
       if (!isCurrentOperation(operation)) {
         return;
@@ -412,16 +423,16 @@ export function createPlaybackWorkerRuntime(
   }
 
   async function handleConsumedCallback(
-    result: ConsumeSpotifyAuthorizationCallbackResult,
+    result: ConsumeAuthorizationCallbackResult,
     operation: RuntimeOperation,
   ): Promise<void> {
     switch (result.kind) {
       case "connected": {
-        emitCallbackReturnUrl(result.returnTo);
+        emitCallbackReturnUrl(result.returnUrl);
         const connected = transition({ kind: "authorization-complete" });
         if (
           !connected ||
-          !installAccessToken(result.accessToken, result.expiresIn)
+          !installAccessToken(result.credential, result.lifetime)
         ) {
           return;
         }
@@ -431,7 +442,7 @@ export function createPlaybackWorkerRuntime(
         return;
       }
       case "authorization-denied":
-        emitCallbackReturnUrl(result.returnTo);
+        emitCallbackReturnUrl(result.returnUrl);
         emitDiagnostic("authorization", "authorization-denied");
         transitionToFailure({
           kind: "authorization-failed",
@@ -446,8 +457,8 @@ export function createPlaybackWorkerRuntime(
         });
         return;
       case "authorization-required":
-        if ("returnTo" in result) {
-          emitCallbackReturnUrl(result.returnTo);
+        if (result.returnUrl.kind === "available") {
+          emitCallbackReturnUrl(result.returnUrl.value);
         }
         emitDiagnostic("authorization", "authorization-required");
         transition({
@@ -456,12 +467,12 @@ export function createPlaybackWorkerRuntime(
         });
         return;
       case "transient-failure":
-        emitCallbackReturnUrl(result.returnTo);
+        emitCallbackReturnUrl(result.returnUrl);
         emitDiagnostic("authorization", "authorization-transient-failure");
         transitionToFailure(providerFailure("network"));
         return;
       case "provider-failure":
-        emitCallbackReturnUrl(result.returnTo);
+        emitCallbackReturnUrl(result.returnUrl);
         emitDiagnostic("authorization", "authorization-provider-failure");
         transitionToFailure({
           kind: "authorization-failed",
@@ -473,19 +484,10 @@ export function createPlaybackWorkerRuntime(
     emitDiagnostic("authorization", "runtime-operation-failed");
   }
 
-  function emitCallbackReturnUrl(returnTo: DisplayReturnConfiguration): void {
-    const configuration = activeConfiguration();
-    if (configuration.kind === "unavailable") {
-      emitDiagnostic("authorization", "runtime-operation-failed");
-      return;
-    }
-
+  function emitCallbackReturnUrl(url: string): void {
     const event: PlaybackWorkerEvent = {
       kind: "callback-url-restored",
-      url: buildQueryStrippedDisplayReturnUrl({
-        configuration: configuration.value,
-        returnTo,
-      }),
+      url,
     };
     ports.events.emit(Object.freeze(event));
   }
@@ -543,8 +545,13 @@ export function createPlaybackWorkerRuntime(
     transition({ kind: "authorization-required", reason: "not-authorized" });
 
     return enqueue(async (): Promise<void> => {
+      const authorization = activeAuthorization();
+      if (authorization.kind === "unavailable") {
+        return;
+      }
+
       try {
-        await logoutSpotifyAuthorization(ports.auth.storage);
+        await authorization.value.logout();
       } catch {
         emitDiagnostic("storage", "storage-failure");
       }
@@ -628,7 +635,7 @@ export function createPlaybackWorkerRuntime(
 
     switch (refreshed.kind) {
       case "success":
-        if (!installAccessToken(refreshed.accessToken, refreshed.expiresIn)) {
+        if (!installAccessToken(refreshed.credential, refreshed.lifetime)) {
           return;
         }
 
@@ -829,7 +836,7 @@ export function createPlaybackWorkerRuntime(
 
     switch (refreshed.kind) {
       case "success":
-        if (!installAccessToken(refreshed.accessToken, refreshed.expiresIn)) {
+        if (!installAccessToken(refreshed.credential, refreshed.lifetime)) {
           return;
         }
 
@@ -871,12 +878,12 @@ export function createPlaybackWorkerRuntime(
       return refreshFlight.result;
     }
 
-    const configuration = activeConfiguration();
-    if (configuration.kind === "unavailable") {
+    const authorization = activeAuthorization();
+    if (authorization.kind === "unavailable") {
       return frozenUnexpectedRefreshResult();
     }
 
-    const result = requestRefreshConnection(configuration.value, operation);
+    const result = requestRefreshConnection(authorization.value, operation);
     refreshFlight = frozenRunningRefreshFlight(operation.epoch, result);
     try {
       return await result;
@@ -891,16 +898,16 @@ export function createPlaybackWorkerRuntime(
   }
 
   async function requestRefreshConnection(
-    configuration: SpotifyPublicConfiguration,
+    authorization: AuthorizationSessionPort,
     operation: RuntimeOperation,
   ): Promise<RuntimeRefreshResult> {
     try {
-      return await refreshSpotifyConnection({
-        configuration,
-        fetch: ports.auth.fetch,
+      const request = {
         signal: operation.controller.signal,
-        storage: cancellationAwareStorage(operation),
-      });
+      };
+      return accessTokenState.kind === "missing"
+        ? await authorization.recoverConnection(request)
+        : await authorization.refreshCredential(request);
     } catch {
       return frozenUnexpectedRefreshResult();
     }
@@ -949,8 +956,8 @@ export function createPlaybackWorkerRuntime(
   }
 
   function installAccessToken(
-    accessToken: SpotifyAccessToken,
-    expiresIn: SpotifyAccessTokenLifetimeSeconds,
+    accessToken: PlaybackCredential,
+    expiresIn: PlaybackCredentialLifetime,
   ): boolean {
     const now = readCurrentTime();
     if (now.kind === "unavailable") {
@@ -1201,6 +1208,10 @@ export function createPlaybackWorkerRuntime(
   function cancelRuntimeWork(): void {
     cancelActiveOperation();
     cancelAllSchedules();
+    const authorization = activeAuthorization();
+    if (authorization.kind === "available") {
+      authorization.value.cancelPendingWork();
+    }
   }
 
   function cancelAllSchedules(): void {
@@ -1288,77 +1299,6 @@ export function createPlaybackWorkerRuntime(
     );
   }
 
-  function cancellationAwareStorage(
-    operation: RuntimeOperation,
-  ): SpotifyAuthStoragePort {
-    const storage: SpotifyAuthStoragePort = {
-      async savePendingAuthorizationAttempt(attempt): Promise<void> {
-        if (!isCurrentOperation(operation)) {
-          return;
-        }
-
-        await ports.auth.storage.savePendingAuthorizationAttempt(attempt);
-      },
-
-      async consumePendingAuthorizationAttempt(
-        options: SpotifyPendingAuthorizationAttemptConsumeOptions,
-      ): Promise<SpotifyPendingAuthorizationAttemptConsumeResult> {
-        if (!isCurrentOperation(operation)) {
-          return frozenRejectedPendingAuthorizationAttempt();
-        }
-
-        const result =
-          await ports.auth.storage.consumePendingAuthorizationAttempt(options);
-        if (!isCurrentOperation(operation)) {
-          return frozenRejectedPendingAuthorizationAttempt();
-        }
-
-        return result;
-      },
-
-      async readSpotifyRefreshToken(): Promise<SpotifyRefreshTokenReadResult> {
-        if (!isCurrentOperation(operation)) {
-          return frozenMissingRefreshToken();
-        }
-
-        const result = await ports.auth.storage.readSpotifyRefreshToken();
-        if (!isCurrentOperation(operation)) {
-          return frozenMissingRefreshToken();
-        }
-
-        return result;
-      },
-
-      async saveSpotifyRefreshToken(
-        refreshToken: SpotifyRefreshToken,
-      ): Promise<void> {
-        if (!isCurrentOperation(operation)) {
-          return;
-        }
-
-        await ports.auth.storage.saveSpotifyRefreshToken(refreshToken);
-      },
-
-      async deleteSpotifyRefreshToken(): Promise<void> {
-        if (!isCurrentOperation(operation)) {
-          return;
-        }
-
-        await ports.auth.storage.deleteSpotifyRefreshToken();
-      },
-
-      async clearSpotifyAuthorization(): Promise<void> {
-        if (!isCurrentOperation(operation)) {
-          return;
-        }
-
-        await ports.auth.storage.clearSpotifyAuthorization();
-      },
-    };
-
-    return Object.freeze(storage);
-  }
-
   function failInitialization(
     code: "invalid-public-configuration" | "worker-initialization-failed",
   ): void {
@@ -1367,10 +1307,10 @@ export function createPlaybackWorkerRuntime(
     ports.events.emit(createPlaybackWorkerFatalInitializationFailure(code));
   }
 
-  function activeConfiguration():
+  function activeAuthorization():
     | {
         readonly kind: "available";
-        readonly value: SpotifyPublicConfiguration;
+        readonly value: AuthorizationSessionPort;
       }
     | {
         readonly kind: "unavailable";
@@ -1381,26 +1321,7 @@ export function createPlaybackWorkerRuntime(
 
     return Object.freeze({
       kind: "available",
-      value: runtimeStatus.configuration,
-    });
-  }
-
-  function currentBrowserAuthClock():
-    | {
-        readonly kind: "available";
-        readonly value: BrowserAuthClockPort;
-      }
-    | {
-        readonly kind: "unavailable";
-      } {
-    const now = readCurrentTime();
-    if (now.kind === "unavailable") {
-      return Object.freeze({ kind: "unavailable" });
-    }
-
-    return Object.freeze({
-      kind: "available",
-      value: createBrowserAuthClockPort(() => now.epochMilliseconds),
+      value: runtimeStatus.authorization,
     });
   }
 
@@ -1499,9 +1420,9 @@ function frozenAwaitingInitialization(): RuntimeStatus {
 }
 
 function frozenActiveRuntime(
-  configuration: SpotifyPublicConfiguration,
+  authorization: AuthorizationSessionPort,
 ): RuntimeStatus {
-  return Object.freeze({ kind: "active", configuration });
+  return Object.freeze({ kind: "active", authorization });
 }
 
 function frozenDisposedRuntime(): RuntimeStatus {
@@ -1517,7 +1438,7 @@ function frozenMissingAccessToken(): AccessTokenState {
 }
 
 function frozenAvailableAccessToken(input: {
-  readonly accessToken: SpotifyAccessToken;
+  readonly accessToken: PlaybackCredential;
   readonly expiresAtEpochMilliseconds: number;
   readonly refreshAtEpochMilliseconds: number;
 }): AccessTokenState {
@@ -1574,10 +1495,6 @@ function frozenNetworkFailure(): PlaybackProviderResult {
   return Object.freeze({ kind: "network-failure" });
 }
 
-function frozenRejectedPendingAuthorizationAttempt(): SpotifyPendingAuthorizationAttemptConsumeResult {
-  return Object.freeze({ kind: "rejected", reason: "missing-attempt" });
-}
-
-function frozenMissingRefreshToken(): SpotifyRefreshTokenReadResult {
-  return Object.freeze({ kind: "missing" });
+function unreachable(value: never): never {
+  throw new Error(`Unexpected authorization result: ${String(value)}`);
 }

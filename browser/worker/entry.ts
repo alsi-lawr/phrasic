@@ -4,6 +4,7 @@ import {
   createNativeIndexedDbAuthorizationPort,
 } from "../auth/storage.ts";
 import { createSpotifyAuthFetchPort } from "../auth/token.ts";
+import { createSpotifyAuthorizationProvider } from "../auth/spotify-provider.ts";
 import { createPlaybackProviderRegistry } from "../providers/registry.ts";
 import { createSpotifyPlaybackProvider } from "../providers/spotify.ts";
 import {
@@ -77,7 +78,7 @@ function createWorkerBootstrap(): WorkerBootstrap {
       return Object.freeze({ kind: "unavailable" });
     }
     const runtime = createPlaybackWorkerRuntime({
-      auth: Object.freeze({
+      authorization: createSpotifyAuthorizationProvider({
         crypto: createBrowserPkceCryptoPort(self.crypto),
         fetch: createSpotifyAuthFetchPort({
           fetchImplementation: self.fetch,

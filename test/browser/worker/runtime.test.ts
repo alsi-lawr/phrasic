@@ -21,6 +21,7 @@ import {
   type SpotifyAuthFetchResult,
   type SpotifyAuthJsonReadResult,
 } from "../../../browser/auth/token.ts";
+import { createSpotifyAuthorizationProvider } from "../../../browser/auth/spotify-provider.ts";
 import { parseSpotifyPlaybackPayload } from "../../../browser/providers/spotify-payload.ts";
 import {
   createPlaybackProviderRegistry,
@@ -934,7 +935,7 @@ function createRuntime(
   });
 
   return createPlaybackWorkerRuntime({
-    auth: Object.freeze({
+    authorization: createSpotifyAuthorizationProvider({
       crypto: deterministicCrypto(),
       fetch: dependencies.authFetch,
       storage: dependencies.storage,
