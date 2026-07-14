@@ -24,6 +24,7 @@ test("Tailwind output discovers application utilities but excludes test utilitie
     const css = generatedCss(outputDirectory);
     assert.match(css, /\.animate-artwork-fade-in\{/);
     assert.match(css, /\.animate-vinyl-spin\{/);
+    assert.match(css, /transform-box:fill-box/);
     assert.match(css, /\.min-h-full\{/);
     assert.match(css, /\.fill-overlay-title\{/);
     assert.doesNotMatch(css, /\.bg-fuchsia-500\{/);

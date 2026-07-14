@@ -10,7 +10,7 @@ export function FallbackVinyl({ motion }: FallbackVinylProps): ReactElement {
     <g
       className={
         motion.kind === "enabled"
-          ? "origin-center animate-vinyl-spin"
+          ? "origin-center [transform-box:fill-box] animate-vinyl-spin"
           : undefined
       }
     >
@@ -31,6 +31,16 @@ export function FallbackVinyl({ motion }: FallbackVinylProps): ReactElement {
         d="M 540 202 A 338 338 0 0 1 779 301"
         className="fill-none stroke-overlay-vinyl-groove stroke-8"
       />
+      <path
+        d="M 250 352 Q 286 306 334 284"
+        className="fill-none stroke-overlay-vinyl-groove stroke-8"
+      />
+      <path
+        d="M 744 728 Q 782 700 810 652"
+        className="fill-none stroke-overlay-vinyl-rim stroke-8"
+      />
+      <circle cx={690} cy={350} r={12} className="fill-overlay-vinyl-groove" />
+      <circle cx={374} cy={648} r={8} className="fill-overlay-vinyl-rim" />
       <circle
         cx={540}
         cy={540}
