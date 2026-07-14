@@ -44,6 +44,32 @@ test("overlay metadata renders normalized paused episode text and hierarchy", ()
   assert.match(markup, />PAUSED · EPISODE<\/text>/);
 });
 
+test("overlay metadata distinguishes fatal browser capability and configuration failures", () => {
+  const browserCapabilityMarkup = renderMetadata(
+    fatalSnapshot("browser-capability-unavailable"),
+  );
+  assert.match(
+    browserCapabilityMarkup,
+    />This browser cannot start Spotify playback\.<\/text>/,
+  );
+  assert.match(
+    browserCapabilityMarkup,
+    />A required browser playback capability is unavailable\.<\/text>/,
+  );
+
+  const configurationMarkup = renderMetadata(
+    fatalSnapshot("configuration-unavailable"),
+  );
+  assert.match(
+    configurationMarkup,
+    />The browser configuration is unavailable\.<\/text>/,
+  );
+  assert.match(
+    configurationMarkup,
+    />The public Spotify configuration could not be loaded\.<\/text>/,
+  );
+});
+
 test("marquee identity stays stable for a normalized item whose title changes", () => {
   const originalState = expectSuccess(
     parseSpotifyPlaybackPayload(playingTrackPayload),
@@ -104,6 +130,15 @@ function playbackSnapshot(
   state: PlaybackState,
 ): BrowserPlaybackApplicationSnapshot {
   return Object.freeze({ kind: "playback", state });
+}
+
+function fatalSnapshot(
+  reason: Extract<
+    BrowserPlaybackApplicationSnapshot,
+    { readonly kind: "fatal" }
+  >["reason"],
+): BrowserPlaybackApplicationSnapshot {
+  return Object.freeze({ kind: "fatal", reason });
 }
 
 function playingTrack(state: PlaybackState): TrackItem {

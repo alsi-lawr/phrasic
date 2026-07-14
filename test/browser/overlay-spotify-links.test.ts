@@ -13,10 +13,12 @@ import {
   ProviderId,
   ProviderLink,
   TrackItem,
+  transitionPlaybackState,
   type PlaybackState,
   type Result,
 } from "../../domain/playback.ts";
 import {
+  emptyTrackPayload,
   pausedEpisodePayload,
   playingTrackPayload,
 } from "./providers/spotify-payload.fixture.ts";
@@ -78,6 +80,24 @@ test("Spotify destinations render an episode and its show", () => {
   );
   assert.match(markup, /href="https:\/\/open\.spotify\.com\/episode\/episode-1"/);
   assert.match(markup, /href="https:\/\/open\.spotify\.com\/show\/show-1"/);
+});
+
+test("reconnecting playback retains Spotify destinations for its stale item", () => {
+  const markup = renderSpotifyLinks(
+    playbackSnapshot(reconnectingStateWithStaleItem()),
+  );
+
+  assert.match(markup, /href="https:\/\/open\.spotify\.com\/track\/track-1"/);
+  assert.match(markup, /href="https:\/\/open\.spotify\.com\/artist\/artist-1"/);
+  assert.match(markup, /href="https:\/\/open\.spotify\.com\/album\/album-1"/);
+});
+
+test("reconnecting playback without a stale item has no Spotify destinations", () => {
+  const markup = renderSpotifyLinks(
+    playbackSnapshot(reconnectingStateWithoutStaleItem()),
+  );
+
+  assert.equal(markup, "");
 });
 
 test("rendered Spotify links retain accessible pointer and keyboard-focus targets", () => {
@@ -187,6 +207,24 @@ function playingSpotifyState(): Extract<
   }
 
   throw new Error("Expected a playing Spotify state.");
+}
+
+function reconnectingStateWithStaleItem(): PlaybackState {
+  return expectSuccess(
+    transitionPlaybackState(playingSpotifyState(), {
+      kind: "connection-lost",
+    }),
+  );
+}
+
+function reconnectingStateWithoutStaleItem(): PlaybackState {
+  const emptyState = expectSuccess(
+    parseSpotifyPlaybackPayload(emptyTrackPayload),
+  );
+
+  return expectSuccess(
+    transitionPlaybackState(emptyState, { kind: "connection-lost" }),
+  );
 }
 
 function playbackSnapshot(
