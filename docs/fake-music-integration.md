@@ -33,7 +33,7 @@ headless Chrome, drives the complete Fake Music flow, records native
 transparency at 24 fps, and replaces `docs/fake-music-flow.webp`:
 
 ```sh
-node docs/fake-music-flow/generate.mjs
+docs/generate-fake-music-flow.sh
 ```
 
 It requires the repository's npm dependencies, `google-chrome`, and `ffmpeg`.
