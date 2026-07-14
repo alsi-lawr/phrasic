@@ -22,11 +22,10 @@ import {
   type SpotifyAuthorizationRedirect,
 } from "../../../browser/auth/session.ts";
 import {
-  SpotifyRefreshTokenConnection,
   type SpotifyAuthStoragePort,
   type SpotifyPendingAuthorizationAttemptConsumeOptions,
   type SpotifyPendingAuthorizationAttemptConsumeResult,
-  type SpotifyRefreshTokenConnectionReadResult,
+  type SpotifyRefreshTokenReadResult,
 } from "../../../browser/auth/storage.ts";
 import {
   SpotifyRefreshToken,
@@ -37,13 +36,13 @@ import {
   type SpotifyAuthJsonReadResult,
 } from "../../../browser/auth/token.ts";
 
-type StoredConnection =
+type StoredRefreshToken =
   | {
       readonly kind: "empty";
     }
   | {
       readonly kind: "stored";
-      readonly connection: SpotifyRefreshTokenConnection;
+      readonly refreshToken: SpotifyRefreshToken;
     };
 
 type ClockFixture = {
@@ -60,7 +59,7 @@ const applicationUrl = new URL("https://nowplaying.example/nowplaying");
 const validState = "A".repeat(43);
 const validVerifier = "A".repeat(86);
 
-test("successful PKCE callback persists only pending values and the refresh-token connection", async () => {
+test("successful PKCE callback persists only pending values and the refresh token", async () => {
   const storage = new InMemorySpotifyAuthStorage();
   const clock = clockFixture(1_000_000);
   const begun = await beginAuthorization(storage, clock.clock);
@@ -131,7 +130,7 @@ test("provider denial consumes the matching pending authorization without callin
   assert.equal(result.kind, "authorization-denied");
   assert.equal(storage.pendingAttemptCount, 0);
   assert.equal(fetch.requestCount, 0);
-  await assertMissingConnection(storage);
+  await assertMissingRefreshToken(storage);
 });
 
 test("malformed callbacks do not exchange code or consume a pending attempt", async () => {
@@ -237,7 +236,7 @@ test("pending authorization attempts expire at the exact ten-minute boundary", a
   assert.equal(fetch.requestCount, 0);
 });
 
-test("malformed token JSON becomes a safe provider failure without persisting a connection", async () => {
+test("malformed token JSON becomes a safe provider failure without persisting a refresh token", async () => {
   const storage = new InMemorySpotifyAuthStorage();
   const clock = clockFixture(1_000_000);
   const begun = await beginAuthorization(storage, clock.clock);
@@ -264,7 +263,7 @@ test("malformed token JSON becomes a safe provider failure without persisting a 
     returnTo: displayReturnConfiguration(),
   });
   assert.equal(storage.pendingAttemptCount, 0);
-  await assertMissingConnection(storage);
+  await assertMissingRefreshToken(storage);
 });
 
 test("refresh rotates a new refresh token and retains the existing token when Spotify omits rotation", async () => {
@@ -320,7 +319,7 @@ test("refresh rotates a new refresh token and retains the existing token when Sp
   );
 });
 
-test("invalid_grant deletes the refresh-token connection and requires authorization", async () => {
+test("invalid_grant deletes the stored refresh token and requires authorization", async () => {
   const storage = new InMemorySpotifyAuthStorage();
   await seedRefreshToken(storage, "stored-refresh-token");
   const fetch = new FakeSpotifyAuthFetch([
@@ -340,10 +339,10 @@ test("invalid_grant deletes the refresh-token connection and requires authorizat
     kind: "authorization-required",
     reason: "invalid-credentials",
   });
-  await assertMissingConnection(storage);
+  await assertMissingRefreshToken(storage);
 });
 
-test("transient token failures retain the stored refresh-token connection", async () => {
+test("transient token failures retain the stored refresh token", async () => {
   const storage = new InMemorySpotifyAuthStorage();
   await seedRefreshToken(storage, "stored-refresh-token");
   const fetch = new FakeSpotifyAuthFetch([networkFailure()]);
@@ -361,7 +360,7 @@ test("transient token failures retain the stored refresh-token connection", asyn
   assert.equal(await storedRefreshToken(storage), "stored-refresh-token");
 });
 
-test("logout clears pending authorization attempts and the refresh-token connection in one storage operation", async () => {
+test("logout clears pending authorization attempts and the refresh token in one storage operation", async () => {
   const storage = new InMemorySpotifyAuthStorage();
   const clock = clockFixture(1_000_000);
   await beginAuthorization(storage, clock.clock);
@@ -374,12 +373,14 @@ test("logout clears pending authorization attempts and the refresh-token connect
   });
   assert.equal(storage.pendingAttemptCount, 0);
   assert.equal(storage.clearOperationCount, 1);
-  await assertMissingConnection(storage);
+  await assertMissingRefreshToken(storage);
 });
 
 class InMemorySpotifyAuthStorage implements SpotifyAuthStoragePort {
   private pendingAttempts: ReadonlyArray<PendingAuthorizationAttempt> = [];
-  private storedConnection: StoredConnection = Object.freeze({ kind: "empty" });
+  private storedRefreshToken: StoredRefreshToken = Object.freeze({
+    kind: "empty",
+  });
   private storedValues: Array<string> = [];
   private clearOperations = 0;
 
@@ -437,34 +438,34 @@ class InMemorySpotifyAuthStorage implements SpotifyAuthStoragePort {
     return frozenConsumedPendingAttempt(attempt);
   }
 
-  async readSpotifyRefreshTokenConnection(): Promise<SpotifyRefreshTokenConnectionReadResult> {
-    if (this.storedConnection.kind === "empty") {
-      return Object.freeze({ kind: "connection-missing" });
+  async readSpotifyRefreshToken(): Promise<SpotifyRefreshTokenReadResult> {
+    if (this.storedRefreshToken.kind === "empty") {
+      return Object.freeze({ kind: "missing" });
     }
 
     return Object.freeze({
-      kind: "connection-found",
-      connection: this.storedConnection.connection,
+      kind: "found",
+      refreshToken: this.storedRefreshToken.refreshToken,
     });
   }
 
-  async saveSpotifyRefreshTokenConnection(
-    connection: SpotifyRefreshTokenConnection,
+  async saveSpotifyRefreshToken(
+    refreshToken: SpotifyRefreshToken,
   ): Promise<void> {
-    this.storedConnection = Object.freeze({
+    this.storedRefreshToken = Object.freeze({
       kind: "stored",
-      connection,
+      refreshToken,
     });
-    this.storedValues.push(connection.refreshToken.toStorageValue());
+    this.storedValues.push(refreshToken.toStorageValue());
   }
 
-  async deleteSpotifyRefreshTokenConnection(): Promise<void> {
-    this.storedConnection = Object.freeze({ kind: "empty" });
+  async deleteSpotifyRefreshToken(): Promise<void> {
+    this.storedRefreshToken = Object.freeze({ kind: "empty" });
   }
 
   async clearSpotifyAuthorization(): Promise<void> {
     this.pendingAttempts = Object.freeze([]);
-    this.storedConnection = Object.freeze({ kind: "empty" });
+    this.storedRefreshToken = Object.freeze({ kind: "empty" });
     this.clearOperations += 1;
   }
 }
@@ -639,28 +640,26 @@ async function seedRefreshToken(
     throw new Error("Expected test refresh token to be valid.");
   }
 
-  await storage.saveSpotifyRefreshTokenConnection(
-    SpotifyRefreshTokenConnection.create(parsed.value),
-  );
+  await storage.saveSpotifyRefreshToken(parsed.value);
 }
 
 async function storedRefreshToken(
   storage: SpotifyAuthStoragePort,
 ): Promise<string> {
-  const connection = await storage.readSpotifyRefreshTokenConnection();
-  if (connection.kind === "connection-missing") {
-    throw new Error("Expected a stored Spotify refresh-token connection.");
+  const refreshToken = await storage.readSpotifyRefreshToken();
+  if (refreshToken.kind === "missing") {
+    throw new Error("Expected a stored Spotify refresh token.");
   }
 
-  return connection.connection.refreshToken.toStorageValue();
+  return refreshToken.refreshToken.toStorageValue();
 }
 
-async function assertMissingConnection(
+async function assertMissingRefreshToken(
   storage: SpotifyAuthStoragePort,
 ): Promise<void> {
-  const connection = await storage.readSpotifyRefreshTokenConnection();
-  assert.deepEqual(connection, {
-    kind: "connection-missing",
+  const refreshToken = await storage.readSpotifyRefreshToken();
+  assert.deepEqual(refreshToken, {
+    kind: "missing",
   });
 }
 

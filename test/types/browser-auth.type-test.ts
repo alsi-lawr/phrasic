@@ -15,9 +15,9 @@ import {
   type SpotifyAuthorizationCode,
 } from "../../browser/auth/pkce.ts";
 import type { RefreshSpotifyConnectionResult } from "../../browser/auth/session.ts";
-import {
-  SpotifyRefreshTokenConnection,
-  type SpotifyAuthStoragePort,
+import type {
+  SpotifyAuthStoragePort,
+  SpotifyRefreshTokenReadResult,
 } from "../../browser/auth/storage.ts";
 import {
   type SpotifyAccessToken,
@@ -37,6 +37,7 @@ declare const accessToken: SpotifyAccessToken;
 declare const refreshToken: SpotifyRefreshToken;
 declare const storage: SpotifyAuthStoragePort;
 declare const refreshResult: RefreshSpotifyConnectionResult;
+declare const storedRefreshToken: SpotifyRefreshTokenReadResult;
 
 const returnTo: DisplayReturnConfiguration = Object.freeze({
   width,
@@ -52,7 +53,6 @@ const pendingOptions: PendingAuthorizationAttemptOptions = Object.freeze({
   returnTo,
 });
 const pending = PendingAuthorizationAttempt.create(pendingOptions);
-const refreshConnection = SpotifyRefreshTokenConnection.create(refreshToken);
 const rawConfiguration = Object.freeze({
   spotify: Object.freeze({
     clientId: "browser-client-id",
@@ -91,7 +91,12 @@ const arbitraryExpiry = PendingAuthorizationAttempt.create({
 const constructedClientId = new SpotifyClientId("browser-client-id");
 // @ts-expect-error PKCE states can only be constructed by their parser.
 const constructedState = new PkceState("A".repeat(43));
-void storage.saveSpotifyRefreshTokenConnection(refreshConnection);
+void storage.saveSpotifyRefreshToken(refreshToken);
+if (storedRefreshToken.kind === "found") {
+  void storedRefreshToken.refreshToken.toStorageValue();
+  // @ts-expect-error A found refresh-token result exposes no connection wrapper.
+  void storedRefreshToken.connection;
+}
 if (refreshResult.kind === "success") {
   // @ts-expect-error Access-token refresh success retains credentials only in trusted memory.
   void refreshResult.refreshToken;
@@ -99,7 +104,7 @@ if (refreshResult.kind === "success") {
 // @ts-expect-error Access tokens have no persistence representation.
 void accessToken.toStorageValue();
 // @ts-expect-error Refresh-token storage cannot accept an access token.
-void storage.saveSpotifyRefreshTokenConnection(accessToken);
+void storage.saveSpotifyRefreshToken(accessToken);
 
 void configuration;
 void pending;
@@ -111,4 +116,3 @@ void candidatePendingOptions;
 void arbitraryExpiry;
 void constructedClientId;
 void constructedState;
-void refreshConnection;
