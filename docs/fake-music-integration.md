@@ -26,6 +26,21 @@ docker run --rm --publish 127.0.0.1:8080:8080 \
 Hosts that do not use the bundled Caddyfile must reproduce the same default-off
 gate. Keep the route disabled in normal production deployments.
 
+## Regenerate the demonstration
+
+The checked-in harness builds the production app, launches a local preview and
+headless Chrome, drives the complete Fake Music flow, records native
+transparency at 24 fps, and replaces `docs/fake-music-flow.webp`:
+
+```sh
+node docs/fake-music-flow/generate.mjs
+```
+
+It requires the repository's npm dependencies, `google-chrome`, and `ffmpeg`.
+Set `CHROME_BIN`, `PREVIEW_PORT`, or `CHROME_DEBUG_PORT` to override their
+defaults. Temporary frames and the intermediate transparent GIF are removed
+after the WebP is written.
+
 ## Send controls
 
 Controls are same-window `message` events. Open the `/fake/` page's developer
