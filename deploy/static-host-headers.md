@@ -17,11 +17,23 @@ X-Content-Type-Options: nosniff
 Permissions-Policy: accelerometer=(), autoplay=(), camera=(), clipboard-read=(), clipboard-write=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), microphone=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), web-share=(), xr-spatial-tracking=()
 ```
 
-The CSP permits only same-origin application files, the Spotify accounts and API
+The baseline CSP permits only same-origin application files, the Spotify accounts and API
 origins required by PKCE and playback polling, and Spotify's documented
 `https://i.scdn.co` artwork origin. `data:` is retained solely for the
 build-embedded fallback artwork; it does not allow an arbitrary network image
 origin. No generic `https:` source is permitted for images or connections.
+
+When the disabled-by-default `/fake/` entry is enabled, its HTML response must
+replace the baseline CSP with this provider-isolated policy:
+
+```http
+Content-Security-Policy: default-src 'none'; base-uri 'none'; object-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'none'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'none'
+```
+
+It permits arbitrary HTTPS artwork by design but includes no authorization or
+playback API origin. Return HTTP 404 for `/fake`, `/fake/`, and
+`/fake/index.html` unless the host's equivalent of
+`FAKE_PROVIDER_ENABLED=true` is explicitly set.
 
 ## Required cache rules
 
@@ -29,13 +41,13 @@ Apply cache rules by URL path, ignoring the query string. In particular, every
 OAuth callback request to `/spotify/`, including one with `code`, `state`, or an
 error parameter, must receive the callback HTML rule.
 
-| Published path                                                   | Required response header                                        |
-| ---------------------------------------------------------------- | --------------------------------------------------------------- |
-| `/config.json`                                                   | `Cache-Control: no-store, no-cache, max-age=0, must-revalidate` |
-| `/spotify/` and `/spotify/index.html`                            | `Cache-Control: no-store, no-cache, max-age=0, must-revalidate` |
-| `/`, `/index.html`, and every other HTML entry                   | `Cache-Control: no-cache, max-age=0, must-revalidate`           |
-| `/assets/<name>-<content-hash>.<ext>` emitted by Vite            | `Cache-Control: public, max-age=31536000, immutable`            |
-| `/fonts/*`, `/favicon.ico`, and every other unhashed static file | `Cache-Control: no-cache, max-age=0, must-revalidate`           |
+| Published path                                                                            | Required response header                                        |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `/config.json`                                                                            | `Cache-Control: no-store, no-cache, max-age=0, must-revalidate` |
+| `/spotify`, `/spotify/`, `/spotify/index.html`, `/fake`, `/fake/`, and `/fake/index.html` | `Cache-Control: no-store, no-cache, max-age=0, must-revalidate` |
+| `/`, `/index.html`, and every other HTML entry                                            | `Cache-Control: no-cache, max-age=0, must-revalidate`           |
+| `/assets/<name>-<content-hash>.<ext>` emitted by Vite                                     | `Cache-Control: public, max-age=31536000, immutable`            |
+| `/fonts/*`, `/favicon.ico`, and every other unhashed static file                          | `Cache-Control: no-cache, max-age=0, must-revalidate`           |
 
 Serve `/config.json` as `Content-Type: application/json; charset=utf-8`. Its
 entire public runtime shape is:

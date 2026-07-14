@@ -13,6 +13,7 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       input: {
+        fake: resolve(projectRoot, "fake/index.html"),
         index: resolve(projectRoot, "index.html"),
         spotify: resolve(projectRoot, "spotify/index.html"),
       },

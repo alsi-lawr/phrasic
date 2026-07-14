@@ -7,7 +7,12 @@
 	root * /srv
 
 	@assets path /assets/*
-	@noStore path /config.json /spotify /spotify/ /spotify/index.html
+	@fakeDisabled {
+		path /fake /fake/ /fake/index.html
+		expression `{$FAKE_PROVIDER_ENABLED:false} == false`
+	}
+	@fakeHtml path /fake /fake/ /fake/index.html
+	@noStore path /config.json /fake /fake/ /fake/index.html /spotify /spotify/ /spotify/index.html
 	@config path /config.json
 
 	route {
@@ -18,10 +23,13 @@
 			Permissions-Policy "accelerometer=(), autoplay=(), camera=(), clipboard-read=(), clipboard-write=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), microphone=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), web-share=(), xr-spatial-tracking=()"
 			Cache-Control "no-cache, max-age=0, must-revalidate"
 		}
+		header @fakeHtml Content-Security-Policy "default-src 'none'; base-uri 'none'; object-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'none'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'; frame-ancestors 'none'"
 
 		header @assets Cache-Control "public, max-age=31536000, immutable"
 		header @noStore Cache-Control "no-store, no-cache, max-age=0, must-revalidate"
 		header @config Content-Type "application/json; charset=utf-8"
+
+		respond @fakeDisabled 404
 
 		file_server
 	}

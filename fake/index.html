@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" class="m-0 h-full w-full bg-transparent">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; base-uri 'none'; object-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'none'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'none'; frame-src 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Exercise the OBS overlay with the in-memory Fake Music provider."
+    />
+    <link rel="icon" href="/favicon.ico" />
+    <title>Fake Music Now Playing</title>
+  </head>
+  <body
+    class="m-0 min-h-full w-full overflow-x-auto bg-transparent p-0 font-sans text-white"
+  >
+    <div
+      id="root"
+      class="m-0 flex min-h-full w-full items-start justify-start p-0"
+    ></div>
+    <script type="module" src="/browser/fake/main.tsx"></script>
+  </body>
+</html>
