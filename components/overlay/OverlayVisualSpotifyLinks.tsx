@@ -1,64 +1,271 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
+import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
+import type {
+  Creator,
+  NowPlayingItem,
+  PlaybackState,
+  ProviderLink,
+} from "../../domain/playback.ts";
 import { overlayViewBox } from "./overlay-geometry.ts";
 import {
   overlayArtworkRoundedClipPathData,
   overlayMetadataLayout,
   type OverlayTextLineLayout,
 } from "./overlay-layout.ts";
-import {
-  spotifyLinkAccessibleName,
-  type OverlaySpotifyLink,
-  type OverlaySpotifyLinks,
-} from "./overlay-spotify-links.ts";
-import { overlayVisibleSpotifyLinkClasses } from "./overlay-presentation.ts";
+
+const spotifyProviderId = "spotify";
 
 type OverlayVisualSpotifyLinksProps = {
   readonly availableWidth: number;
-  readonly links: OverlaySpotifyLinks;
+  readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
 export function OverlayVisualSpotifyLinks({
   availableWidth,
-  links,
+  snapshot,
 }: OverlayVisualSpotifyLinksProps): ReactElement | null {
-  switch (links.kind) {
-    case "not-applicable":
-    case "unavailable":
+  switch (snapshot.kind) {
+    case "fatal":
       return null;
-    case "available":
+    case "playback":
       return (
-        <nav
-          aria-label="Spotify destinations"
-          className="pointer-events-none absolute inset-0"
-        >
-          {links.links.map((link): ReactElement => (
-            <VisualSpotifyLink
-              key={`${link.destination}:${link.providerLink.href}`}
-              availableWidth={availableWidth}
-              link={link}
-            />
-          ))}
-        </nav>
+        <SpotifyLinksForPlaybackState
+          availableWidth={availableWidth}
+          state={snapshot.state}
+        />
       );
   }
 
-  return unreachable(links);
+  return unreachable(snapshot);
+}
+
+type SpotifyLinksForPlaybackStateProps = {
+  readonly availableWidth: number;
+  readonly state: PlaybackState;
+};
+
+function SpotifyLinksForPlaybackState({
+  availableWidth,
+  state,
+}: SpotifyLinksForPlaybackStateProps): ReactElement | null {
+  switch (state.kind) {
+    case "playing":
+    case "paused":
+      return (
+        <SpotifyLinksForItem
+          availableWidth={availableWidth}
+          item={state.snapshot.item}
+        />
+      );
+    case "reconnecting":
+      return (
+        <ReconnectingSpotifyLinks
+          availableWidth={availableWidth}
+          state={state}
+        />
+      );
+    case "initializing":
+    case "authorization-required":
+    case "authorizing":
+    case "empty":
+    case "unsupported":
+    case "failure":
+      return null;
+  }
+
+  return unreachable(state);
+}
+
+type ReconnectingSpotifyLinksProps = {
+  readonly availableWidth: number;
+  readonly state: Extract<PlaybackState, { readonly kind: "reconnecting" }>;
+};
+
+function ReconnectingSpotifyLinks({
+  availableWidth,
+  state,
+}: ReconnectingSpotifyLinksProps): ReactElement | null {
+  switch (state.lastItem.kind) {
+    case "available":
+      return (
+        <SpotifyLinksForItem
+          availableWidth={availableWidth}
+          item={state.lastItem.item}
+        />
+      );
+    case "unavailable":
+      return null;
+  }
+
+  return unreachable(state.lastItem);
+}
+
+type SpotifyLinksForItemProps = {
+  readonly availableWidth: number;
+  readonly item: NowPlayingItem;
+};
+
+function SpotifyLinksForItem({
+  availableWidth,
+  item,
+}: SpotifyLinksForItemProps): ReactElement | null {
+  switch (item.kind) {
+    case "track":
+      return <TrackSpotifyLinks availableWidth={availableWidth} item={item} />;
+    case "episode":
+      return (
+        <EpisodeSpotifyLinks availableWidth={availableWidth} item={item} />
+      );
+  }
+
+  return unreachable(item);
+}
+
+type TrackSpotifyLinksProps = {
+  readonly availableWidth: number;
+  readonly item: Extract<NowPlayingItem, { readonly kind: "track" }>;
+};
+
+type SelectedCreatorLink = {
+  readonly creator: Creator;
+  readonly providerLink: ProviderLink;
+};
+
+function TrackSpotifyLinks({
+  availableWidth,
+  item,
+}: TrackSpotifyLinksProps): ReactElement | null {
+  const trackLink = item.links.find(isSpotifyProviderLink);
+  const albumLink = item.collection.links.find(isSpotifyProviderLink);
+  if (trackLink === undefined || albumLink === undefined) {
+    return null;
+  }
+
+  const creatorLinks: SelectedCreatorLink[] = [];
+  for (const creator of item.artists) {
+    const creatorLink = creator.links.find(isSpotifyProviderLink);
+    if (creatorLink === undefined) {
+      return null;
+    }
+
+    creatorLinks.push({ creator, providerLink: creatorLink });
+  }
+
+  return (
+    <SpotifyDestinationNavigation>
+      <VisualSpotifyLink
+        href={trackLink.href}
+        label={`LISTEN ON SPOTIFY: TRACK — ${item.title.value}`}
+      >
+        <ArtworkLinkRegion />
+        <MetadataLinkRegion
+          availableWidth={availableWidth}
+          line={overlayMetadataLayout.titleLine}
+        />
+      </VisualSpotifyLink>
+      {creatorLinks.map(({ creator, providerLink }, index): ReactElement => (
+        <VisualSpotifyLink
+          key={`creator:${providerLink.href}:${creator.name.value}`}
+          href={providerLink.href}
+          label={`OPEN CREATOR ON SPOTIFY: ${creator.name.value}`}
+        >
+          <CreatorLinkRegion
+            availableWidth={availableWidth}
+            precedingText={creatorPrecedingText(item.artists, index)}
+            text={creator.name.value}
+          />
+        </VisualSpotifyLink>
+      ))}
+      <VisualSpotifyLink
+        href={albumLink.href}
+        label={`OPEN ALBUM ON SPOTIFY: ${item.collection.title.value}`}
+      >
+        <MetadataLinkRegion
+          availableWidth={availableWidth}
+          line={overlayMetadataLayout.detailLine}
+        />
+      </VisualSpotifyLink>
+    </SpotifyDestinationNavigation>
+  );
+}
+
+type EpisodeSpotifyLinksProps = {
+  readonly availableWidth: number;
+  readonly item: Extract<NowPlayingItem, { readonly kind: "episode" }>;
+};
+
+function EpisodeSpotifyLinks({
+  availableWidth,
+  item,
+}: EpisodeSpotifyLinksProps): ReactElement | null {
+  const episodeLink = item.links.find(isSpotifyProviderLink);
+  const showLink = item.show.links.find(isSpotifyProviderLink);
+  if (episodeLink === undefined || showLink === undefined) {
+    return null;
+  }
+
+  return (
+    <SpotifyDestinationNavigation>
+      <VisualSpotifyLink
+        href={episodeLink.href}
+        label={`LISTEN ON SPOTIFY: EPISODE — ${item.title.value}`}
+      >
+        <ArtworkLinkRegion />
+        <MetadataLinkRegion
+          availableWidth={availableWidth}
+          line={overlayMetadataLayout.titleLine}
+        />
+      </VisualSpotifyLink>
+      <VisualSpotifyLink
+        href={showLink.href}
+        label={`OPEN SHOW ON SPOTIFY: ${item.show.title.value}`}
+      >
+        <MetadataLinkRegion
+          availableWidth={availableWidth}
+          line={overlayMetadataLayout.creatorLine}
+        />
+        <MetadataLinkRegion
+          availableWidth={availableWidth}
+          line={overlayMetadataLayout.detailLine}
+        />
+      </VisualSpotifyLink>
+    </SpotifyDestinationNavigation>
+  );
+}
+
+type SpotifyDestinationNavigationProps = {
+  readonly children: ReactNode;
+};
+
+function SpotifyDestinationNavigation({
+  children,
+}: SpotifyDestinationNavigationProps): ReactElement {
+  return (
+    <nav
+      aria-label="Spotify destinations"
+      className="pointer-events-none absolute inset-0"
+    >
+      {children}
+    </nav>
+  );
 }
 
 type VisualSpotifyLinkProps = {
-  readonly availableWidth: number;
-  readonly link: OverlaySpotifyLink;
+  readonly children: ReactNode;
+  readonly href: string;
+  readonly label: string;
 };
 
 function VisualSpotifyLink({
-  availableWidth,
-  link,
+  children,
+  href,
+  label,
 }: VisualSpotifyLinkProps): ReactElement {
   return (
     <a
-      aria-label={spotifyLinkAccessibleName(link)}
-      className={overlayVisibleSpotifyLinkClasses.anchor}
-      href={link.providerLink.href}
+      aria-label={`${label} (opens in a new tab)`}
+      className="group absolute inset-0 block pointer-events-none outline-none"
+      href={href}
       rel="noopener noreferrer"
       target="_blank"
     >
@@ -68,70 +275,17 @@ function VisualSpotifyLink({
         focusable="false"
         viewBox={overlayViewBox}
       >
-        <VisualSpotifyLinkTarget availableWidth={availableWidth} link={link} />
+        {children}
       </svg>
     </a>
   );
-}
-
-type VisualSpotifyLinkTargetProps = {
-  readonly availableWidth: number;
-  readonly link: OverlaySpotifyLink;
-};
-
-function VisualSpotifyLinkTarget({
-  availableWidth,
-  link,
-}: VisualSpotifyLinkTargetProps): ReactElement {
-  switch (link.visibleTarget.kind) {
-    case "item-metadata":
-      return (
-        <>
-          <ArtworkLinkRegion />
-          <MetadataLinkRegion
-            availableWidth={availableWidth}
-            line={overlayMetadataLayout.titleLine}
-          />
-        </>
-      );
-    case "creator-metadata":
-      return (
-        <CreatorLinkRegion
-          availableWidth={availableWidth}
-          precedingText={link.visibleTarget.precedingText}
-          text={link.visibleTarget.text}
-        />
-      );
-    case "detail-metadata":
-      return (
-        <MetadataLinkRegion
-          availableWidth={availableWidth}
-          line={overlayMetadataLayout.detailLine}
-        />
-      );
-    case "show-metadata":
-      return (
-        <>
-          <MetadataLinkRegion
-            availableWidth={availableWidth}
-            line={overlayMetadataLayout.creatorLine}
-          />
-          <MetadataLinkRegion
-            availableWidth={availableWidth}
-            line={overlayMetadataLayout.detailLine}
-          />
-        </>
-      );
-  }
-
-  return unreachable(link.visibleTarget);
 }
 
 function ArtworkLinkRegion(): ReactElement {
   return (
     <path
       d={overlayArtworkRoundedClipPathData}
-      className={overlayVisibleSpotifyLinkClasses.target}
+      className="pointer-events-auto cursor-pointer fill-transparent stroke-transparent stroke-0 group-focus-visible:stroke-white group-focus-visible:stroke-40"
     />
   );
 }
@@ -151,7 +305,7 @@ function MetadataLinkRegion({
       y={line.clipY}
       width={availableWidth}
       height={line.clipHeight}
-      className={overlayVisibleSpotifyLinkClasses.target}
+      className="pointer-events-auto cursor-pointer fill-transparent stroke-transparent stroke-0 group-focus-visible:stroke-white group-focus-visible:stroke-40"
     />
   );
 }
@@ -176,20 +330,38 @@ function CreatorLinkRegion({
         y={line.clipY}
         width={availableWidth}
         height={line.clipHeight}
-        className={overlayVisibleSpotifyLinkClasses.focusIndicator}
+        className="pointer-events-none fill-none stroke-transparent stroke-0 group-focus-visible:stroke-white group-focus-visible:stroke-40"
       />
       <text
         x={overlayMetadataLayout.x}
         y={line.y}
-        className={overlayVisibleSpotifyLinkClasses.creatorText}
+        className="font-overlay-display fill-none text-overlay-creator-size font-semibold tracking-overlay-normal uppercase"
       >
         <tspan className="pointer-events-none">{precedingText}</tspan>
-        <tspan className={overlayVisibleSpotifyLinkClasses.creatorTextTarget}>
+        <tspan className="pointer-events-auto cursor-pointer fill-transparent">
           {text}
         </tspan>
       </text>
     </>
   );
+}
+
+function isSpotifyProviderLink(link: ProviderLink): boolean {
+  return link.providerId.value === spotifyProviderId;
+}
+
+function creatorPrecedingText(
+  artists: ReadonlyArray<Creator>,
+  creatorIndex: number,
+): string {
+  if (creatorIndex === 0) {
+    return "";
+  }
+
+  return `${artists
+    .slice(0, creatorIndex)
+    .map((artist): string => artist.name.value)
+    .join(", ")}, `;
 }
 
 function unreachable(value: never): never {

@@ -11,24 +11,17 @@ export type Result<Value, Failure> =
 export type ValueValidationError = {
   readonly kind: "invalid-value";
   readonly value:
-    | "access-token"
-    | "access-token-expires-in-seconds"
-    | "access-token-refresh-delay-milliseconds"
-    | "authorization-code"
     | "display-text"
     | "original-artwork-url"
-    | "playback-poll-delay-milliseconds"
     | "playback-duration-milliseconds"
     | "playback-position-milliseconds"
     | "provider-collection-id"
     | "provider-id"
     | "provider-item-id"
-    | "provider-link"
-    | "refresh-token";
+    | "provider-link";
   readonly reason:
     | "empty-string"
     | "expected-non-negative-integer"
-    | "expected-positive-integer"
     | "expected-string"
     | "invalid-url";
 };
@@ -250,183 +243,7 @@ export class ProviderCollectionId {
   }
 }
 
-export class AuthorizationCode {
-  private readonly rawValue: string;
-
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
-  }
-
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<AuthorizationCode, ValueValidationError> {
-    const result = validateNonEmptyString("authorization-code", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new AuthorizationCode(result.value));
-  }
-}
-
-export class AccessToken {
-  private readonly rawValue: string;
-
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
-  }
-
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<AccessToken, ValueValidationError> {
-    const result = validateNonEmptyString("access-token", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new AccessToken(result.value));
-  }
-}
-
-const millisecondsPerSecond = 1_000;
-
 export const maximumPlatformTimerDelayMilliseconds = 2_147_483_647;
-
-const maximumAccessTokenExpiresInSeconds = Math.floor(
-  maximumPlatformTimerDelayMilliseconds / millisecondsPerSecond,
-);
-
-export class AccessTokenExpiresInSeconds {
-  private readonly rawValue: number;
-
-  private constructor(value: number) {
-    this.rawValue = value;
-    Object.freeze(this);
-  }
-
-  public get value(): number {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<AccessTokenExpiresInSeconds, ValueValidationError> {
-    const result = validatePositiveInteger(
-      "access-token-expires-in-seconds",
-      input,
-    );
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    if (result.value > maximumAccessTokenExpiresInSeconds) {
-      return failed(
-        invalidValue(
-          "access-token-expires-in-seconds",
-          "expected-positive-integer",
-        ),
-      );
-    }
-
-    return succeeded(new AccessTokenExpiresInSeconds(result.value));
-  }
-}
-
-export class AccessTokenRefreshDelayMilliseconds {
-  private readonly rawValue: number;
-
-  private constructor(value: number) {
-    this.rawValue = value;
-    Object.freeze(this);
-  }
-
-  public get value(): number {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<AccessTokenRefreshDelayMilliseconds, ValueValidationError> {
-    const result = validateTimerDelayMilliseconds(
-      "access-token-refresh-delay-milliseconds",
-      input,
-    );
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new AccessTokenRefreshDelayMilliseconds(result.value));
-  }
-
-  public static fromExpiresInSeconds(
-    expiresIn: AccessTokenExpiresInSeconds,
-  ): AccessTokenRefreshDelayMilliseconds {
-    return new AccessTokenRefreshDelayMilliseconds(
-      expiresIn.value * millisecondsPerSecond,
-    );
-  }
-}
-
-export class PlaybackPollDelayMilliseconds {
-  private readonly rawValue: number;
-
-  private constructor(value: number) {
-    this.rawValue = value;
-    Object.freeze(this);
-  }
-
-  public get value(): number {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<PlaybackPollDelayMilliseconds, ValueValidationError> {
-    const result = validateTimerDelayMilliseconds(
-      "playback-poll-delay-milliseconds",
-      input,
-    );
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new PlaybackPollDelayMilliseconds(result.value));
-  }
-}
-
-export class RefreshToken {
-  private readonly rawValue: string;
-
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
-  }
-
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<RefreshToken, ValueValidationError> {
-    const result = validateNonEmptyString("refresh-token", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new RefreshToken(result.value));
-  }
-}
 
 export class PlaybackPositionMilliseconds {
   private readonly rawValue: number;
@@ -947,33 +764,6 @@ function validateNonNegativeInteger(
   }
 
   return succeeded(input);
-}
-
-function validatePositiveInteger(
-  value: ValueValidationError["value"],
-  input: unknown,
-): Result<number, ValueValidationError> {
-  if (typeof input !== "number" || !Number.isSafeInteger(input) || input <= 0) {
-    return failed(invalidValue(value, "expected-positive-integer"));
-  }
-
-  return succeeded(input);
-}
-
-function validateTimerDelayMilliseconds(
-  value: ValueValidationError["value"],
-  input: unknown,
-): Result<number, ValueValidationError> {
-  const result = validatePositiveInteger(value, input);
-  if (result.kind === "failure") {
-    return result;
-  }
-
-  if (result.value > maximumPlatformTimerDelayMilliseconds) {
-    return failed(invalidValue(value, "expected-positive-integer"));
-  }
-
-  return result;
 }
 
 function validateHttpUrl(

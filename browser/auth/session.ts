@@ -9,7 +9,6 @@ import {
   type SpotifyAuthorizationCallback,
 } from "./pkce.ts";
 import {
-  SpotifyRefreshTokenConnection,
   type SpotifyAuthStoragePort,
   type SpotifyPendingAuthorizationAttemptConsumeResult,
 } from "./storage.ts";
@@ -182,32 +181,29 @@ export async function consumeSpotifyAuthorizationCallback(
 export async function refreshSpotifyConnection(
   options: RefreshSpotifyConnectionOptions,
 ): Promise<RefreshSpotifyConnectionResult> {
-  const storedConnection =
-    await options.storage.readSpotifyRefreshTokenConnection();
-  if (storedConnection.kind === "connection-missing") {
+  const storedRefreshToken = await options.storage.readSpotifyRefreshToken();
+  if (storedRefreshToken.kind === "missing") {
     return frozenMissingConnectionAuthorizationRequired();
   }
 
   const refreshed = await refreshSpotifyAccessToken({
     configuration: options.configuration,
-    refreshToken: storedConnection.connection.refreshToken,
+    refreshToken: storedRefreshToken.refreshToken,
     fetch: options.fetch,
     signal: options.signal,
   });
   switch (refreshed.kind) {
     case "success": {
       if (refreshed.refreshToken.kind === "refresh-token-rotated") {
-        await options.storage.saveSpotifyRefreshTokenConnection(
-          SpotifyRefreshTokenConnection.create(
-            refreshed.refreshToken.refreshToken,
-          ),
+        await options.storage.saveSpotifyRefreshToken(
+          refreshed.refreshToken.refreshToken,
         );
       }
 
       return frozenRefreshSuccess(refreshed.accessToken, refreshed.expiresIn);
     }
     case "authorization-required":
-      await options.storage.deleteSpotifyRefreshTokenConnection();
+      await options.storage.deleteSpotifyRefreshToken();
       return frozenInvalidCredentialsAuthorizationRequired();
     case "transient-failure":
       return frozenRefreshTransientFailure();
@@ -272,16 +268,14 @@ async function consumeSuccessfulSpotifyAuthorizationCallback(
   });
   switch (exchanged.kind) {
     case "success":
-      await options.storage.saveSpotifyRefreshTokenConnection(
-        SpotifyRefreshTokenConnection.create(exchanged.refreshToken),
-      );
+      await options.storage.saveSpotifyRefreshToken(exchanged.refreshToken);
       return frozenConnected(
         exchanged.accessToken,
         exchanged.expiresIn,
         consumed.attempt.returnTo,
       );
     case "authorization-required":
-      await options.storage.deleteSpotifyRefreshTokenConnection();
+      await options.storage.deleteSpotifyRefreshToken();
       return frozenCallbackInvalidCredentialsAuthorizationRequired(
         consumed.attempt.returnTo,
       );

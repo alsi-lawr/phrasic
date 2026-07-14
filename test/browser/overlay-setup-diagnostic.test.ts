@@ -1,46 +1,33 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
-
-const diagnosticSource = readFileSync(
-  new URL(
-    "../../components/overlay/OverlaySetupDiagnostic.tsx",
-    import.meta.url,
-  ),
-  "utf8",
-);
-const overlaySource = readFileSync(
-  new URL(
-    "../../components/overlay/SpotifyNowPlayingOverlay.tsx",
-    import.meta.url,
-  ),
-  "utf8",
-);
-const visualSource = readFileSync(
-  new URL("../../components/overlay/OverlayVisual.tsx", import.meta.url),
-  "utf8",
-);
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { OverlaySetupDiagnostic } from "../../components/overlay/OverlaySetupDiagnostic.tsx";
+import type { OverlayDisplayDiagnostic } from "../../components/overlay/overlay-geometry.ts";
 
 test("the overlay setup diagnostic renders static semantic correction guidance", () => {
-  assert.match(diagnosticSource, /<section[\s\S]*role="alert"/);
+  const diagnostic: OverlayDisplayDiagnostic = Object.freeze({
+    kind: "invalid-display-query",
+    reason: "fractional-display-width",
+  });
+  const markup = renderToStaticMarkup(
+    createElement(OverlaySetupDiagnostic, { diagnostic }),
+  );
+
+  assert.match(markup, /<section[^>]*role="alert"/);
+  assert.match(markup, /aria-labelledby="overlay-setup-diagnostic-heading"/);
+  assert.match(markup, /Overlay setup needs attention/);
   assert.match(
-    diagnosticSource,
-    /aria-labelledby=\{overlaySetupDiagnosticHeadingId\}/,
+    markup,
+    /Use exactly one integer width between 320 and 7680 and setup=1 when setup is intended\./,
   );
-  assert.match(diagnosticSource, /Overlay setup needs attention/);
-  assert.match(
-    diagnosticSource,
-    /Use exactly one integer width between 320 and 7680 and setup=1 when[\s\S]*setup is intended\./,
+});
+
+test("the overlay setup diagnostic renders nothing when display query validation succeeds", () => {
+  const diagnostic: OverlayDisplayDiagnostic = Object.freeze({ kind: "none" });
+  const markup = renderToStaticMarkup(
+    createElement(OverlaySetupDiagnostic, { diagnostic }),
   );
-  assert.match(diagnosticSource, /case "none":\s*return null;/);
-  assert.match(diagnosticSource, /case "invalid-display-query":/);
-  assert.doesNotMatch(
-    diagnosticSource,
-    /\b(?:URLSearchParams|location|window)\b|diagnostic\.reason/,
-  );
-  assert.match(
-    overlaySource,
-    /<OverlayVisual[\s\S]*\/>\s*<OverlaySetupDiagnostic diagnostic=\{geometry\.diagnostic\} \/>\s*<OverlayControls/,
-  );
-  assert.doesNotMatch(visualSource, /OverlaySetupDiagnostic/);
+
+  assert.equal(markup, "");
 });

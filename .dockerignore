@@ -1,0 +1,18 @@
+# Version control and agent scratch
+/.git
+/.agent-workspace
+/.agents
+/.codex
+
+# Local dependencies and generated output
+/node_modules
+/dist
+/coverage
+/logs
+*.log
+
+# Local environment and deployment configuration
+/.env*
+/config.json
+/public/config.json
+/deploy

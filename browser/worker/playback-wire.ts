@@ -221,16 +221,6 @@ export function reconnectingPlaybackWireState(
   return Object.freeze(state);
 }
 
-export function failurePlaybackWireState(
-  error: PlaybackFailure,
-): FailurePlaybackWireState {
-  const state: FailurePlaybackWireState = {
-    kind: "failure",
-    error: serializePlaybackFailure(error),
-  };
-  return Object.freeze(state);
-}
-
 export function serializePlaybackState(
   state: PlaybackState,
 ): PlaybackWireState {
@@ -251,8 +241,13 @@ export function serializePlaybackState(
       return unsupportedPlaybackWireState(state.reason);
     case "reconnecting":
       return reconnectingPlaybackWireState(state.lastItem);
-    case "failure":
-      return failurePlaybackWireState(state.error);
+    case "failure": {
+      const wireState: FailurePlaybackWireState = {
+        kind: "failure",
+        error: serializePlaybackFailure(state.error),
+      };
+      return Object.freeze(wireState);
+    }
   }
 
   return assertNever(state);

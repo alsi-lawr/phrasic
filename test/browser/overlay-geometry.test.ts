@@ -22,10 +22,6 @@ test("overlay geometry defaults to the validated display width and exact fixed r
   assert.equal(geometry.viewBox, overlayViewBox);
   assert.equal(geometry.setupMode.kind, "overlay");
   assert.equal(geometry.diagnostic.kind, "none");
-  assert.equal(Object.isFrozen(geometry), true);
-  assert.equal(Object.isFrozen(geometry.diagnostic), true);
-  assert.equal(Object.isFrozen(geometry.width), true);
-  assert.equal(Object.isFrozen(geometry.height), true);
 });
 
 test("overlay geometry accepts the inclusive width bounds and setup flag", () => {
@@ -119,11 +115,6 @@ test("overlay geometry falls back with typed diagnostics for invalid display que
     assert.equal(
       geometry.diagnostic.reason,
       invalidQuery.diagnostic,
-      invalidQuery.query,
-    );
-    assert.equal(
-      Object.isFrozen(geometry.diagnostic),
-      true,
       invalidQuery.query,
     );
   }

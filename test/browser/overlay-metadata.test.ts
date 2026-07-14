@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
 import { parseSpotifyPlaybackPayload } from "../../browser/providers/spotify-payload.ts";
+import { OverlayMetadata } from "../../components/overlay/OverlayMetadata.tsx";
+import {
+  overlayAnimationIdentityKey,
+  overlayItemIdentityKey,
+} from "../../components/overlay/overlay-identities.ts";
+import { overlayMotionDecisionForPreference } from "../../components/overlay/overlay-motion.ts";
 import {
   DisplayText,
   PlaybackSnapshot,
@@ -8,107 +17,129 @@ import {
   type PlaybackState,
   type Result,
 } from "../../domain/playback.ts";
-import { overlayItemIdentityKey } from "../../components/overlay/overlay-metadata.ts";
-import { overlayViewModelForState } from "../../components/overlay/overlay-view-model.ts";
 import {
   pausedEpisodePayload,
   playingTrackPayload,
 } from "./providers/spotify-payload.fixture.ts";
 
-test("overlay metadata maps a track to its normalized title, artists, and album", () => {
+test("overlay metadata renders normalized track text and current track hierarchy", () => {
   const state = expectSuccess(parseSpotifyPlaybackPayload(playingTrackPayload));
-  const metadata = overlayViewModelForState(state).metadata;
+  const markup = renderMetadata(playbackSnapshot(state));
 
-  assert.equal(metadata.kind, "track");
-  if (metadata.kind !== "track") {
-    throw new Error("Expected track metadata.");
-  }
-  assert.equal(state.kind, "playing");
-  if (state.kind !== "playing" || state.snapshot.item.kind !== "track") {
-    throw new Error("Expected a playing track state.");
-  }
-  assert.equal(metadata.presentation.kind, "now-playing");
-  assert.equal(metadata.trackTitle, state.snapshot.item.title);
-  assert.equal(metadata.artists, state.snapshot.item.artists);
-  assert.equal(metadata.album, state.snapshot.item.collection);
-  assert.equal(metadata.trackTitle.value, "Track title");
-  assert.deepEqual(
-    metadata.artists.map((artist): string => artist.name.value),
-    ["Track artist"],
-  );
-  assert.equal(metadata.album.title.value, "Album title");
+  assert.match(markup, />Track artist<\/text>/);
+  assert.match(markup, />Track title<\/text>/);
+  assert.match(markup, />ALBUM · Album title<\/text>/);
+  assert.match(markup, />NOW PLAYING · TRACK<\/text>/);
 });
 
-test("overlay metadata maps an episode to its normalized title, show, and publisher", () => {
+test("overlay metadata renders normalized paused episode text and hierarchy", () => {
   const state = expectSuccess(
     parseSpotifyPlaybackPayload(pausedEpisodePayload),
   );
-  const metadata = overlayViewModelForState(state).metadata;
+  const markup = renderMetadata(playbackSnapshot(state));
 
-  assert.equal(metadata.kind, "episode");
-  if (metadata.kind !== "episode") {
-    throw new Error("Expected episode metadata.");
-  }
-  assert.equal(state.kind, "paused");
-  if (state.kind !== "paused" || state.snapshot.item.kind !== "episode") {
-    throw new Error("Expected a paused episode state.");
-  }
-  assert.equal(metadata.presentation.kind, "paused");
-  assert.equal(metadata.episodeTitle, state.snapshot.item.title);
-  assert.equal(metadata.show, state.snapshot.item.show);
-  assert.equal(metadata.episodeTitle.value, "Episode title");
-  assert.equal(metadata.show.title.value, "Show title");
-  assert.equal(metadata.show.publisher.value, "Show publisher");
+  assert.match(markup, />Show publisher<\/text>/);
+  assert.match(markup, />Episode title<\/text>/);
+  assert.match(markup, />SHOW · Show title<\/text>/);
+  assert.match(markup, />PAUSED · EPISODE<\/text>/);
 });
 
-test("overlay marquee identity is stable for an item whose normalized title changes", () => {
+test("overlay metadata distinguishes fatal browser capability and configuration failures", () => {
+  const browserCapabilityMarkup = renderMetadata(
+    fatalSnapshot("browser-capability-unavailable"),
+  );
+  assert.match(
+    browserCapabilityMarkup,
+    />This browser cannot start Spotify playback\.<\/text>/,
+  );
+  assert.match(
+    browserCapabilityMarkup,
+    />A required browser playback capability is unavailable\.<\/text>/,
+  );
+
+  const configurationMarkup = renderMetadata(
+    fatalSnapshot("configuration-unavailable"),
+  );
+  assert.match(
+    configurationMarkup,
+    />The browser configuration is unavailable\.<\/text>/,
+  );
+  assert.match(
+    configurationMarkup,
+    />The public Spotify configuration could not be loaded\.<\/text>/,
+  );
+});
+
+test("marquee identity stays stable for a normalized item whose title changes", () => {
   const originalState = expectSuccess(
     parseSpotifyPlaybackPayload(playingTrackPayload),
   );
   if (originalState.kind !== "playing") {
     throw new Error("Expected a playing track state.");
   }
+
   const originalTrack = playingTrack(originalState);
-  const changedTitle = expectSuccess(DisplayText.create("Updated track title"));
   const changedTrack = expectSuccess(
     TrackItem.create({
-      providerId: originalTrack.providerId,
-      itemId: originalTrack.itemId,
-      title: changedTitle,
+      artwork: originalTrack.artwork,
       artists: originalTrack.artists,
       collection: originalTrack.collection,
-      artwork: originalTrack.artwork,
+      itemId: originalTrack.itemId,
       links: originalTrack.links,
-    }),
-  );
-  const changedSnapshot = expectSuccess(
-    PlaybackSnapshot.create({
-      item: changedTrack,
-      position: originalState.snapshot.position,
-      duration: originalState.snapshot.duration,
+      providerId: originalTrack.providerId,
+      title: expectSuccess(DisplayText.create("Updated track title")),
     }),
   );
   const changedState: PlaybackState = Object.freeze({
     kind: "playing",
-    snapshot: changedSnapshot,
+    snapshot: expectSuccess(
+      PlaybackSnapshot.create({
+        duration: originalState.snapshot.duration,
+        item: changedTrack,
+        position: originalState.snapshot.position,
+      }),
+    ),
   });
-  const originalMetadata = overlayViewModelForState(originalState).metadata;
-  const changedMetadata = overlayViewModelForState(changedState).metadata;
 
-  assert.equal(originalMetadata.kind, "track");
-  assert.equal(changedMetadata.kind, "track");
-  if (originalMetadata.kind !== "track" || changedMetadata.kind !== "track") {
-    throw new Error("Expected track metadata for both normalized items.");
-  }
-  assert.notEqual(
-    originalMetadata.trackTitle.value,
-    changedMetadata.trackTitle.value,
+  const originalSnapshot = playbackSnapshot(originalState);
+  const changedSnapshot = playbackSnapshot(changedState);
+
+  assert.equal(
+    overlayItemIdentityKey(originalTrack),
+    overlayItemIdentityKey(changedTrack),
   );
   assert.equal(
-    overlayItemIdentityKey(originalMetadata.itemIdentity),
-    overlayItemIdentityKey(changedMetadata.itemIdentity),
+    overlayAnimationIdentityKey(originalSnapshot),
+    overlayAnimationIdentityKey(changedSnapshot),
   );
+  assert.match(renderMetadata(changedSnapshot), />Updated track title<\/text>/);
 });
+
+function renderMetadata(snapshot: BrowserPlaybackApplicationSnapshot): string {
+  return renderToStaticMarkup(
+    createElement(OverlayMetadata, {
+      availableWidth: 2_400,
+      motion: overlayMotionDecisionForPreference(true),
+      onTextMeasurement: (): void => {},
+      snapshot,
+    }),
+  );
+}
+
+function playbackSnapshot(
+  state: PlaybackState,
+): BrowserPlaybackApplicationSnapshot {
+  return Object.freeze({ kind: "playback", state });
+}
+
+function fatalSnapshot(
+  reason: Extract<
+    BrowserPlaybackApplicationSnapshot,
+    { readonly kind: "fatal" }
+  >["reason"],
+): BrowserPlaybackApplicationSnapshot {
+  return Object.freeze({ kind: "fatal", reason });
+}
 
 function playingTrack(state: PlaybackState): TrackItem {
   if (state.kind === "playing" && state.snapshot.item.kind === "track") {

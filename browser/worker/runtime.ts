@@ -22,13 +22,13 @@ import {
   type SpotifyAuthStoragePort,
   type SpotifyPendingAuthorizationAttemptConsumeOptions,
   type SpotifyPendingAuthorizationAttemptConsumeResult,
-  type SpotifyRefreshTokenConnection,
-  type SpotifyRefreshTokenConnectionReadResult,
+  type SpotifyRefreshTokenReadResult,
 } from "../auth/storage.ts";
 import {
   type SpotifyAccessToken,
   type SpotifyAccessTokenLifetimeSeconds,
   type SpotifyAuthFetchPort,
+  type SpotifyRefreshToken,
 } from "../auth/token.ts";
 import {
   initialPlaybackState,
@@ -45,6 +45,7 @@ import {
   type PlaybackProviderResult,
 } from "../providers/registry.ts";
 import {
+  createPlaybackWorkerFatalInitializationFailure,
   createPlaybackWorkerSafeDiagnostic,
   noPlaybackWorkerDiagnosticMetadata,
   parsePlaybackWorkerCommand,
@@ -1315,36 +1316,35 @@ export function createPlaybackWorkerRuntime(
         return result;
       },
 
-      async readSpotifyRefreshTokenConnection(): Promise<SpotifyRefreshTokenConnectionReadResult> {
+      async readSpotifyRefreshToken(): Promise<SpotifyRefreshTokenReadResult> {
         if (!isCurrentOperation(operation)) {
-          return frozenMissingRefreshTokenConnection();
+          return frozenMissingRefreshToken();
         }
 
-        const result =
-          await ports.auth.storage.readSpotifyRefreshTokenConnection();
+        const result = await ports.auth.storage.readSpotifyRefreshToken();
         if (!isCurrentOperation(operation)) {
-          return frozenMissingRefreshTokenConnection();
+          return frozenMissingRefreshToken();
         }
 
         return result;
       },
 
-      async saveSpotifyRefreshTokenConnection(
-        connection: SpotifyRefreshTokenConnection,
+      async saveSpotifyRefreshToken(
+        refreshToken: SpotifyRefreshToken,
       ): Promise<void> {
         if (!isCurrentOperation(operation)) {
           return;
         }
 
-        await ports.auth.storage.saveSpotifyRefreshTokenConnection(connection);
+        await ports.auth.storage.saveSpotifyRefreshToken(refreshToken);
       },
 
-      async deleteSpotifyRefreshTokenConnection(): Promise<void> {
+      async deleteSpotifyRefreshToken(): Promise<void> {
         if (!isCurrentOperation(operation)) {
           return;
         }
 
-        await ports.auth.storage.deleteSpotifyRefreshTokenConnection();
+        await ports.auth.storage.deleteSpotifyRefreshToken();
       },
 
       async clearSpotifyAuthorization(): Promise<void> {
@@ -1364,13 +1364,7 @@ export function createPlaybackWorkerRuntime(
   ): void {
     cancelRuntimeWork();
     runtimeStatus = frozenFatalRuntime();
-    ports.events.emit(createFatalInitializationEvent(code));
-  }
-
-  function createFatalInitializationEvent(
-    code: "invalid-public-configuration" | "worker-initialization-failed",
-  ): PlaybackWorkerEvent {
-    return Object.freeze({ kind: "fatal-initialization-failure", code });
+    ports.events.emit(createPlaybackWorkerFatalInitializationFailure(code));
   }
 
   function activeConfiguration():
@@ -1584,6 +1578,6 @@ function frozenRejectedPendingAuthorizationAttempt(): SpotifyPendingAuthorizatio
   return Object.freeze({ kind: "rejected", reason: "missing-attempt" });
 }
 
-function frozenMissingRefreshTokenConnection(): SpotifyRefreshTokenConnectionReadResult {
-  return Object.freeze({ kind: "connection-missing" });
+function frozenMissingRefreshToken(): SpotifyRefreshTokenReadResult {
+  return Object.freeze({ kind: "missing" });
 }

@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
-import type { NowPlayingItem } from "../../domain/playback.ts";
+import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
+import type { NowPlayingItem, PlaybackState } from "../../domain/playback.ts";
 import { FallbackVinyl } from "./FallbackVinyl.tsx";
 import {
   overlayArtworkRoundedClipPathData,
@@ -7,22 +8,21 @@ import {
   overlayArtworkRectangle,
 } from "./overlay-layout.ts";
 import type { OverlayMotionDecision } from "./overlay-motion.ts";
-import { type OverlayArtworkTreatment } from "./overlay-view-model.ts";
 
 type OverlayArtworkProps = {
   readonly motion: OverlayMotionDecision;
-  readonly treatment: OverlayArtworkTreatment;
+  readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
 export function OverlayArtwork({
   motion,
-  treatment,
+  snapshot,
 }: OverlayArtworkProps): ReactElement {
   return (
     <g>
       <ArtworkClipPath />
       <g clipPath={`url(#${overlayArtworkClipPathId})`}>
-        <ArtworkTreatment motion={motion} treatment={treatment} />
+        <ArtworkForSnapshot motion={motion} snapshot={snapshot} />
       </g>
     </g>
   );
@@ -38,25 +38,69 @@ function ArtworkClipPath(): ReactElement {
   );
 }
 
-type ArtworkTreatmentProps = {
+type ArtworkForSnapshotProps = {
   readonly motion: OverlayMotionDecision;
-  readonly treatment: OverlayArtworkTreatment;
+  readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
-function ArtworkTreatment({
+function ArtworkForSnapshot({
   motion,
-  treatment,
-}: ArtworkTreatmentProps): ReactElement {
-  switch (treatment.kind) {
-    case "fallback":
+  snapshot,
+}: ArtworkForSnapshotProps): ReactElement {
+  switch (snapshot.kind) {
+    case "fatal":
       return <FallbackVinyl motion={motion} />;
-    case "current-item":
-      return <CurrentArtwork item={treatment.item} motion={motion} />;
-    case "stale-item":
-      return <CurrentArtwork item={treatment.item} motion={motion} />;
+    case "playback":
+      return <ArtworkForPlaybackState motion={motion} state={snapshot.state} />;
   }
 
-  return unreachable(treatment);
+  return unreachable(snapshot);
+}
+
+type ArtworkForPlaybackStateProps = {
+  readonly motion: OverlayMotionDecision;
+  readonly state: PlaybackState;
+};
+
+function ArtworkForPlaybackState({
+  motion,
+  state,
+}: ArtworkForPlaybackStateProps): ReactElement {
+  switch (state.kind) {
+    case "playing":
+    case "paused":
+      return <CurrentArtwork item={state.snapshot.item} motion={motion} />;
+    case "reconnecting":
+      return <ReconnectingArtwork motion={motion} state={state} />;
+    case "initializing":
+    case "authorization-required":
+    case "authorizing":
+    case "empty":
+    case "unsupported":
+    case "failure":
+      return <FallbackVinyl motion={motion} />;
+  }
+
+  return unreachable(state);
+}
+
+type ReconnectingArtworkProps = {
+  readonly motion: OverlayMotionDecision;
+  readonly state: Extract<PlaybackState, { readonly kind: "reconnecting" }>;
+};
+
+function ReconnectingArtwork({
+  motion,
+  state,
+}: ReconnectingArtworkProps): ReactElement {
+  switch (state.lastItem.kind) {
+    case "available":
+      return <CurrentArtwork item={state.lastItem.item} motion={motion} />;
+    case "unavailable":
+      return <FallbackVinyl motion={motion} />;
+  }
+
+  return unreachable(state.lastItem);
 }
 
 type CurrentArtworkProps = {
@@ -85,5 +129,5 @@ function CurrentArtwork({ item, motion }: CurrentArtworkProps): ReactElement {
 }
 
 function unreachable(value: never): never {
-  throw new Error(`Unexpected overlay artwork treatment: ${String(value)}`);
+  throw new Error(`Unexpected overlay artwork value: ${String(value)}`);
 }

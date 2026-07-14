@@ -864,8 +864,6 @@ function validationFailureCode(
       return "expected-non-empty-string";
     case "expected-non-negative-integer":
       return "expected-non-negative-integer";
-    case "expected-positive-integer":
-      return "expected-positive-integer";
     case "expected-string":
       return "expected-string";
     case "invalid-url":

@@ -1,58 +1,87 @@
 import type { ComponentProps } from "react";
-import type { BrowserPlaybackApplication } from "../../browser/application.ts";
-import SpotifyNowPlayingOverlay from "../../components/overlay/SpotifyNowPlayingOverlay.tsx";
+import type {
+  BrowserPlaybackApplication,
+  BrowserPlaybackApplicationSnapshot,
+} from "../../browser/application.ts";
+import { OverlayArtwork } from "../../components/overlay/OverlayArtwork.tsx";
 import { OverlayControls } from "../../components/overlay/OverlayControls.tsx";
+import { OverlayMetadata } from "../../components/overlay/OverlayMetadata.tsx";
+import { OverlaySemanticCompanion } from "../../components/overlay/OverlaySemanticCompanion.tsx";
+import { OverlaySetupDiagnostic } from "../../components/overlay/OverlaySetupDiagnostic.tsx";
+import { OverlayVisual } from "../../components/overlay/OverlayVisual.tsx";
+import { OverlayVisualSpotifyLinks } from "../../components/overlay/OverlayVisualSpotifyLinks.tsx";
+import SpotifyNowPlayingOverlay from "../../components/overlay/SpotifyNowPlayingOverlay.tsx";
+import {
+  overlayAnimationIdentityKey,
+  overlayItemIdentityKey,
+  overlayLiveAnnouncementKey,
+} from "../../components/overlay/overlay-identities.ts";
 import {
   resolveOverlayGeometry,
   type OverlayDisplayDiagnostic,
   type OverlaySetupMode,
 } from "../../components/overlay/overlay-geometry.ts";
-import { OverlaySetupDiagnostic } from "../../components/overlay/OverlaySetupDiagnostic.tsx";
-import type { OverlayUiState } from "../../components/overlay/overlay-state.ts";
-import {
-  overlayViewModelForState,
-  type OverlayControlPlan,
-  type OverlayViewModel,
-} from "../../components/overlay/overlay-view-model.ts";
+import { overlayMotionDecisionForPreference } from "../../components/overlay/overlay-motion.ts";
+import type { NowPlayingItem } from "../../domain/playback.ts";
 
 declare const application: BrowserPlaybackApplication;
+declare const item: NowPlayingItem;
+declare const snapshot: BrowserPlaybackApplicationSnapshot;
 
-const props: ComponentProps<typeof SpotifyNowPlayingOverlay> = Object.freeze({
-  application,
-});
+const overlayProps: ComponentProps<typeof SpotifyNowPlayingOverlay> =
+  Object.freeze({ application });
 const geometry = resolveOverlayGeometry(new URLSearchParams("width=1920"));
-declare const overlayState: OverlayUiState;
-declare const controlPlan: OverlayControlPlan;
-const viewModel: OverlayViewModel = overlayViewModelForState(overlayState);
-declare const setupMode: OverlaySetupMode;
-declare const displayDiagnostic: OverlayDisplayDiagnostic;
-const noDisplayDiagnostic: OverlayDisplayDiagnostic = Object.freeze({
+const motion = overlayMotionDecisionForPreference(false);
+const setupMode: OverlaySetupMode = resolveOverlayGeometry(
+  new URLSearchParams("setup=1"),
+).setupMode;
+const displayDiagnostic: OverlayDisplayDiagnostic = Object.freeze({
   kind: "none",
 });
 const invalidDisplayDiagnostic: OverlayDisplayDiagnostic = Object.freeze({
   kind: "invalid-display-query",
   reason: "fractional-display-width",
 });
-const setupDiagnosticProps: ComponentProps<typeof OverlaySetupDiagnostic> =
-  Object.freeze({ diagnostic: displayDiagnostic });
 const controlsProps: ComponentProps<typeof OverlayControls> = Object.freeze({
   actions: Object.freeze({
     beginAuthorization: (): void => {},
     logout: (): void => {},
     retry: (): void => {},
   }),
-  plans: viewModel.controls,
   setupMode,
+  snapshot,
 });
+const artworkProps: ComponentProps<typeof OverlayArtwork> = Object.freeze({
+  motion,
+  snapshot,
+});
+const metadataProps: ComponentProps<typeof OverlayMetadata> = Object.freeze({
+  availableWidth: 3_096,
+  motion,
+  onTextMeasurement: (): void => {},
+  snapshot,
+});
+const semanticProps: ComponentProps<typeof OverlaySemanticCompanion> =
+  Object.freeze({ snapshot });
+const visualProps: ComponentProps<typeof OverlayVisual> = Object.freeze({
+  geometry,
+  motion,
+  snapshot,
+});
+const visualSpotifyLinkProps: ComponentProps<typeof OverlayVisualSpotifyLinks> =
+  Object.freeze({ availableWidth: 3_096, snapshot });
+const setupDiagnosticProps: ComponentProps<typeof OverlaySetupDiagnostic> =
+  Object.freeze({ diagnostic: displayDiagnostic });
+const itemIdentity = overlayItemIdentityKey(item);
+const animationIdentity = overlayAnimationIdentityKey(snapshot);
+const liveAnnouncementIdentity = overlayLiveAnnouncementKey(snapshot);
 
 // @ts-expect-error The overlay application prop remains readonly.
-props.application = application;
+overlayProps.application = application;
 // @ts-expect-error Validated display widths expose no writable raw value.
 geometry.width.value = 320;
 // @ts-expect-error Derived display heights expose no writable raw value.
 geometry.height.value = 200;
-// @ts-expect-error A reconnecting UI state always carries an explicit last item state.
-const invalidReconnectingState: OverlayUiState = { kind: "reconnecting" };
 // @ts-expect-error Setup mode is discriminated instead of a boolean behavior flag.
 const invalidSetupMode: OverlaySetupMode = { kind: "setup", enabled: true };
 const invalidDisplayDiagnosticReason: OverlayDisplayDiagnostic = {
@@ -62,74 +91,37 @@ const invalidDisplayDiagnosticReason: OverlayDisplayDiagnostic = {
 };
 // @ts-expect-error Diagnostic presence is a discriminated union, not a nullable flag.
 const nullableDisplayDiagnostic: OverlayDisplayDiagnostic = null;
-// @ts-expect-error Diagnostic presence is a discriminated union, not a string flag.
-const stringDisplayDiagnostic: OverlayDisplayDiagnostic =
-  "invalid-display-query";
-// @ts-expect-error Geometry diagnostics remain readonly.
-geometry.diagnostic = noDisplayDiagnostic;
+// @ts-expect-error Overlay controls consume immutable application snapshots.
+controlsProps.snapshot = snapshot;
+// @ts-expect-error Artwork consumes an immutable application snapshot.
+artworkProps.snapshot = snapshot;
+// @ts-expect-error Metadata consumes an immutable application snapshot.
+metadataProps.snapshot = snapshot;
+// @ts-expect-error The semantic companion consumes an immutable application snapshot.
+semanticProps.snapshot = snapshot;
+// @ts-expect-error The visual overlay consumes an immutable application snapshot.
+visualProps.snapshot = snapshot;
+// @ts-expect-error Spotify destinations consume an immutable application snapshot.
+visualSpotifyLinkProps.snapshot = snapshot;
 // @ts-expect-error Setup diagnostic props remain readonly.
-setupDiagnosticProps.diagnostic = noDisplayDiagnostic;
-// @ts-expect-error Retry controls are only available together with disconnect controls.
-const invalidControlPlan: OverlayControlPlan = { kind: "retry" };
-// @ts-expect-error Projected overlay state remains immutable.
-viewModel.metadata = viewModel.metadata;
-// @ts-expect-error Overlay controls accept immutable plans.
-controlsProps.plans = viewModel.controls;
+setupDiagnosticProps.diagnostic = displayDiagnostic;
+const invalidFatalSnapshot: BrowserPlaybackApplicationSnapshot = {
+  kind: "fatal",
+  // @ts-expect-error Fatal application snapshots only expose declared initialization reasons.
+  reason: "network-unavailable",
+};
 
-function overlayStateKind(state: OverlayUiState): OverlayUiState["kind"] {
-  switch (state.kind) {
-    case "initializing":
-    case "authorization-required":
-    case "authorizing":
-    case "empty":
-    case "playing":
-    case "paused":
-    case "unsupported":
-    case "reconnecting":
-    case "failure":
-    case "fatal-initialization-failure":
-      return state.kind;
+function snapshotKind(
+  value: BrowserPlaybackApplicationSnapshot,
+): BrowserPlaybackApplicationSnapshot["kind"] {
+  switch (value.kind) {
+    case "fatal":
+    case "playback":
+      return value.kind;
   }
 
-  const unhandledState: never = state;
-  return unhandledState;
-}
-
-function overlayControlPlanKind(
-  plan: OverlayControlPlan,
-): OverlayControlPlan["kind"] {
-  switch (plan.kind) {
-    case "none":
-    case "connect":
-    case "disconnect":
-    case "reconnect-and-disconnect":
-    case "retry-and-disconnect":
-      return plan.kind;
-  }
-
-  const unhandledPlan: never = plan;
-  return unhandledPlan;
-}
-
-function overlayViewModelKind(
-  model: OverlayViewModel,
-): OverlayViewModel["kind"] {
-  switch (model.kind) {
-    case "initializing":
-    case "authorization-required":
-    case "authorizing":
-    case "empty":
-    case "playing":
-    case "paused":
-    case "unsupported":
-    case "reconnecting":
-    case "failure":
-    case "fatal-initialization-failure":
-      return model.kind;
-  }
-
-  const unhandledModel: never = model;
-  return unhandledModel;
+  const unhandledSnapshot: never = value;
+  return unhandledSnapshot;
 }
 
 function overlayDisplayDiagnosticKind(
@@ -145,20 +137,22 @@ function overlayDisplayDiagnosticKind(
   return unhandledDiagnostic;
 }
 
-void props;
+void overlayProps;
 void geometry;
-void invalidReconnectingState;
 void invalidSetupMode;
 void invalidDisplayDiagnosticReason;
 void nullableDisplayDiagnostic;
-void stringDisplayDiagnostic;
-void invalidControlPlan;
-void overlayStateKind(overlayState);
-void overlayControlPlanKind(controlPlan);
-void overlayViewModelKind(viewModel);
-void overlayDisplayDiagnosticKind(displayDiagnostic);
-void noDisplayDiagnostic;
-void invalidDisplayDiagnostic;
-void setupDiagnosticProps;
+void invalidFatalSnapshot;
 void controlsProps;
-void setupMode;
+void artworkProps;
+void metadataProps;
+void semanticProps;
+void visualProps;
+void visualSpotifyLinkProps;
+void setupDiagnosticProps;
+void itemIdentity;
+void animationIdentity;
+void liveAnnouncementIdentity;
+void snapshotKind(snapshot);
+void overlayDisplayDiagnosticKind(displayDiagnostic);
+void invalidDisplayDiagnostic;

@@ -13,7 +13,7 @@ type ValueParseFailure<Failure> = {
 type ValueParseResult<Value, Failure> =
   ValueParseSuccess<Value> | ValueParseFailure<Failure>;
 
-const authorizationAttemptLifetimeMilliseconds = 10 * 60 * 1_000;
+export const authorizationAttemptLifetimeMilliseconds = 10 * 60 * 1_000;
 const pkceStateByteLength = 32;
 const pkceVerifierByteLength = 64;
 const sha256DigestByteLength = 32;

@@ -7,11 +7,10 @@ import {
   type PendingAuthorizationAttempt,
 } from "../../../browser/auth/pkce.ts";
 import {
-  SpotifyRefreshTokenConnection,
   type SpotifyAuthStoragePort,
   type SpotifyPendingAuthorizationAttemptConsumeOptions,
   type SpotifyPendingAuthorizationAttemptConsumeResult,
-  type SpotifyRefreshTokenConnectionReadResult,
+  type SpotifyRefreshTokenReadResult,
 } from "../../../browser/auth/storage.ts";
 import {
   createSpotifyAuthFetchPort,
@@ -50,7 +49,7 @@ const testRequestDeadlineMilliseconds = 25;
 
 test("the worker consumes provider-neutral playback results through its registry and schedules from completion", async () => {
   const fixture = await runtimeFixture({
-    storedConnection: { kind: "available", refreshToken: "stored-refresh" },
+    storedRefreshToken: { kind: "available", refreshToken: "stored-refresh" },
     authResponses: [tokenResponse("initial-access")],
     spotifyResponses: [
       playbackResult(playingTrackPayload),
@@ -83,7 +82,7 @@ test("the worker consumes provider-neutral playback results through its registry
 
 test("a 401 performs one token refresh and one retry of the playback request", async () => {
   const fixture = await runtimeFixture({
-    storedConnection: { kind: "available", refreshToken: "stored-refresh" },
+    storedRefreshToken: { kind: "available", refreshToken: "stored-refresh" },
     authResponses: [
       tokenResponse("initial-access"),
       tokenResponse("refreshed-access"),
@@ -115,7 +114,7 @@ test("a 401 performs one token refresh and one retry of the playback request", a
 
 test("a revoked refresh after 401 clears the connection and requires authorization", async () => {
   const fixture = await runtimeFixture({
-    storedConnection: { kind: "available", refreshToken: "stored-refresh" },
+    storedRefreshToken: { kind: "available", refreshToken: "stored-refresh" },
     authResponses: [tokenResponse("initial-access"), invalidGrantResponse()],
     spotifyResponses: [Object.freeze({ kind: "unauthorized", status: 401 })],
   });
@@ -134,7 +133,7 @@ test("a revoked refresh after 401 clears the connection and requires authorizati
 
 test("network failures reconnect with the capped completion-driven retry sequence", async () => {
   const fixture = await runtimeFixture({
-    storedConnection: { kind: "available", refreshToken: "stored-refresh" },
+    storedRefreshToken: { kind: "available", refreshToken: "stored-refresh" },
     authResponses: [tokenResponse("initial-access")],
     spotifyResponses: [
       Object.freeze({ kind: "network-failure" }),
@@ -155,7 +154,7 @@ test("network failures reconnect with the capped completion-driven retry sequenc
 
 test("a rate limit uses the validated Retry-After delay and emits only fixed metadata", async () => {
   const fixture = await runtimeFixture({
-    storedConnection: { kind: "available", refreshToken: "stored-refresh" },
+    storedRefreshToken: { kind: "available", refreshToken: "stored-refresh" },
     authResponses: [tokenResponse("initial-access")],
     spotifyResponses: [
       Object.freeze({
@@ -187,7 +186,7 @@ test("a rate limit uses the validated Retry-After delay and emits only fixed met
 
 test("malformed playback fails safely and stops automatic worker scheduling", async () => {
   const fixture = await runtimeFixture({
-    storedConnection: { kind: "available", refreshToken: "stored-refresh" },
+    storedRefreshToken: { kind: "available", refreshToken: "stored-refresh" },
     authResponses: [tokenResponse("initial-access")],
     spotifyResponses: [Object.freeze({ kind: "malformed-response" })],
   });
@@ -215,7 +214,7 @@ test("malformed playback fails safely and stops automatic worker scheduling", as
 
 test("a 403 stops polling and requires the missing playback permission", async () => {
   const fixture = await runtimeFixture({
-    storedConnection: { kind: "available", refreshToken: "stored-refresh" },
+    storedRefreshToken: { kind: "available", refreshToken: "stored-refresh" },
     authResponses: [tokenResponse("initial-access")],
     spotifyResponses: [
       Object.freeze({ kind: "permission-denied", status: 403 }),
@@ -243,7 +242,7 @@ test("a 403 stops polling and requires the missing playback permission", async (
 
 test("network and 5xx failures share the capped reconnect schedule", async () => {
   const fixture = await runtimeFixture({
-    storedConnection: { kind: "available", refreshToken: "stored-refresh" },
+    storedRefreshToken: { kind: "available", refreshToken: "stored-refresh" },
     authResponses: [tokenResponse("initial-access")],
     spotifyResponses: [
       Object.freeze({ kind: "network-failure" }),
@@ -449,7 +448,7 @@ test("the worker refreshes exactly sixty seconds before expiry without starting 
 
 test("invalid worker initialization produces a fatal event before later commands are rejected", async () => {
   const fixture = await runtimeFixture({
-    storedConnection: { kind: "missing" },
+    storedRefreshToken: { kind: "missing" },
     authResponses: [],
     spotifyResponses: [],
   });
@@ -485,7 +484,7 @@ test("invalid worker initialization produces a fatal event before later commands
 
 test("a persisted PKCE attempt is consumed after reload and never exposes token data to events", async () => {
   const fixture = await runtimeFixture({
-    storedConnection: { kind: "missing" },
+    storedRefreshToken: { kind: "missing" },
     authResponses: [tokenResponse("callback-access", "callback-refresh")],
     spotifyResponses: [playbackResult(playingTrackPayload)],
   });
@@ -576,7 +575,7 @@ test("logout aborts a late token response before it can commit state or rotated 
   await initialization;
   await logout;
 
-  assert.equal(storage.refreshConnectionSaveCount, 1);
+  assert.equal(storage.refreshTokenSaveCount, 1);
   assert.equal(storage.connectionKind, "missing");
   assert.deepEqual(scheduler.activeDelays(), []);
   assert.equal(events.length, eventCountAfterLogout);
@@ -799,7 +798,7 @@ test("safe diagnostics omit credential, callback, request, raw-error, and payloa
 
 test("visibility suspension cancels scheduled work and resumes with one deliberate poll", async () => {
   const fixture = await runtimeFixture({
-    storedConnection: { kind: "available", refreshToken: "stored-refresh" },
+    storedRefreshToken: { kind: "available", refreshToken: "stored-refresh" },
     authResponses: [tokenResponse("initial-access")],
     spotifyResponses: [
       playbackResult(playingTrackPayload),
@@ -842,7 +841,7 @@ type RuntimeFixture = {
 type RuntimeFixtureOptions = {
   readonly authResponses: ReadonlyArray<SpotifyAuthFetchResult>;
   readonly spotifyResponses: ReadonlyArray<PlaybackProviderResult>;
-  readonly storedConnection:
+  readonly storedRefreshToken:
     | {
         readonly kind: "available";
         readonly refreshToken: string;
@@ -861,13 +860,13 @@ type RuntimeDependencies = {
   readonly storage: MemorySpotifyAuthStorage;
 };
 
-type StoredConnection =
+type StoredRefreshToken =
   | {
       readonly kind: "empty";
     }
   | {
       readonly kind: "stored";
-      readonly connection: SpotifyRefreshTokenConnection;
+      readonly refreshToken: SpotifyRefreshToken;
     };
 
 type ScheduledEntry = {
@@ -896,8 +895,8 @@ async function runtimeFixture(
   options: RuntimeFixtureOptions,
 ): Promise<RuntimeFixture> {
   const storage = new MemorySpotifyAuthStorage();
-  if (options.storedConnection.kind === "available") {
-    await storage.seedRefreshToken(options.storedConnection.refreshToken);
+  if (options.storedRefreshToken.kind === "available") {
+    await storage.seedRefreshToken(options.storedRefreshToken.refreshToken);
   }
 
   const clock = new FakeClock(1_000_000);
@@ -1203,15 +1202,17 @@ function deterministicCrypto(): BrowserPkceCryptoPort {
 class MemorySpotifyAuthStorage implements SpotifyAuthStoragePort {
   private pendingAttempts: ReadonlyArray<PendingAuthorizationAttempt> =
     Object.freeze([]);
-  private refreshConnectionSaves = 0;
-  private storedConnection: StoredConnection = Object.freeze({ kind: "empty" });
+  private refreshTokenSaves = 0;
+  private storedRefreshToken: StoredRefreshToken = Object.freeze({
+    kind: "empty",
+  });
 
   get connectionKind(): "found" | "missing" {
-    return this.storedConnection.kind === "stored" ? "found" : "missing";
+    return this.storedRefreshToken.kind === "stored" ? "found" : "missing";
   }
 
-  get refreshConnectionSaveCount(): number {
-    return this.refreshConnectionSaves;
+  get refreshTokenSaveCount(): number {
+    return this.refreshTokenSaves;
   }
 
   async seedRefreshToken(value: string): Promise<void> {
@@ -1220,9 +1221,7 @@ class MemorySpotifyAuthStorage implements SpotifyAuthStoragePort {
       throw new Error("Expected a valid refresh token fixture.");
     }
 
-    await this.saveSpotifyRefreshTokenConnection(
-      SpotifyRefreshTokenConnection.create(parsed.value),
-    );
+    await this.saveSpotifyRefreshToken(parsed.value);
   }
 
   async savePendingAuthorizationAttempt(
@@ -1259,31 +1258,31 @@ class MemorySpotifyAuthStorage implements SpotifyAuthStoragePort {
     return Object.freeze({ kind: "consumed", attempt });
   }
 
-  async readSpotifyRefreshTokenConnection(): Promise<SpotifyRefreshTokenConnectionReadResult> {
-    if (this.storedConnection.kind === "empty") {
-      return Object.freeze({ kind: "connection-missing" });
+  async readSpotifyRefreshToken(): Promise<SpotifyRefreshTokenReadResult> {
+    if (this.storedRefreshToken.kind === "empty") {
+      return Object.freeze({ kind: "missing" });
     }
 
     return Object.freeze({
-      kind: "connection-found",
-      connection: this.storedConnection.connection,
+      kind: "found",
+      refreshToken: this.storedRefreshToken.refreshToken,
     });
   }
 
-  async saveSpotifyRefreshTokenConnection(
-    connection: SpotifyRefreshTokenConnection,
+  async saveSpotifyRefreshToken(
+    refreshToken: SpotifyRefreshToken,
   ): Promise<void> {
-    this.refreshConnectionSaves += 1;
-    this.storedConnection = Object.freeze({ kind: "stored", connection });
+    this.refreshTokenSaves += 1;
+    this.storedRefreshToken = Object.freeze({ kind: "stored", refreshToken });
   }
 
-  async deleteSpotifyRefreshTokenConnection(): Promise<void> {
-    this.storedConnection = Object.freeze({ kind: "empty" });
+  async deleteSpotifyRefreshToken(): Promise<void> {
+    this.storedRefreshToken = Object.freeze({ kind: "empty" });
   }
 
   async clearSpotifyAuthorization(): Promise<void> {
     this.pendingAttempts = Object.freeze([]);
-    this.storedConnection = Object.freeze({ kind: "empty" });
+    this.storedRefreshToken = Object.freeze({ kind: "empty" });
   }
 }
 
