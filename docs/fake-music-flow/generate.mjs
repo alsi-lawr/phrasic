@@ -9,7 +9,7 @@ import process from "node:process";
 const projectRoot = path.resolve(import.meta.dirname, "../..");
 const output = path.join(projectRoot, "docs/fake-music-flow.webp");
 const workspace = fs.mkdtempSync(
-  path.join(os.tmpdir(), "obs-nowplaying-fake-music-flow-"),
+  path.join(os.tmpdir(), "phrasic-fake-music-flow-"),
 );
 const framesDirectory = path.join(workspace, "frames");
 const previewPort = process.env.PREVIEW_PORT ?? "18082";
@@ -223,7 +223,7 @@ async function recordFlow() {
 
   async function post(command) {
     const envelope = {
-      source: "obs-nowplaying-fake",
+      source: "phrasic-fake",
       version: 1,
       command,
     };

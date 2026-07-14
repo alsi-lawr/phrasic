@@ -23,7 +23,7 @@ type ParseFailure = {
 
 type ParseResult<Value> = ParseSuccess<Value> | ParseFailure;
 
-const databaseName = "obs-nowplaying-browser-auth";
+const databaseName = "phrasic-browser-auth";
 const databaseVersion = 1;
 const pendingAuthorizationAttemptsStoreName = "pending-authorization-attempts";
 const spotifyConnectionsStoreName = "spotify-connections";

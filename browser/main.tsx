@@ -70,7 +70,7 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
 function createPlaybackWorker(): BrowserPlaybackWorker {
   const worker = new Worker(new URL("./worker/entry.ts", import.meta.url), {
     type: "module",
-    name: "obs-nowplaying-playback",
+    name: "phrasic-playback",
   });
 
   const playbackWorker: BrowserPlaybackWorker = {

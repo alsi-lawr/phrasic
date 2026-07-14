@@ -10,7 +10,7 @@ const projectRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 test("Tailwind output discovers application utilities but excludes test utilities", async () => {
   const outputDirectory = mkdtempSync(
-    join(tmpdir(), "obs-nowplaying-tailwind-discovery-"),
+    join(tmpdir(), "phrasic-tailwind-discovery-"),
   );
 
   try {

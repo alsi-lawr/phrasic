@@ -20,7 +20,7 @@ when deliberately exposing the test facility:
 ```sh
 docker run --rm --publish 127.0.0.1:8080:8080 \
   --env FAKE_PROVIDER_ENABLED=true \
-  obs-nowplaying
+  phrasic
 ```
 
 Hosts that do not use the bundled Caddyfile must reproduce the same default-off
@@ -49,7 +49,7 @@ console and call `window.postMessage` with the page origin as the target origin:
 ```js
 window.postMessage(
   {
-    source: "obs-nowplaying-fake",
+    source: "phrasic-fake",
     version: 1,
     command: { kind: "resolve-authorization", decision: "approved" },
   },
@@ -68,7 +68,7 @@ Select **Connect Fake Music** before approving or denying authorization.
 ```js
 window.postMessage(
   {
-    source: "obs-nowplaying-fake",
+    source: "phrasic-fake",
     version: 1,
     command: { kind: "resolve-authorization", decision: "denied" },
   },
@@ -77,7 +77,7 @@ window.postMessage(
 
 window.postMessage(
   {
-    source: "obs-nowplaying-fake",
+    source: "phrasic-fake",
     version: 1,
     command: { kind: "expire-authorization" },
   },
@@ -94,7 +94,7 @@ out-of-order authorization decisions have no effect.
 ```js
 window.postMessage(
   {
-    source: "obs-nowplaying-fake",
+    source: "phrasic-fake",
     version: 1,
     command: { kind: "set-empty" },
   },
@@ -103,7 +103,7 @@ window.postMessage(
 
 window.postMessage(
   {
-    source: "obs-nowplaying-fake",
+    source: "phrasic-fake",
     version: 1,
     command: { kind: "set-unsupported", reason: "advertisement" },
   },
@@ -119,7 +119,7 @@ Unsupported reasons are `advertisement`, `local-item`, and
 ```js
 window.postMessage(
   {
-    source: "obs-nowplaying-fake",
+    source: "phrasic-fake",
     version: 1,
     command: {
       kind: "set-track",
@@ -153,7 +153,7 @@ and HTTPS destinations.
 ```js
 window.postMessage(
   {
-    source: "obs-nowplaying-fake",
+    source: "phrasic-fake",
     version: 1,
     command: {
       kind: "set-episode",
@@ -182,7 +182,7 @@ URLs are accepted. Playback position and duration are fixed valid fake values.
 ```js
 window.postMessage(
   {
-    source: "obs-nowplaying-fake",
+    source: "phrasic-fake",
     version: 1,
     command: {
       kind: "set-provider-failure",
@@ -215,7 +215,7 @@ immediate recovery attempt.
 ```js
 window.postMessage(
   {
-    source: "obs-nowplaying-fake",
+    source: "phrasic-fake",
     version: 1,
     command: {
       kind: "set-fatal",

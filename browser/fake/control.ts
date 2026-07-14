@@ -89,7 +89,7 @@ export function parseFakeControlEnvelope(
   const command = dataProperty(envelope.value, "command");
   if (
     source.kind === "failure" ||
-    source.value !== "obs-nowplaying-fake" ||
+    source.value !== "phrasic-fake" ||
     version.kind === "failure" ||
     version.value !== 1 ||
     command.kind === "failure"

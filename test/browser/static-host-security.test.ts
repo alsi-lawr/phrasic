@@ -52,7 +52,7 @@ type DocumentSecurityMetadata = {
 
 test("production artifacts preserve static-host security boundaries", async () => {
   const outputDirectory = mkdtempSync(
-    join(tmpdir(), "obs-nowplaying-static-host-security-"),
+    join(tmpdir(), "phrasic-static-host-security-"),
   );
   const restoreBuildEnvironment = injectSecretBuildEnvironment();
 

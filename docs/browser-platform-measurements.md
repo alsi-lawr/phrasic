@@ -42,7 +42,7 @@ reports `12.0.1`; the helper rejects a version that differs from
 NPM_CLI=/home/alex/.npm/_npx/0636ef6846913eae/node_modules/npm/bin/npm-cli.js
 test "$(node --version)" = 'v26.5.0'
 test "$(node "$NPM_CLI" --version)" = '12.0.1'
-cp package-lock.json /tmp/obs-nowplaying-package-lock.before
+cp package-lock.json /tmp/phrasic-package-lock.before
 node "$NPM_CLI" ci
 node "$NPM_CLI" run format:check
 node "$NPM_CLI" run lint
@@ -50,7 +50,7 @@ node "$NPM_CLI" run typecheck
 node "$NPM_CLI" run typecheck:browser
 node "$NPM_CLI" run test
 node "$NPM_CLI" run build
-cmp -s /tmp/obs-nowplaying-package-lock.before package-lock.json
+cmp -s /tmp/phrasic-package-lock.before package-lock.json
 git diff --exit-code -- package-lock.json
 git diff --cached --exit-code -- package-lock.json
 python3 .agent-workspace/20260712T131304Z-implementation/measure-browser-platform.py \

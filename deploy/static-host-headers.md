@@ -47,7 +47,7 @@ error parameter, must receive the callback HTML rule.
 | `/spotify`, `/spotify/`, `/spotify/index.html`, `/fake`, `/fake/`, and `/fake/index.html` | `Cache-Control: no-store, no-cache, max-age=0, must-revalidate` |
 | `/`, `/index.html`, and every other HTML entry                                            | `Cache-Control: no-cache, max-age=0, must-revalidate`           |
 | `/assets/<name>-<content-hash>.<ext>` emitted by Vite                                     | `Cache-Control: public, max-age=31536000, immutable`            |
-| `/fonts/*`, `/favicon.ico`, and every other unhashed static file                          | `Cache-Control: no-cache, max-age=0, must-revalidate`           |
+| `/fonts/*`, `/favicon.svg`, and every other unhashed static file                          | `Cache-Control: no-cache, max-age=0, must-revalidate`           |
 
 Serve `/config.json` as `Content-Type: application/json; charset=utf-8`. Its
 entire public runtime shape is:
