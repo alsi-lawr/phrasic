@@ -57,6 +57,8 @@ function createWorkerBootstrap(): WorkerBootstrap {
   }
 
   try {
+    const fetchImplementation: typeof globalThis.fetch = (input, init) =>
+      self.fetch(input, init);
     const events: PlaybackWorkerEventSink = Object.freeze({
       emit(event): void {
         self.postMessage(event);
@@ -67,7 +69,7 @@ function createWorkerBootstrap(): WorkerBootstrap {
       nativeRequestDeadlineScheduler(),
     );
     const spotifyPlaybackProvider = createSpotifyPlaybackProvider({
-      fetchImplementation: self.fetch,
+      fetchImplementation,
       requestDeadline,
       timeoutMilliseconds: spotifyHttpRequestDeadlineMilliseconds,
     });
@@ -81,7 +83,7 @@ function createWorkerBootstrap(): WorkerBootstrap {
       authorization: createSpotifyAuthorizationProvider({
         crypto: createBrowserPkceCryptoPort(self.crypto),
         fetch: createSpotifyAuthFetchPort({
-          fetchImplementation: self.fetch,
+          fetchImplementation,
           requestDeadline,
           timeoutMilliseconds: spotifyHttpRequestDeadlineMilliseconds,
         }),

@@ -106,11 +106,11 @@ secret, tokens, query string, fragment, or additional fields.
 ### 2. Run the published image
 
 ```sh
-docker pull alsilawr/phrasic:2.0.0
+docker pull alsilawr/phrasic:2.0.1
 
 docker run --rm --publish 127.0.0.1:8080:8080 \
   --mount type=bind,src="$(pwd)/config.json",dst=/srv/config.json,readonly \
-  alsilawr/phrasic:2.0.0
+  alsilawr/phrasic:2.0.1
 ```
 
 The container serves the production build through Caddy on loopback port

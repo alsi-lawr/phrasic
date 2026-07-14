@@ -30,7 +30,9 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
     createWorker: createPlaybackWorker,
     fetchConfiguration(options) {
       return fetchBrowserConfiguration({
-        fetchImplementation: fetch,
+        fetchImplementation(input, init) {
+          return window.fetch(input, init);
+        },
         signal: options.signal,
         url: options.url,
       });
