@@ -2,7 +2,6 @@ import { type ReactElement, useReducer } from "react";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
 import { OverlayArtwork } from "./OverlayArtwork.tsx";
 import { OverlayItemAppearance } from "./OverlayItemAppearance.tsx";
-import { OverlaySpotifyAttribution } from "./OverlaySpotifyAttribution.tsx";
 import { type OverlayGeometry } from "./overlay-geometry.ts";
 import { overlayAnimationIdentityKey } from "./overlay-identities.ts";
 import { type OverlayMotionDecision } from "./overlay-motion.ts";
@@ -18,21 +17,25 @@ import {
 } from "./overlay-layout.ts";
 import { OverlayMetadata } from "./OverlayMetadata.tsx";
 import { OverlayShell } from "./OverlayShell.tsx";
-import { OverlayVisualSpotifyLinks } from "./OverlayVisualSpotifyLinks.tsx";
+import { OverlayVisualProviderLinks } from "./OverlayVisualProviderLinks.tsx";
+import type { OverlayPresentation } from "./overlay-presentation.ts";
 
 type OverlayVisualProps = {
   readonly geometry: OverlayGeometry;
   readonly motion: OverlayMotionDecision;
+  readonly presentation: OverlayPresentation;
   readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
 export function OverlayVisual({
   geometry,
   motion,
+  presentation,
   snapshot,
 }: OverlayVisualProps): ReactElement {
   const animationIdentityKey = overlayAnimationIdentityKey(snapshot);
   const contentSizedShell = useContentSizedShell(animationIdentityKey);
+  const Attribution = presentation.attribution;
 
   return (
     <div className="relative shrink-0">
@@ -54,14 +57,16 @@ export function OverlayVisual({
               availableWidth={contentSizedShell.availableWidth}
               motion={motion}
               onTextMeasurement={contentSizedShell.reportTextMeasurement}
+              presentation={presentation}
               snapshot={snapshot}
             />
-            <OverlaySpotifyAttribution shellWidth={contentSizedShell.width} />
+            <Attribution shellWidth={contentSizedShell.width} />
           </OverlayItemAppearance>
         </g>
       </svg>
-      <OverlayVisualSpotifyLinks
+      <OverlayVisualProviderLinks
         availableWidth={contentSizedShell.availableWidth}
+        presentation={presentation}
         snapshot={snapshot}
       />
     </div>

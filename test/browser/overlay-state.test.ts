@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
 import { parseSpotifyPlaybackPayload } from "../../browser/providers/spotify-payload.ts";
+import { spotifyOverlayPresentation } from "../../browser/providers/spotify-presentation.ts";
 import { OverlayControls } from "../../components/overlay/OverlayControls.tsx";
 import { resolveOverlayGeometry } from "../../components/overlay/overlay-geometry.ts";
 import {
@@ -134,6 +135,7 @@ function renderControls(
         logout: (): void => {},
         retry: (): void => {},
       }),
+      presentation: spotifyOverlayPresentation,
       setupMode: resolveOverlayGeometry(parameters).setupMode,
       snapshot,
     }),

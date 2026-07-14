@@ -12,25 +12,27 @@ import {
   overlayMetadataLayout,
   type OverlayTextLineLayout,
 } from "./overlay-layout.ts";
+import type { OverlayPresentation } from "./overlay-presentation.ts";
 
-const spotifyProviderId = "spotify";
-
-type OverlayVisualSpotifyLinksProps = {
+type OverlayVisualProviderLinksProps = {
   readonly availableWidth: number;
+  readonly presentation: OverlayPresentation;
   readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
-export function OverlayVisualSpotifyLinks({
+export function OverlayVisualProviderLinks({
   availableWidth,
+  presentation,
   snapshot,
-}: OverlayVisualSpotifyLinksProps): ReactElement | null {
+}: OverlayVisualProviderLinksProps): ReactElement | null {
   switch (snapshot.kind) {
     case "fatal":
       return null;
     case "playback":
       return (
-        <SpotifyLinksForPlaybackState
+        <ProviderLinksForPlaybackState
           availableWidth={availableWidth}
+          presentation={presentation}
           state={snapshot.state}
         />
       );
@@ -39,28 +41,32 @@ export function OverlayVisualSpotifyLinks({
   return unreachable(snapshot);
 }
 
-type SpotifyLinksForPlaybackStateProps = {
+type ProviderLinksForPlaybackStateProps = {
   readonly availableWidth: number;
+  readonly presentation: OverlayPresentation;
   readonly state: PlaybackState;
 };
 
-function SpotifyLinksForPlaybackState({
+function ProviderLinksForPlaybackState({
   availableWidth,
+  presentation,
   state,
-}: SpotifyLinksForPlaybackStateProps): ReactElement | null {
+}: ProviderLinksForPlaybackStateProps): ReactElement | null {
   switch (state.kind) {
     case "playing":
     case "paused":
       return (
-        <SpotifyLinksForItem
+        <ProviderLinksForItem
           availableWidth={availableWidth}
           item={state.snapshot.item}
+          presentation={presentation}
         />
       );
     case "reconnecting":
       return (
-        <ReconnectingSpotifyLinks
+        <ReconnectingProviderLinks
           availableWidth={availableWidth}
+          presentation={presentation}
           state={state}
         />
       );
@@ -76,21 +82,24 @@ function SpotifyLinksForPlaybackState({
   return unreachable(state);
 }
 
-type ReconnectingSpotifyLinksProps = {
+type ReconnectingProviderLinksProps = {
   readonly availableWidth: number;
+  readonly presentation: OverlayPresentation;
   readonly state: Extract<PlaybackState, { readonly kind: "reconnecting" }>;
 };
 
-function ReconnectingSpotifyLinks({
+function ReconnectingProviderLinks({
   availableWidth,
+  presentation,
   state,
-}: ReconnectingSpotifyLinksProps): ReactElement | null {
+}: ReconnectingProviderLinksProps): ReactElement | null {
   switch (state.lastItem.kind) {
     case "available":
       return (
-        <SpotifyLinksForItem
+        <ProviderLinksForItem
           availableWidth={availableWidth}
           item={state.lastItem.item}
+          presentation={presentation}
         />
       );
     case "unavailable":
@@ -100,30 +109,43 @@ function ReconnectingSpotifyLinks({
   return unreachable(state.lastItem);
 }
 
-type SpotifyLinksForItemProps = {
+type ProviderLinksForItemProps = {
   readonly availableWidth: number;
   readonly item: NowPlayingItem;
+  readonly presentation: OverlayPresentation;
 };
 
-function SpotifyLinksForItem({
+function ProviderLinksForItem({
   availableWidth,
   item,
-}: SpotifyLinksForItemProps): ReactElement | null {
+  presentation,
+}: ProviderLinksForItemProps): ReactElement | null {
   switch (item.kind) {
     case "track":
-      return <TrackSpotifyLinks availableWidth={availableWidth} item={item} />;
+      return (
+        <TrackProviderLinks
+          availableWidth={availableWidth}
+          item={item}
+          presentation={presentation}
+        />
+      );
     case "episode":
       return (
-        <EpisodeSpotifyLinks availableWidth={availableWidth} item={item} />
+        <EpisodeProviderLinks
+          availableWidth={availableWidth}
+          item={item}
+          presentation={presentation}
+        />
       );
   }
 
   return unreachable(item);
 }
 
-type TrackSpotifyLinksProps = {
+type TrackProviderLinksProps = {
   readonly availableWidth: number;
   readonly item: Extract<NowPlayingItem, { readonly kind: "track" }>;
+  readonly presentation: OverlayPresentation;
 };
 
 type SelectedCreatorLink = {
@@ -131,19 +153,26 @@ type SelectedCreatorLink = {
   readonly providerLink: ProviderLink;
 };
 
-function TrackSpotifyLinks({
+function TrackProviderLinks({
   availableWidth,
   item,
-}: TrackSpotifyLinksProps): ReactElement | null {
-  const trackLink = item.links.find(isSpotifyProviderLink);
-  const albumLink = item.collection.links.find(isSpotifyProviderLink);
+  presentation,
+}: TrackProviderLinksProps): ReactElement | null {
+  const trackLink = selectedProviderLink(item.links, presentation.providerId);
+  const albumLink = selectedProviderLink(
+    item.collection.links,
+    presentation.providerId,
+  );
   if (trackLink === undefined || albumLink === undefined) {
     return null;
   }
 
   const creatorLinks: SelectedCreatorLink[] = [];
   for (const creator of item.artists) {
-    const creatorLink = creator.links.find(isSpotifyProviderLink);
+    const creatorLink = selectedProviderLink(
+      creator.links,
+      presentation.providerId,
+    );
     if (creatorLink === undefined) {
       return null;
     }
@@ -152,73 +181,78 @@ function TrackSpotifyLinks({
   }
 
   return (
-    <SpotifyDestinationNavigation>
-      <VisualSpotifyLink
+    <ProviderDestinationNavigation presentation={presentation}>
+      <VisualProviderLink
         href={trackLink.href}
-        label={`LISTEN ON SPOTIFY: TRACK — ${item.title.value}`}
+        label={`LISTEN ON ${providerLabel(presentation)}: TRACK — ${item.title.value}`}
       >
         <ArtworkLinkRegion />
         <MetadataLinkRegion
           availableWidth={availableWidth}
           line={overlayMetadataLayout.titleLine}
         />
-      </VisualSpotifyLink>
+      </VisualProviderLink>
       {creatorLinks.map(({ creator, providerLink }, index): ReactElement => (
-        <VisualSpotifyLink
+        <VisualProviderLink
           key={`creator:${providerLink.href}:${creator.name.value}`}
           href={providerLink.href}
-          label={`OPEN CREATOR ON SPOTIFY: ${creator.name.value}`}
+          label={`OPEN CREATOR ON ${providerLabel(presentation)}: ${creator.name.value}`}
         >
           <CreatorLinkRegion
             availableWidth={availableWidth}
             precedingText={creatorPrecedingText(item.artists, index)}
             text={creator.name.value}
           />
-        </VisualSpotifyLink>
+        </VisualProviderLink>
       ))}
-      <VisualSpotifyLink
+      <VisualProviderLink
         href={albumLink.href}
-        label={`OPEN ALBUM ON SPOTIFY: ${item.collection.title.value}`}
+        label={`OPEN ALBUM ON ${providerLabel(presentation)}: ${item.collection.title.value}`}
       >
         <MetadataLinkRegion
           availableWidth={availableWidth}
           line={overlayMetadataLayout.detailLine}
         />
-      </VisualSpotifyLink>
-    </SpotifyDestinationNavigation>
+      </VisualProviderLink>
+    </ProviderDestinationNavigation>
   );
 }
 
-type EpisodeSpotifyLinksProps = {
+type EpisodeProviderLinksProps = {
   readonly availableWidth: number;
   readonly item: Extract<NowPlayingItem, { readonly kind: "episode" }>;
+  readonly presentation: OverlayPresentation;
 };
 
-function EpisodeSpotifyLinks({
+function EpisodeProviderLinks({
   availableWidth,
   item,
-}: EpisodeSpotifyLinksProps): ReactElement | null {
-  const episodeLink = item.links.find(isSpotifyProviderLink);
-  const showLink = item.show.links.find(isSpotifyProviderLink);
+  presentation,
+}: EpisodeProviderLinksProps): ReactElement | null {
+  const episodeLink = selectedProviderLink(item.links, presentation.providerId);
+  const showLink = selectedProviderLink(
+    item.show.links,
+    presentation.providerId,
+  );
   if (episodeLink === undefined || showLink === undefined) {
     return null;
   }
 
   return (
-    <SpotifyDestinationNavigation>
-      <VisualSpotifyLink
+    <ProviderDestinationNavigation presentation={presentation}>
+      <VisualProviderLink
         href={episodeLink.href}
-        label={`LISTEN ON SPOTIFY: EPISODE — ${item.title.value}`}
+        label={`LISTEN ON ${providerLabel(presentation)}: EPISODE — ${item.title.value}`}
       >
         <ArtworkLinkRegion />
         <MetadataLinkRegion
           availableWidth={availableWidth}
           line={overlayMetadataLayout.titleLine}
         />
-      </VisualSpotifyLink>
-      <VisualSpotifyLink
+      </VisualProviderLink>
+      <VisualProviderLink
         href={showLink.href}
-        label={`OPEN SHOW ON SPOTIFY: ${item.show.title.value}`}
+        label={`OPEN SHOW ON ${providerLabel(presentation)}: ${item.show.title.value}`}
       >
         <MetadataLinkRegion
           availableWidth={availableWidth}
@@ -228,21 +262,23 @@ function EpisodeSpotifyLinks({
           availableWidth={availableWidth}
           line={overlayMetadataLayout.detailLine}
         />
-      </VisualSpotifyLink>
-    </SpotifyDestinationNavigation>
+      </VisualProviderLink>
+    </ProviderDestinationNavigation>
   );
 }
 
-type SpotifyDestinationNavigationProps = {
+type ProviderDestinationNavigationProps = {
   readonly children: ReactNode;
+  readonly presentation: OverlayPresentation;
 };
 
-function SpotifyDestinationNavigation({
+function ProviderDestinationNavigation({
   children,
-}: SpotifyDestinationNavigationProps): ReactElement {
+  presentation,
+}: ProviderDestinationNavigationProps): ReactElement {
   return (
     <nav
-      aria-label="Spotify destinations"
+      aria-label={`${presentation.displayName} destinations`}
       className="pointer-events-none absolute inset-0"
     >
       {children}
@@ -250,17 +286,17 @@ function SpotifyDestinationNavigation({
   );
 }
 
-type VisualSpotifyLinkProps = {
+type VisualProviderLinkProps = {
   readonly children: ReactNode;
   readonly href: string;
   readonly label: string;
 };
 
-function VisualSpotifyLink({
+function VisualProviderLink({
   children,
   href,
   label,
-}: VisualSpotifyLinkProps): ReactElement {
+}: VisualProviderLinkProps): ReactElement {
   return (
     <a
       aria-label={`${label} (opens in a new tab)`}
@@ -346,8 +382,15 @@ function CreatorLinkRegion({
   );
 }
 
-function isSpotifyProviderLink(link: ProviderLink): boolean {
-  return link.providerId.value === spotifyProviderId;
+function selectedProviderLink(
+  links: ReadonlyArray<ProviderLink>,
+  providerId: string,
+): ProviderLink | undefined {
+  return links.find((link): boolean => link.providerId.value === providerId);
+}
+
+function providerLabel(presentation: OverlayPresentation): string {
+  return presentation.displayName.toLocaleUpperCase("en-US");
 }
 
 function creatorPrecedingText(

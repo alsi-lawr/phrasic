@@ -1,8 +1,4 @@
 import {
-  parseSpotifyPublicConfiguration,
-  type SpotifyPublicConfiguration,
-} from "./config.ts";
-import {
   deserializePlaybackWireState,
   type PlaybackWireState,
 } from "./worker/playback-wire.ts";
@@ -16,38 +12,16 @@ import {
   transitionPlaybackState,
   type PlaybackState,
 } from "../domain/playback.ts";
+import type { BrowserConfigurationResponse } from "./configuration-response.ts";
+import type { BrowserPlaybackIntegration } from "./integrations/browser-integration.ts";
 
 const defaultDisplayWidth = 1_920;
 const minimumDisplayWidth = 320;
 const maximumDisplayWidth = 7_680;
-const spotifyAuthorizationOrigin = "https://accounts.spotify.com";
-const spotifyAuthorizationParameterNames: ReadonlyArray<string> = Object.freeze(
-  [
-    "client_id",
-    "response_type",
-    "redirect_uri",
-    "code_challenge_method",
-    "code_challenge",
-    "state",
-    "scope",
-  ],
-);
-const callbackQueryParameterNames: ReadonlyArray<string> = Object.freeze([
-  "code",
-  "error",
-  "error_description",
-  "error_uri",
-  "state",
-]);
 const displayQueryParameterNames: ReadonlyArray<string> = Object.freeze([
   "width",
   "setup",
 ]);
-
-export type BrowserConfigurationResponse = {
-  readonly ok: boolean;
-  readonly readJson: () => Promise<unknown>;
-};
 
 export type BrowserPlaybackWorker = {
   readonly onError: (listener: () => void) => () => void;
@@ -73,6 +47,7 @@ export type BrowserPlaybackApplicationPorts = {
     readonly signal: AbortSignal;
     readonly url: URL;
   }) => Promise<BrowserConfigurationResponse>;
+  readonly integration: BrowserPlaybackIntegration;
   readonly location: {
     readonly current: () => URL;
     readonly navigate: (url: URL) => void;
@@ -110,15 +85,6 @@ type ApplicationRuntime =
       readonly kind: "disposed";
     };
 
-type CallbackCommand =
-  | {
-      readonly kind: "none";
-    }
-  | {
-      readonly callbackUrl: string;
-      readonly kind: "pending";
-    };
-
 type DisplayQuery =
   | {
       readonly kind: "invalid";
@@ -137,31 +103,6 @@ type DisplayQuery =
       readonly kind: "width-and-setup";
       readonly width: number;
     };
-
-type RestoredCallbackUrl =
-  | {
-      readonly kind: "invalid";
-    }
-  | {
-      readonly kind: "valid";
-      readonly value: URL;
-    };
-
-type SpotifyAuthorizationUrl =
-  | {
-      readonly kind: "invalid";
-    }
-  | {
-      readonly kind: "valid";
-      readonly value: URL;
-    };
-
-type WorkerPublicConfiguration = {
-  readonly spotify: {
-    readonly clientId: string;
-    readonly redirectUri: string;
-  };
-};
 
 export function createBrowserPlaybackApplication(
   ports: BrowserPlaybackApplicationPorts,
@@ -236,8 +177,10 @@ export function createBrowserPlaybackApplication(
       }
 
       const currentUrl = ports.location.current();
-      const callback = captureCallbackCommand(currentUrl);
-      const applicationUrl = new URL("/spotify/", currentUrl.origin);
+      const applicationUrl = new URL(
+        ports.integration.applicationPath,
+        currentUrl.origin,
+      );
 
       let worker: BrowserPlaybackWorker;
       try {
@@ -265,7 +208,7 @@ export function createBrowserPlaybackApplication(
           worker,
         });
       runtime = active;
-      void initialize(active, callback, applicationUrl);
+      void initialize(active, currentUrl, applicationUrl);
     },
 
     subscribe(listener: () => void): () => void {
@@ -281,51 +224,20 @@ export function createBrowserPlaybackApplication(
 
   async function initialize(
     active: Extract<ApplicationRuntime, { readonly kind: "active" }>,
-    callback: CallbackCommand,
+    currentUrl: URL,
     applicationUrl: URL,
   ): Promise<void> {
-    const configurationUrl = new URL("/config.json", applicationUrl.origin);
-
-    let response: BrowserConfigurationResponse;
-    try {
-      response = await ports.fetchConfiguration({
-        signal: active.abortController.signal,
-        url: configurationUrl,
-      });
-    } catch {
-      if (isCurrent(active)) {
-        replaceSnapshot(fatalSnapshot("configuration-unavailable"));
-      }
-      return;
-    }
-
-    if (!isCurrent(active)) {
-      return;
-    }
-
-    if (!response.ok) {
-      replaceSnapshot(fatalSnapshot("configuration-unavailable"));
-      return;
-    }
-
-    let source: unknown;
-    try {
-      source = await response.readJson();
-    } catch {
-      if (isCurrent(active)) {
-        replaceSnapshot(fatalSnapshot("configuration-unavailable"));
-      }
-      return;
-    }
-
-    if (!isCurrent(active)) {
-      return;
-    }
-
-    const configuration = parseSpotifyPublicConfiguration(source, {
+    const prepared = await ports.integration.prepare({
       applicationUrl,
+      currentUrl,
+      fetchConfiguration: ports.fetchConfiguration,
+      signal: active.abortController.signal,
     });
-    if (configuration.kind === "failure") {
+    if (!isCurrent(active)) {
+      return;
+    }
+
+    if (prepared.kind === "failure") {
       replaceSnapshot(fatalSnapshot("configuration-unavailable"));
       return;
     }
@@ -333,12 +245,12 @@ export function createBrowserPlaybackApplication(
     postCommand(active, {
       kind: "initialize",
       applicationUrl: applicationUrl.toString(),
-      configuration: serializeWorkerPublicConfiguration(configuration.value),
+      configuration: prepared.configuration,
     });
-    if (callback.kind === "pending") {
+    if (prepared.callbackUrl.kind === "available") {
       postCommand(active, {
         kind: "consume-callback",
-        callbackUrl: callback.callbackUrl,
+        callbackUrl: prepared.callbackUrl.value,
       });
     }
     forwardVisibilityChange();
@@ -355,7 +267,7 @@ export function createBrowserPlaybackApplication(
         commitPlaybackWireState(event.value.state);
         return;
       case "authorization-redirect":
-        navigateToSpotifyAuthorization(event.value.url);
+        navigateToAuthorization(event.value.url);
         return;
       case "callback-url-restored":
         restoreCallbackUrl(event.value.url);
@@ -384,8 +296,8 @@ export function createBrowserPlaybackApplication(
     replaceSnapshot(playbackSnapshot(deserialized.value));
   }
 
-  function navigateToSpotifyAuthorization(input: string): void {
-    const authorizationUrl = parseSpotifyAuthorizationUrl(
+  function navigateToAuthorization(input: string): void {
+    const authorizationUrl = ports.integration.validateAuthorizationUrl(
       input,
       ports.location.current(),
     );
@@ -398,7 +310,10 @@ export function createBrowserPlaybackApplication(
   }
 
   function restoreCallbackUrl(input: string): void {
-    const restored = parseRestoredCallbackUrl(input, ports.location.current());
+    const restored = ports.integration.validateRestoredUrl(
+      input,
+      ports.location.current(),
+    );
     if (restored.kind === "invalid") {
       return;
     }
@@ -471,26 +386,6 @@ export function createBrowserPlaybackApplication(
       subscriber();
     }
   }
-}
-
-function captureCallbackCommand(currentUrl: URL): CallbackCommand {
-  const isCallback = callbackQueryParameterNames.some((parameter): boolean =>
-    currentUrl.searchParams.has(parameter),
-  );
-
-  if (!isCallback) {
-    return Object.freeze({ kind: "none" });
-  }
-
-  const callbackUrl = new URL(currentUrl);
-  for (const parameter of displayQueryParameterNames) {
-    callbackUrl.searchParams.delete(parameter);
-  }
-
-  return Object.freeze({
-    kind: "pending",
-    callbackUrl: callbackUrl.toString(),
-  });
 }
 
 function displayReturnConfiguration(currentUrl: URL): unknown {
@@ -592,170 +487,6 @@ function frozenWidthDisplayQuery(width: number): DisplayQuery {
 
 function frozenWidthAndSetupDisplayQuery(width: number): DisplayQuery {
   return Object.freeze({ kind: "width-and-setup", width });
-}
-
-function serializeWorkerPublicConfiguration(
-  configuration: SpotifyPublicConfiguration,
-): WorkerPublicConfiguration {
-  const serialized: WorkerPublicConfiguration = {
-    spotify: Object.freeze({
-      clientId: configuration.spotify.clientId.toAuthorizationParameter(),
-      redirectUri: configuration.spotify.redirectUri.toAuthorizationParameter(),
-    }),
-  };
-
-  return Object.freeze(serialized);
-}
-
-function parseSpotifyAuthorizationUrl(
-  input: string,
-  applicationUrl: URL,
-): SpotifyAuthorizationUrl {
-  try {
-    const url = new URL(input);
-    if (
-      url.protocol !== "https:" ||
-      url.origin !== spotifyAuthorizationOrigin ||
-      url.pathname !== "/authorize" ||
-      url.username !== "" ||
-      url.password !== "" ||
-      url.hash !== "" ||
-      !hasExpectedSpotifyAuthorizationParameters(url, applicationUrl)
-    ) {
-      return Object.freeze({ kind: "invalid" });
-    }
-
-    return Object.freeze({ kind: "valid", value: url });
-  } catch {
-    return Object.freeze({ kind: "invalid" });
-  }
-}
-
-function hasExpectedSpotifyAuthorizationParameters(
-  authorizationUrl: URL,
-  applicationUrl: URL,
-): boolean {
-  const parameters = authorizationUrl.searchParams;
-  const hasOneValueForEachParameter = spotifyAuthorizationParameterNames.every(
-    (parameter): boolean => parameters.getAll(parameter).length === 1,
-  );
-  const parameterCount = Array.from(parameters.keys()).length;
-  if (
-    !hasOneValueForEachParameter ||
-    parameterCount !== spotifyAuthorizationParameterNames.length
-  ) {
-    return false;
-  }
-
-  const responseType = parameters.getAll("response_type")[0];
-  const codeChallengeMethod = parameters.getAll("code_challenge_method")[0];
-  const scope = parameters.getAll("scope")[0];
-  if (
-    responseType !== "code" ||
-    codeChallengeMethod !== "S256" ||
-    scope !== "user-read-currently-playing"
-  ) {
-    return false;
-  }
-
-  const publicParameters: ReadonlyArray<string | undefined> = [
-    parameters.getAll("client_id")[0],
-    parameters.getAll("code_challenge")[0],
-    parameters.getAll("state")[0],
-  ];
-  if (
-    publicParameters.some(
-      (parameter): boolean =>
-        parameter === undefined || parameter.trim().length === 0,
-    )
-  ) {
-    return false;
-  }
-
-  const redirectUri = parameters.getAll("redirect_uri")[0];
-  if (redirectUri === undefined) {
-    return false;
-  }
-
-  return isSameOriginSpotifyCallback(redirectUri, applicationUrl);
-}
-
-function isSameOriginSpotifyCallback(
-  input: string,
-  applicationUrl: URL,
-): boolean {
-  try {
-    const redirectUri = new URL(input);
-    return (
-      redirectUri.protocol === "https:" &&
-      redirectUri.origin === applicationUrl.origin &&
-      redirectUri.pathname === "/spotify/" &&
-      redirectUri.username === "" &&
-      redirectUri.password === "" &&
-      redirectUri.search === "" &&
-      redirectUri.hash === ""
-    );
-  } catch {
-    return false;
-  }
-}
-
-function parseRestoredCallbackUrl(
-  input: string,
-  currentUrl: URL,
-): RestoredCallbackUrl {
-  try {
-    const parsed = new URL(input);
-    if (
-      parsed.origin !== currentUrl.origin ||
-      parsed.pathname !== "/spotify/" ||
-      parsed.username !== "" ||
-      parsed.password !== "" ||
-      parsed.hash !== ""
-    ) {
-      return Object.freeze({ kind: "invalid" });
-    }
-
-    const widthValues = parsed.searchParams.getAll("width");
-    const setupValues = parsed.searchParams.getAll("setup");
-    const parameterCount = Array.from(parsed.searchParams.keys()).length;
-    if (
-      widthValues.length !== 1 ||
-      setupValues.length > 1 ||
-      parameterCount !== widthValues.length + setupValues.length
-    ) {
-      return Object.freeze({ kind: "invalid" });
-    }
-
-    const width = widthValues[0];
-    if (width === undefined || !/^\d+$/.test(width)) {
-      return Object.freeze({ kind: "invalid" });
-    }
-
-    const parsedWidth = Number(width);
-    if (
-      !Number.isSafeInteger(parsedWidth) ||
-      parsedWidth < minimumDisplayWidth ||
-      parsedWidth > maximumDisplayWidth
-    ) {
-      return Object.freeze({ kind: "invalid" });
-    }
-
-    const setup = setupValues[0];
-    if (setup !== undefined && setup !== "1") {
-      return Object.freeze({ kind: "invalid" });
-    }
-
-    const restored = new URL("/spotify/", currentUrl.origin);
-    restored.searchParams.set("width", `${parsedWidth}`);
-    if (setup === "1") {
-      restored.searchParams.set("setup", "1");
-    }
-
-    return Object.freeze({ kind: "valid", value: restored });
-  } catch {
-    return Object.freeze({ kind: "invalid" });
-  }
 }
 
 function malformedWorkerPlaybackState(): PlaybackState {

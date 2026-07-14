@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
 import type { PlaybackState } from "../../domain/playback.ts";
 import type { OverlaySetupMode } from "./overlay-geometry.ts";
+import type { OverlayPresentation } from "./overlay-presentation.ts";
 
 const controlButtonClass =
   "rounded-md border border-slate-500 bg-slate-950 px-3 py-2 text-sm font-medium text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950";
@@ -14,12 +15,14 @@ type OverlayControlActions = {
 
 type OverlayControlsProps = {
   readonly actions: OverlayControlActions;
+  readonly presentation: OverlayPresentation;
   readonly setupMode: OverlaySetupMode;
   readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
 export function OverlayControls({
   actions,
+  presentation,
   setupMode,
   snapshot,
 }: OverlayControlsProps): ReactElement | null {
@@ -30,6 +33,7 @@ export function OverlayControls({
       return (
         <ControlsForPlaybackState
           actions={actions}
+          presentation={presentation}
           setupMode={setupMode}
           state={snapshot.state}
         />
@@ -41,12 +45,14 @@ export function OverlayControls({
 
 type ControlsForPlaybackStateProps = {
   readonly actions: OverlayControlActions;
+  readonly presentation: OverlayPresentation;
   readonly setupMode: OverlaySetupMode;
   readonly state: PlaybackState;
 };
 
 function ControlsForPlaybackState({
   actions,
+  presentation,
   setupMode,
   state,
 }: ControlsForPlaybackStateProps): ReactElement | null {
@@ -55,9 +61,9 @@ function ControlsForPlaybackState({
       return null;
     case "authorization-required":
       return (
-        <ControlNavigation>
+        <ControlNavigation presentation={presentation}>
           <ControlButton
-            label="Connect Spotify"
+            label={`Connect ${presentation.displayName}`}
             onClick={actions.beginAuthorization}
           />
         </ControlNavigation>
@@ -68,22 +74,34 @@ function ControlsForPlaybackState({
     case "paused":
     case "unsupported":
       return (
-        <SetupControls setupMode={setupMode}>
-          <ControlButton label="Disconnect Spotify" onClick={actions.logout} />
+        <SetupControls presentation={presentation} setupMode={setupMode}>
+          <ControlButton
+            label={`Disconnect ${presentation.displayName}`}
+            onClick={actions.logout}
+          />
         </SetupControls>
       );
     case "reconnecting":
       return (
-        <SetupControls setupMode={setupMode}>
-          <ControlButton label="Reconnect Spotify" onClick={actions.retry} />
-          <ControlButton label="Disconnect Spotify" onClick={actions.logout} />
+        <SetupControls presentation={presentation} setupMode={setupMode}>
+          <ControlButton
+            label={`Reconnect ${presentation.displayName}`}
+            onClick={actions.retry}
+          />
+          <ControlButton
+            label={`Disconnect ${presentation.displayName}`}
+            onClick={actions.logout}
+          />
         </SetupControls>
       );
     case "failure":
       return (
-        <SetupControls setupMode={setupMode}>
+        <SetupControls presentation={presentation} setupMode={setupMode}>
           <ControlButton label="Retry playback" onClick={actions.retry} />
-          <ControlButton label="Disconnect Spotify" onClick={actions.logout} />
+          <ControlButton
+            label={`Disconnect ${presentation.displayName}`}
+            onClick={actions.logout}
+          />
         </SetupControls>
       );
   }
@@ -93,18 +111,24 @@ function ControlsForPlaybackState({
 
 type SetupControlsProps = {
   readonly children: ReactNode;
+  readonly presentation: OverlayPresentation;
   readonly setupMode: OverlaySetupMode;
 };
 
 function SetupControls({
   children,
+  presentation,
   setupMode,
 }: SetupControlsProps): ReactElement | null {
   switch (setupMode.kind) {
     case "overlay":
       return null;
     case "setup":
-      return <ControlNavigation>{children}</ControlNavigation>;
+      return (
+        <ControlNavigation presentation={presentation}>
+          {children}
+        </ControlNavigation>
+      );
   }
 
   return unreachable(setupMode);
@@ -112,13 +136,17 @@ function SetupControls({
 
 type ControlNavigationProps = {
   readonly children: ReactNode;
+  readonly presentation: OverlayPresentation;
 };
 
-function ControlNavigation({ children }: ControlNavigationProps): ReactElement {
+function ControlNavigation({
+  children,
+  presentation,
+}: ControlNavigationProps): ReactElement {
   return (
     <nav
       className="m-0 flex w-full items-center gap-2 p-2"
-      aria-label="Spotify playback controls"
+      aria-label={`${presentation.displayName} playback controls`}
     >
       {children}
     </nav>

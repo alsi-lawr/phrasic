@@ -5,7 +5,9 @@ import {
   type BrowserPlaybackWorker,
 } from "./application.ts";
 import { fetchBrowserConfiguration } from "./configuration-fetch.ts";
-import SpotifyNowPlayingOverlay from "../components/overlay/SpotifyNowPlayingOverlay.tsx";
+import NowPlayingOverlay from "../components/overlay/NowPlayingOverlay.tsx";
+import { spotifyOverlayPresentation } from "./providers/spotify-presentation.ts";
+import { spotifyBrowserIntegration } from "./integrations/spotify-browser-integration.ts";
 import "./globals.css";
 
 const rootElement = document.getElementById("root");
@@ -17,7 +19,10 @@ const application = createBrowserPlaybackApplication(browserApplicationPorts());
 application.start();
 
 createRoot(rootElement).render(
-  <SpotifyNowPlayingOverlay application={application} />,
+  <NowPlayingOverlay
+    application={application}
+    presentation={spotifyOverlayPresentation}
+  />,
 );
 
 function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
@@ -30,6 +35,7 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
         url: options.url,
       });
     },
+    integration: spotifyBrowserIntegration,
     location: Object.freeze({
       current(): URL {
         return new URL(window.location.href);

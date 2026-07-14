@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
 import { parseSpotifyPlaybackPayload } from "../../browser/providers/spotify-payload.ts";
+import { spotifyOverlayPresentation } from "../../browser/providers/spotify-presentation.ts";
 import { OverlayMetadata } from "../../components/overlay/OverlayMetadata.tsx";
 import {
   overlayAnimationIdentityKey,
@@ -121,6 +122,7 @@ function renderMetadata(snapshot: BrowserPlaybackApplicationSnapshot): string {
       availableWidth: 2_400,
       motion: overlayMotionDecisionForPreference(true),
       onTextMeasurement: (): void => {},
+      presentation: spotifyOverlayPresentation,
       snapshot,
     }),
   );

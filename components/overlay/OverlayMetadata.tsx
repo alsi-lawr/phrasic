@@ -15,11 +15,13 @@ import {
   type OverlayTextMeasurementReporter,
 } from "./overlay-layout.ts";
 import { type OverlayMotionDecision } from "./overlay-motion.ts";
+import type { OverlayPresentation } from "./overlay-presentation.ts";
 
 type OverlayMetadataProps = {
   readonly availableWidth: number;
   readonly motion: OverlayMotionDecision;
   readonly onTextMeasurement: OverlayTextMeasurementReporter;
+  readonly presentation: OverlayPresentation;
   readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
@@ -27,6 +29,7 @@ export function OverlayMetadata({
   availableWidth,
   motion,
   onTextMeasurement,
+  presentation,
   snapshot,
 }: OverlayMetadataProps): ReactElement {
   const animationIdentityKey = overlayAnimationIdentityKey(snapshot);
@@ -39,6 +42,7 @@ export function OverlayMetadata({
         availableWidth={availableWidth}
         motion={motion}
         onTextMeasurement={onTextMeasurement}
+        presentation={presentation}
         snapshot={snapshot}
       />
     </g>
@@ -53,6 +57,7 @@ type MetadataContentProps = {
 };
 
 type MetadataForSnapshotProps = MetadataContentProps & {
+  readonly presentation: OverlayPresentation;
   readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
@@ -61,6 +66,7 @@ function MetadataForSnapshot({
   availableWidth,
   motion,
   onTextMeasurement,
+  presentation,
   snapshot,
 }: MetadataForSnapshotProps): ReactElement {
   switch (snapshot.kind) {
@@ -71,6 +77,7 @@ function MetadataForSnapshot({
           availableWidth={availableWidth}
           motion={motion}
           onTextMeasurement={onTextMeasurement}
+          presentation={presentation}
           reason={snapshot.reason}
         />
       );
@@ -81,6 +88,7 @@ function MetadataForSnapshot({
           availableWidth={availableWidth}
           motion={motion}
           onTextMeasurement={onTextMeasurement}
+          presentation={presentation}
           state={snapshot.state}
         />
       );
@@ -90,6 +98,7 @@ function MetadataForSnapshot({
 }
 
 type FatalMetadataProps = MetadataContentProps & {
+  readonly presentation: OverlayPresentation;
   readonly reason: Extract<
     BrowserPlaybackApplicationSnapshot,
     { readonly kind: "fatal" }
@@ -101,6 +110,7 @@ function FatalMetadata({
   availableWidth,
   motion,
   onTextMeasurement,
+  presentation,
   reason,
 }: FatalMetadataProps): ReactElement {
   switch (reason) {
@@ -114,7 +124,7 @@ function FatalMetadata({
           motion={motion}
           onTextMeasurement={onTextMeasurement}
           subtitle="The browser display could not be initialized."
-          title="This browser cannot start Spotify playback."
+          title={`This browser cannot start ${presentation.displayName} playback.`}
         />
       );
     case "configuration-unavailable":
@@ -123,7 +133,7 @@ function FatalMetadata({
           animationIdentityKey={animationIdentityKey}
           availableWidth={availableWidth}
           category="OVERLAY UNAVAILABLE"
-          context="The public Spotify configuration could not be loaded."
+          context={`The public ${presentation.displayName} configuration could not be loaded.`}
           motion={motion}
           onTextMeasurement={onTextMeasurement}
           subtitle="The browser display could not be initialized."
@@ -136,6 +146,7 @@ function FatalMetadata({
 }
 
 type PlaybackMetadataProps = MetadataContentProps & {
+  readonly presentation: OverlayPresentation;
   readonly state: PlaybackState;
 };
 
@@ -144,6 +155,7 @@ function PlaybackMetadata({
   availableWidth,
   motion,
   onTextMeasurement,
+  presentation,
   state,
 }: PlaybackMetadataProps): ReactElement {
   switch (state.kind) {
@@ -156,8 +168,8 @@ function PlaybackMetadata({
           context="Preparing the display connection."
           motion={motion}
           onTextMeasurement={onTextMeasurement}
-          subtitle="Spotify Now Playing"
-          title="Starting Spotify playback."
+          subtitle={`${presentation.displayName} Now Playing`}
+          title={`Starting ${presentation.displayName} playback.`}
         />
       );
     case "authorization-required":
@@ -165,12 +177,15 @@ function PlaybackMetadata({
         <StatusMetadata
           animationIdentityKey={animationIdentityKey}
           availableWidth={availableWidth}
-          category="CONNECT SPOTIFY"
-          context={authorizationRequiredContext(state.reason)}
+          category={`CONNECT ${providerLabel(presentation)}`}
+          context={authorizationRequiredContext(
+            state.reason,
+            presentation.displayName,
+          )}
           motion={motion}
           onTextMeasurement={onTextMeasurement}
-          subtitle="Connect Spotify to continue."
-          title="Spotify authorization is required."
+          subtitle={`Connect ${presentation.displayName} to continue.`}
+          title={`${presentation.displayName} authorization is required.`}
         />
       );
     case "authorizing":
@@ -182,8 +197,8 @@ function PlaybackMetadata({
           context="This display will reconnect after authorization completes."
           motion={motion}
           onTextMeasurement={onTextMeasurement}
-          subtitle="Finish authorization in Spotify."
-          title="Waiting for Spotify authorization."
+          subtitle={`Finish authorization in ${presentation.displayName}.`}
+          title={`Waiting for ${presentation.displayName} authorization.`}
         />
       );
     case "empty":
@@ -195,7 +210,7 @@ function PlaybackMetadata({
           context="Start a track or episode to populate the overlay."
           motion={motion}
           onTextMeasurement={onTextMeasurement}
-          subtitle="Spotify is connected."
+          subtitle={`${presentation.displayName} is connected.`}
           title="No track or episode is currently playing."
         />
       );
@@ -229,11 +244,11 @@ function PlaybackMetadata({
           animationIdentityKey={animationIdentityKey}
           availableWidth={availableWidth}
           category="UNSUPPORTED"
-          context="Play a supported Spotify track or episode."
+          context={`Play a supported ${presentation.displayName} track or episode.`}
           motion={motion}
           onTextMeasurement={onTextMeasurement}
-          subtitle={unsupportedSubtitle(state.reason)}
-          title="The current Spotify item cannot be displayed."
+          subtitle={unsupportedSubtitle(state.reason, presentation.displayName)}
+          title={`The current ${presentation.displayName} item cannot be displayed.`}
         />
       );
     case "reconnecting":
@@ -243,6 +258,7 @@ function PlaybackMetadata({
           availableWidth={availableWidth}
           motion={motion}
           onTextMeasurement={onTextMeasurement}
+          presentation={presentation}
           state={state}
         />
       );
@@ -252,10 +268,13 @@ function PlaybackMetadata({
           animationIdentityKey={animationIdentityKey}
           availableWidth={availableWidth}
           category="PLAYBACK UNAVAILABLE"
-          context="Use setup mode to retry playback or disconnect Spotify."
+          context={`Use setup mode to retry playback or disconnect ${presentation.displayName}.`}
           motion={motion}
           onTextMeasurement={onTextMeasurement}
-          subtitle={playbackFailureSubtitle(state.error)}
+          subtitle={playbackFailureSubtitle(
+            state.error,
+            presentation.displayName,
+          )}
           title="Playback updates failed."
         />
       );
@@ -265,6 +284,7 @@ function PlaybackMetadata({
 }
 
 type ReconnectingMetadataProps = MetadataContentProps & {
+  readonly presentation: OverlayPresentation;
   readonly state: Extract<PlaybackState, { readonly kind: "reconnecting" }>;
 };
 
@@ -273,6 +293,7 @@ function ReconnectingMetadata({
   availableWidth,
   motion,
   onTextMeasurement,
+  presentation,
   state,
 }: ReconnectingMetadataProps): ReactElement {
   switch (state.lastItem.kind) {
@@ -294,11 +315,11 @@ function ReconnectingMetadata({
           animationIdentityKey={animationIdentityKey}
           availableWidth={availableWidth}
           category="RECONNECTING"
-          context="Waiting for Spotify playback updates to return."
+          context={`Waiting for ${presentation.displayName} playback updates to return.`}
           motion={motion}
           onTextMeasurement={onTextMeasurement}
           subtitle="No previous item is available."
-          title="Reconnecting to Spotify."
+          title={`Reconnecting to ${presentation.displayName}.`}
         />
       );
   }
@@ -622,40 +643,47 @@ function MetadataClipPath({
 
 function authorizationRequiredContext(
   reason: AuthorizationRequiredReason,
+  displayName: string,
 ): string {
   switch (reason) {
     case "authorization-expired":
-      return "Spotify authorization expired.";
+      return `${displayName} authorization expired.`;
     case "authorization-revoked":
-      return "Spotify authorization was revoked.";
+      return `${displayName} authorization was revoked.`;
     case "not-authorized":
-      return "Spotify is not connected in this browser profile.";
+      return `${displayName} is not connected in this browser profile.`;
     case "permission-required":
-      return "Spotify playback permission is required.";
+      return `${displayName} playback permission is required.`;
   }
 
   return unreachable(reason);
 }
 
-function unsupportedSubtitle(reason: UnsupportedPlaybackReason): string {
+function unsupportedSubtitle(
+  reason: UnsupportedPlaybackReason,
+  displayName: string,
+): string {
   switch (reason) {
     case "advertisement":
-      return "Spotify is playing an advertisement.";
+      return `${displayName} is playing an advertisement.`;
     case "local-item":
-      return "Spotify is playing a local item.";
+      return `${displayName} is playing a local item.`;
     case "unknown-item-type":
-      return "Spotify returned an unsupported item type.";
+      return `${displayName} returned an unsupported item type.`;
   }
 
   return unreachable(reason);
 }
 
-function playbackFailureSubtitle(failure: PlaybackFailure): string {
+function playbackFailureSubtitle(
+  failure: PlaybackFailure,
+  displayName: string,
+): string {
   switch (failure.kind) {
     case "authorization-failed":
-      return authorizationFailureSubtitle(failure.reason);
+      return authorizationFailureSubtitle(failure.reason, displayName);
     case "provider-failed":
-      return providerFailureSubtitle(failure.reason);
+      return providerFailureSubtitle(failure.reason, displayName);
   }
 
   return unreachable(failure);
@@ -663,12 +691,13 @@ function playbackFailureSubtitle(failure: PlaybackFailure): string {
 
 function authorizationFailureSubtitle(
   reason: "authorization-denied" | "code-exchange-rejected",
+  displayName: string,
 ): string {
   switch (reason) {
     case "authorization-denied":
-      return "Spotify authorization was denied.";
+      return `${displayName} authorization was denied.`;
     case "code-exchange-rejected":
-      return "Spotify rejected the authorization code.";
+      return `${displayName} rejected the authorization code.`;
   }
 
   return unreachable(reason);
@@ -676,16 +705,17 @@ function authorizationFailureSubtitle(
 
 function providerFailureSubtitle(
   reason: "malformed-response" | "network" | "rate-limited" | "server-error",
+  displayName: string,
 ): string {
   switch (reason) {
     case "malformed-response":
-      return "Spotify returned an unreadable playback response.";
+      return `${displayName} returned an unreadable playback response.`;
     case "network":
-      return "The Spotify connection is unavailable.";
+      return `The ${displayName} connection is unavailable.`;
     case "rate-limited":
-      return "Spotify temporarily limited playback requests.";
+      return `${displayName} temporarily limited playback requests.`;
     case "server-error":
-      return "Spotify returned a server error.";
+      return `${displayName} returned a server error.`;
   }
 
   return unreachable(reason);
@@ -695,6 +725,10 @@ function artistNames(
   item: Extract<NowPlayingItem, { readonly kind: "track" }>,
 ): string {
   return item.artists.map((artist): string => artist.name.value).join(", ");
+}
+
+function providerLabel(presentation: OverlayPresentation): string {
+  return presentation.displayName.toLocaleUpperCase("en-US");
 }
 
 function unreachable(value: never): never {

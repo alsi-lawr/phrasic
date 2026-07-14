@@ -8,61 +8,85 @@ import type {
   UnsupportedPlaybackReason,
 } from "../../domain/playback.ts";
 import { overlayLiveAnnouncementKey } from "./overlay-identities.ts";
-
-export const overlaySemanticHeadingId = "spotify-now-playing-heading";
+import type { OverlayPresentation } from "./overlay-presentation.ts";
 
 type OverlaySemanticCompanionProps = {
+  readonly presentation: OverlayPresentation;
   readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
 export function OverlaySemanticCompanion({
+  presentation,
   snapshot,
 }: OverlaySemanticCompanionProps): ReactElement {
   return (
-    <section aria-labelledby={overlaySemanticHeadingId} className="sr-only">
-      <SemanticDetails snapshot={snapshot} />
-      <PoliteOverlayAnnouncement snapshot={snapshot} />
+    <section aria-labelledby={presentation.headingId} className="sr-only">
+      <SemanticDetails presentation={presentation} snapshot={snapshot} />
+      <PoliteOverlayAnnouncement
+        presentation={presentation}
+        snapshot={snapshot}
+      />
     </section>
   );
 }
 
 type SemanticDetailsProps = {
+  readonly presentation: OverlayPresentation;
   readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
-function SemanticDetails({ snapshot }: SemanticDetailsProps): ReactElement {
+function SemanticDetails({
+  presentation,
+  snapshot,
+}: SemanticDetailsProps): ReactElement {
   return (
     <dl>
-      <DefinitionsForSnapshot snapshot={snapshot} />
+      <DefinitionsForSnapshot presentation={presentation} snapshot={snapshot} />
     </dl>
   );
 }
 
 type DefinitionsForSnapshotProps = {
+  readonly presentation: OverlayPresentation;
   readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
 function DefinitionsForSnapshot({
+  presentation,
   snapshot,
 }: DefinitionsForSnapshotProps): ReactElement {
   switch (snapshot.kind) {
     case "fatal":
-      return <FatalDefinitions reason={snapshot.reason} />;
+      return (
+        <FatalDefinitions
+          presentation={presentation}
+          reason={snapshot.reason}
+        />
+      );
     case "playback":
-      return <PlaybackDefinitions state={snapshot.state} />;
+      return (
+        <PlaybackDefinitions
+          presentation={presentation}
+          state={snapshot.state}
+        />
+      );
   }
 
   return unreachable(snapshot);
 }
 
 type FatalDefinitionsProps = {
+  readonly presentation: OverlayPresentation;
   readonly reason: Extract<
     BrowserPlaybackApplicationSnapshot,
     { readonly kind: "fatal" }
   >["reason"];
 };
 
-function FatalDefinitions({ reason }: FatalDefinitionsProps): ReactElement {
+function FatalDefinitions({
+  presentation,
+  reason,
+}: FatalDefinitionsProps): ReactElement {
   switch (reason) {
     case "browser-capability-unavailable":
       return (
@@ -70,14 +94,14 @@ function FatalDefinitions({ reason }: FatalDefinitionsProps): ReactElement {
           details="The browser display could not be initialized."
           guidance="A required browser playback capability is unavailable."
           label="OVERLAY UNAVAILABLE"
-          message="This browser cannot start Spotify playback."
+          message={`This browser cannot start ${presentation.displayName} playback.`}
         />
       );
     case "configuration-unavailable":
       return (
         <StatusDefinitions
           details="The browser display could not be initialized."
-          guidance="The public Spotify configuration could not be loaded."
+          guidance={`The public ${presentation.displayName} configuration could not be loaded.`}
           label="OVERLAY UNAVAILABLE"
           message="The browser configuration is unavailable."
         />
@@ -88,44 +112,49 @@ function FatalDefinitions({ reason }: FatalDefinitionsProps): ReactElement {
 }
 
 type PlaybackDefinitionsProps = {
+  readonly presentation: OverlayPresentation;
   readonly state: PlaybackState;
 };
 
 function PlaybackDefinitions({
+  presentation,
   state,
 }: PlaybackDefinitionsProps): ReactElement {
   switch (state.kind) {
     case "initializing":
       return (
         <StatusDefinitions
-          details="Spotify Now Playing"
+          details={`${presentation.displayName} Now Playing`}
           guidance="Preparing the display connection."
           label="INITIALIZING"
-          message="Starting Spotify playback."
+          message={`Starting ${presentation.displayName} playback.`}
         />
       );
     case "authorization-required":
       return (
         <StatusDefinitions
-          details="Connect Spotify to continue."
-          guidance={authorizationRequiredContext(state.reason)}
-          label="CONNECT SPOTIFY"
-          message="Spotify authorization is required."
+          details={`Connect ${presentation.displayName} to continue.`}
+          guidance={authorizationRequiredContext(
+            state.reason,
+            presentation.displayName,
+          )}
+          label={`CONNECT ${providerLabel(presentation)}`}
+          message={`${presentation.displayName} authorization is required.`}
         />
       );
     case "authorizing":
       return (
         <StatusDefinitions
-          details="Finish authorization in Spotify."
+          details={`Finish authorization in ${presentation.displayName}.`}
           guidance="This display will reconnect after authorization completes."
           label="AUTHORIZING"
-          message="Waiting for Spotify authorization."
+          message={`Waiting for ${presentation.displayName} authorization.`}
         />
       );
     case "empty":
       return (
         <StatusDefinitions
-          details="Spotify is connected."
+          details={`${presentation.displayName} is connected.`}
           guidance="Start a track or episode to populate the overlay."
           label="NOTHING PLAYING"
           message="No track or episode is currently playing."
@@ -137,7 +166,7 @@ function PlaybackDefinitions({
           freshness="Current playback item."
           item={state.snapshot.item}
           label="PLAYING"
-          message="Spotify is playing."
+          message={`${presentation.displayName} is playing.`}
         />
       );
     case "paused":
@@ -146,25 +175,30 @@ function PlaybackDefinitions({
           freshness="Paused playback item."
           item={state.snapshot.item}
           label="PAUSED"
-          message="Spotify is paused."
+          message={`${presentation.displayName} is paused.`}
         />
       );
     case "unsupported":
       return (
         <StatusDefinitions
-          details={unsupportedSubtitle(state.reason)}
-          guidance="Play a supported Spotify track or episode."
+          details={unsupportedSubtitle(state.reason, presentation.displayName)}
+          guidance={`Play a supported ${presentation.displayName} track or episode.`}
           label="UNSUPPORTED"
-          message="The current Spotify item cannot be displayed."
+          message={`The current ${presentation.displayName} item cannot be displayed.`}
         />
       );
     case "reconnecting":
-      return <ReconnectingDefinitions state={state} />;
+      return (
+        <ReconnectingDefinitions presentation={presentation} state={state} />
+      );
     case "failure":
       return (
         <StatusDefinitions
-          details={playbackFailureSubtitle(state.error)}
-          guidance="Use setup mode to retry playback or disconnect Spotify."
+          details={playbackFailureSubtitle(
+            state.error,
+            presentation.displayName,
+          )}
+          guidance={`Use setup mode to retry playback or disconnect ${presentation.displayName}.`}
           label="PLAYBACK UNAVAILABLE"
           message="Playback updates failed."
         />
@@ -175,29 +209,31 @@ function PlaybackDefinitions({
 }
 
 type ReconnectingDefinitionsProps = {
+  readonly presentation: OverlayPresentation;
   readonly state: Extract<PlaybackState, { readonly kind: "reconnecting" }>;
 };
 
 function ReconnectingDefinitions({
+  presentation,
   state,
 }: ReconnectingDefinitionsProps): ReactElement {
   switch (state.lastItem.kind) {
     case "available":
       return (
         <ItemDefinitions
-          freshness="Last known playback item while Spotify reconnects."
+          freshness={`Last known playback item while ${presentation.displayName} reconnects.`}
           item={state.lastItem.item}
           label="RECONNECTING"
-          message="Reconnecting to Spotify."
+          message={`Reconnecting to ${presentation.displayName}.`}
         />
       );
     case "unavailable":
       return (
         <StatusDefinitions
           details="No previous item is available."
-          guidance="Waiting for Spotify playback updates to return."
+          guidance={`Waiting for ${presentation.displayName} playback updates to return.`}
           label="RECONNECTING"
-          message="Reconnecting to Spotify."
+          message={`Reconnecting to ${presentation.displayName}.`}
         />
       );
   }
@@ -293,14 +329,16 @@ function MetadataDefinition({
 }
 
 type PoliteOverlayAnnouncementProps = {
+  readonly presentation: OverlayPresentation;
   readonly snapshot: BrowserPlaybackApplicationSnapshot;
 };
 
 function PoliteOverlayAnnouncement({
+  presentation,
   snapshot,
 }: PoliteOverlayAnnouncementProps): ReactElement {
   const announcementKey = overlayLiveAnnouncementKey(snapshot);
-  const message = announcementMessageForSnapshot(snapshot);
+  const message = announcementMessageForSnapshot(snapshot, presentation);
 
   return (
     <p aria-atomic="true" aria-live="polite" role="status">
@@ -311,12 +349,13 @@ function PoliteOverlayAnnouncement({
 
 function announcementMessageForSnapshot(
   snapshot: BrowserPlaybackApplicationSnapshot,
+  presentation: OverlayPresentation,
 ): string {
   switch (snapshot.kind) {
     case "fatal":
-      return fatalAnnouncementMessage(snapshot.reason);
+      return fatalAnnouncementMessage(snapshot.reason, presentation);
     case "playback":
-      return announcementMessageForPlaybackState(snapshot.state);
+      return announcementMessageForPlaybackState(snapshot.state, presentation);
   }
 
   return unreachable(snapshot);
@@ -327,37 +366,41 @@ function fatalAnnouncementMessage(
     BrowserPlaybackApplicationSnapshot,
     { readonly kind: "fatal" }
   >["reason"],
+  presentation: OverlayPresentation,
 ): string {
   switch (reason) {
     case "browser-capability-unavailable":
-      return "This browser cannot start Spotify playback. The browser display could not be initialized. A required browser playback capability is unavailable.";
+      return `This browser cannot start ${presentation.displayName} playback. The browser display could not be initialized. A required browser playback capability is unavailable.`;
     case "configuration-unavailable":
-      return "The browser configuration is unavailable. The browser display could not be initialized. The public Spotify configuration could not be loaded.";
+      return `The browser configuration is unavailable. The browser display could not be initialized. The public ${presentation.displayName} configuration could not be loaded.`;
   }
 
   return unreachable(reason);
 }
 
-function announcementMessageForPlaybackState(state: PlaybackState): string {
+function announcementMessageForPlaybackState(
+  state: PlaybackState,
+  presentation: OverlayPresentation,
+): string {
   switch (state.kind) {
     case "initializing":
-      return "Starting Spotify playback. Spotify Now Playing Preparing the display connection.";
+      return `Starting ${presentation.displayName} playback. ${presentation.displayName} Now Playing Preparing the display connection.`;
     case "authorization-required":
-      return `Spotify authorization is required. Connect Spotify to continue. ${authorizationRequiredContext(state.reason)}`;
+      return `${presentation.displayName} authorization is required. Connect ${presentation.displayName} to continue. ${authorizationRequiredContext(state.reason, presentation.displayName)}`;
     case "authorizing":
-      return "Waiting for Spotify authorization. Finish authorization in Spotify. This display will reconnect after authorization completes.";
+      return `Waiting for ${presentation.displayName} authorization. Finish authorization in ${presentation.displayName}. This display will reconnect after authorization completes.`;
     case "empty":
-      return "No track or episode is currently playing. Spotify is connected. Start a track or episode to populate the overlay.";
+      return `No track or episode is currently playing. ${presentation.displayName} is connected. Start a track or episode to populate the overlay.`;
     case "playing":
       return itemAnnouncementMessage("Now playing", state.snapshot.item);
     case "paused":
       return itemAnnouncementMessage("Playback paused", state.snapshot.item);
     case "unsupported":
-      return `The current Spotify item cannot be displayed. ${unsupportedSubtitle(state.reason)} Play a supported Spotify track or episode.`;
+      return `The current ${presentation.displayName} item cannot be displayed. ${unsupportedSubtitle(state.reason, presentation.displayName)} Play a supported ${presentation.displayName} track or episode.`;
     case "reconnecting":
-      return reconnectingAnnouncementMessage(state);
+      return reconnectingAnnouncementMessage(state, presentation);
     case "failure":
-      return `Playback updates failed. ${playbackFailureSubtitle(state.error)} Use setup mode to retry playback or disconnect Spotify.`;
+      return `Playback updates failed. ${playbackFailureSubtitle(state.error, presentation.displayName)} Use setup mode to retry playback or disconnect ${presentation.displayName}.`;
   }
 
   return unreachable(state);
@@ -365,15 +408,16 @@ function announcementMessageForPlaybackState(state: PlaybackState): string {
 
 function reconnectingAnnouncementMessage(
   state: Extract<PlaybackState, { readonly kind: "reconnecting" }>,
+  presentation: OverlayPresentation,
 ): string {
   switch (state.lastItem.kind) {
     case "available":
       return itemAnnouncementMessage(
-        "Reconnecting to Spotify. Last known",
+        `Reconnecting to ${presentation.displayName}. Last known`,
         state.lastItem.item,
       );
     case "unavailable":
-      return "Reconnecting to Spotify. No previous item is available. Waiting for Spotify playback updates to return.";
+      return `Reconnecting to ${presentation.displayName}. No previous item is available. Waiting for ${presentation.displayName} playback updates to return.`;
   }
 
   return unreachable(state.lastItem);
@@ -392,40 +436,47 @@ function itemAnnouncementMessage(prefix: string, item: NowPlayingItem): string {
 
 function authorizationRequiredContext(
   reason: AuthorizationRequiredReason,
+  displayName: string,
 ): string {
   switch (reason) {
     case "authorization-expired":
-      return "Spotify authorization expired.";
+      return `${displayName} authorization expired.`;
     case "authorization-revoked":
-      return "Spotify authorization was revoked.";
+      return `${displayName} authorization was revoked.`;
     case "not-authorized":
-      return "Spotify is not connected in this browser profile.";
+      return `${displayName} is not connected in this browser profile.`;
     case "permission-required":
-      return "Spotify playback permission is required.";
+      return `${displayName} playback permission is required.`;
   }
 
   return unreachable(reason);
 }
 
-function unsupportedSubtitle(reason: UnsupportedPlaybackReason): string {
+function unsupportedSubtitle(
+  reason: UnsupportedPlaybackReason,
+  displayName: string,
+): string {
   switch (reason) {
     case "advertisement":
-      return "Spotify is playing an advertisement.";
+      return `${displayName} is playing an advertisement.`;
     case "local-item":
-      return "Spotify is playing a local item.";
+      return `${displayName} is playing a local item.`;
     case "unknown-item-type":
-      return "Spotify returned an unsupported item type.";
+      return `${displayName} returned an unsupported item type.`;
   }
 
   return unreachable(reason);
 }
 
-function playbackFailureSubtitle(failure: PlaybackFailure): string {
+function playbackFailureSubtitle(
+  failure: PlaybackFailure,
+  displayName: string,
+): string {
   switch (failure.kind) {
     case "authorization-failed":
-      return authorizationFailureSubtitle(failure.reason);
+      return authorizationFailureSubtitle(failure.reason, displayName);
     case "provider-failed":
-      return providerFailureSubtitle(failure.reason);
+      return providerFailureSubtitle(failure.reason, displayName);
   }
 
   return unreachable(failure);
@@ -433,12 +484,13 @@ function playbackFailureSubtitle(failure: PlaybackFailure): string {
 
 function authorizationFailureSubtitle(
   reason: "authorization-denied" | "code-exchange-rejected",
+  displayName: string,
 ): string {
   switch (reason) {
     case "authorization-denied":
-      return "Spotify authorization was denied.";
+      return `${displayName} authorization was denied.`;
     case "code-exchange-rejected":
-      return "Spotify rejected the authorization code.";
+      return `${displayName} rejected the authorization code.`;
   }
 
   return unreachable(reason);
@@ -446,16 +498,17 @@ function authorizationFailureSubtitle(
 
 function providerFailureSubtitle(
   reason: "malformed-response" | "network" | "rate-limited" | "server-error",
+  displayName: string,
 ): string {
   switch (reason) {
     case "malformed-response":
-      return "Spotify returned an unreadable playback response.";
+      return `${displayName} returned an unreadable playback response.`;
     case "network":
-      return "The Spotify connection is unavailable.";
+      return `The ${displayName} connection is unavailable.`;
     case "rate-limited":
-      return "Spotify temporarily limited playback requests.";
+      return `${displayName} temporarily limited playback requests.`;
     case "server-error":
-      return "Spotify returned a server error.";
+      return `${displayName} returned a server error.`;
   }
 
   return unreachable(reason);
@@ -465,6 +518,10 @@ function artistNames(
   item: Extract<NowPlayingItem, { readonly kind: "track" }>,
 ): string {
   return item.artists.map((artist): string => artist.name.value).join(", ");
+}
+
+function providerLabel(presentation: OverlayPresentation): string {
+  return presentation.displayName.toLocaleUpperCase("en-US");
 }
 
 function unreachable(value: never): never {

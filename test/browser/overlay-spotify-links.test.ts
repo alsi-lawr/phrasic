@@ -4,7 +4,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
 import { parseSpotifyPlaybackPayload } from "../../browser/providers/spotify-payload.ts";
-import { OverlayVisualSpotifyLinks } from "../../components/overlay/OverlayVisualSpotifyLinks.tsx";
+import { spotifyOverlayPresentation } from "../../browser/providers/spotify-presentation.ts";
+import { OverlayVisualProviderLinks } from "../../components/overlay/OverlayVisualProviderLinks.tsx";
 import {
   Collection,
   Creator,
@@ -173,8 +174,9 @@ function renderSpotifyLinks(
   snapshot: BrowserPlaybackApplicationSnapshot,
 ): string {
   return renderToStaticMarkup(
-    createElement(OverlayVisualSpotifyLinks, {
+    createElement(OverlayVisualProviderLinks, {
       availableWidth: 2_400,
+      presentation: spotifyOverlayPresentation,
       snapshot,
     }),
   );

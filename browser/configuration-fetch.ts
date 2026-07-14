@@ -1,4 +1,4 @@
-import type { BrowserConfigurationResponse } from "./application.ts";
+import type { BrowserConfigurationResponse } from "./configuration-response.ts";
 
 type ConfigurationFetchResponse = {
   readonly ok: boolean;

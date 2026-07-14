@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
 import { parseSpotifyPlaybackPayload } from "../../browser/providers/spotify-payload.ts";
+import { spotifyOverlayPresentation } from "../../browser/providers/spotify-presentation.ts";
 import { OverlaySemanticCompanion } from "../../components/overlay/OverlaySemanticCompanion.tsx";
 import { overlayLiveAnnouncementKey } from "../../components/overlay/overlay-identities.ts";
 import {
@@ -273,7 +274,10 @@ function renderSemanticCompanion(
   snapshot: BrowserPlaybackApplicationSnapshot,
 ): string {
   return renderToStaticMarkup(
-    createElement(OverlaySemanticCompanion, { snapshot }),
+    createElement(OverlaySemanticCompanion, {
+      presentation: spotifyOverlayPresentation,
+      snapshot,
+    }),
   );
 }
 

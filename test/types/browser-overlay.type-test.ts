@@ -3,14 +3,15 @@ import type {
   BrowserPlaybackApplication,
   BrowserPlaybackApplicationSnapshot,
 } from "../../browser/application.ts";
+import { spotifyOverlayPresentation } from "../../browser/providers/spotify-presentation.ts";
 import { OverlayArtwork } from "../../components/overlay/OverlayArtwork.tsx";
 import { OverlayControls } from "../../components/overlay/OverlayControls.tsx";
 import { OverlayMetadata } from "../../components/overlay/OverlayMetadata.tsx";
 import { OverlaySemanticCompanion } from "../../components/overlay/OverlaySemanticCompanion.tsx";
 import { OverlaySetupDiagnostic } from "../../components/overlay/OverlaySetupDiagnostic.tsx";
 import { OverlayVisual } from "../../components/overlay/OverlayVisual.tsx";
-import { OverlayVisualSpotifyLinks } from "../../components/overlay/OverlayVisualSpotifyLinks.tsx";
-import SpotifyNowPlayingOverlay from "../../components/overlay/SpotifyNowPlayingOverlay.tsx";
+import { OverlayVisualProviderLinks } from "../../components/overlay/OverlayVisualProviderLinks.tsx";
+import NowPlayingOverlay from "../../components/overlay/NowPlayingOverlay.tsx";
 import {
   overlayAnimationIdentityKey,
   overlayItemIdentityKey,
@@ -28,8 +29,10 @@ declare const application: BrowserPlaybackApplication;
 declare const item: NowPlayingItem;
 declare const snapshot: BrowserPlaybackApplicationSnapshot;
 
-const overlayProps: ComponentProps<typeof SpotifyNowPlayingOverlay> =
-  Object.freeze({ application });
+const overlayProps: ComponentProps<typeof NowPlayingOverlay> = Object.freeze({
+  application,
+  presentation: spotifyOverlayPresentation,
+});
 const geometry = resolveOverlayGeometry(new URLSearchParams("width=1920"));
 const motion = overlayMotionDecisionForPreference(false);
 const setupMode: OverlaySetupMode = resolveOverlayGeometry(
@@ -48,6 +51,7 @@ const controlsProps: ComponentProps<typeof OverlayControls> = Object.freeze({
     logout: (): void => {},
     retry: (): void => {},
   }),
+  presentation: spotifyOverlayPresentation,
   setupMode,
   snapshot,
 });
@@ -59,17 +63,24 @@ const metadataProps: ComponentProps<typeof OverlayMetadata> = Object.freeze({
   availableWidth: 3_096,
   motion,
   onTextMeasurement: (): void => {},
+  presentation: spotifyOverlayPresentation,
   snapshot,
 });
 const semanticProps: ComponentProps<typeof OverlaySemanticCompanion> =
-  Object.freeze({ snapshot });
+  Object.freeze({ presentation: spotifyOverlayPresentation, snapshot });
 const visualProps: ComponentProps<typeof OverlayVisual> = Object.freeze({
   geometry,
   motion,
+  presentation: spotifyOverlayPresentation,
   snapshot,
 });
-const visualSpotifyLinkProps: ComponentProps<typeof OverlayVisualSpotifyLinks> =
-  Object.freeze({ availableWidth: 3_096, snapshot });
+const visualProviderLinkProps: ComponentProps<
+  typeof OverlayVisualProviderLinks
+> = Object.freeze({
+  availableWidth: 3_096,
+  presentation: spotifyOverlayPresentation,
+  snapshot,
+});
 const setupDiagnosticProps: ComponentProps<typeof OverlaySetupDiagnostic> =
   Object.freeze({ diagnostic: displayDiagnostic });
 const itemIdentity = overlayItemIdentityKey(item);
@@ -102,7 +113,7 @@ semanticProps.snapshot = snapshot;
 // @ts-expect-error The visual overlay consumes an immutable application snapshot.
 visualProps.snapshot = snapshot;
 // @ts-expect-error Spotify destinations consume an immutable application snapshot.
-visualSpotifyLinkProps.snapshot = snapshot;
+visualProviderLinkProps.snapshot = snapshot;
 // @ts-expect-error Setup diagnostic props remain readonly.
 setupDiagnosticProps.diagnostic = displayDiagnostic;
 const invalidFatalSnapshot: BrowserPlaybackApplicationSnapshot = {
@@ -148,7 +159,7 @@ void artworkProps;
 void metadataProps;
 void semanticProps;
 void visualProps;
-void visualSpotifyLinkProps;
+void visualProviderLinkProps;
 void setupDiagnosticProps;
 void itemIdentity;
 void animationIdentity;

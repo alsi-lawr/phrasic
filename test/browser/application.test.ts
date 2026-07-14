@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createBrowserPlaybackApplication,
-  type BrowserConfigurationResponse,
   type BrowserPlaybackApplication,
   type BrowserPlaybackApplicationPorts,
   type BrowserPlaybackWorker,
 } from "../../browser/application.ts";
+import type { BrowserConfigurationResponse } from "../../browser/configuration-response.ts";
 import type { PlaybackWorkerCommand } from "../../browser/worker/protocol.ts";
+import { spotifyBrowserIntegration } from "../../browser/integrations/spotify-browser-integration.ts";
 
 test("the browser application waits for a validated callback restoration before replacing its URL", async () => {
   const fixture = applicationFixture({
@@ -414,6 +415,7 @@ function applicationFixture(
     createWorker(): BrowserPlaybackWorker {
       return worker;
     },
+    integration: spotifyBrowserIntegration,
     async fetchConfiguration(request): Promise<BrowserConfigurationResponse> {
       configurationPageUrls.push(currentUrl.toString());
       configurationUrls.push(request.url.toString());
@@ -536,6 +538,8 @@ function commandKinds(
 }
 
 async function settleApplicationWork(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
