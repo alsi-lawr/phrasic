@@ -297,6 +297,25 @@ test("reconnecting keeps a stale last item only after active playback", () => {
   }
 });
 
+test("playing and reconnecting playback states survive structured cloning", () => {
+  const playing = expectSuccess(
+    transitionPlaybackState(
+      expectSuccess(
+        transitionPlaybackState(initialPlaybackState(), {
+          kind: "authorization-available",
+        }),
+      ),
+      { kind: "playback-playing", snapshot: makeSnapshot() },
+    ),
+  );
+  const reconnecting = expectSuccess(
+    transitionPlaybackState(playing, { kind: "connection-lost" }),
+  );
+
+  assert.deepEqual(structuredClone(playing), playing);
+  assert.deepEqual(structuredClone(reconnecting), reconnecting);
+});
+
 test("invalid transitions and expected failures use explicit result branches", () => {
   assert.deepEqual(
     expectFailure(

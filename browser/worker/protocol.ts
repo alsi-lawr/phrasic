@@ -1,11 +1,8 @@
 import {
   maximumPlatformTimerDelayMilliseconds,
+  type PlaybackState,
   type Result,
 } from "../../domain/playback.ts";
-import {
-  parsePlaybackWireState,
-  type PlaybackWireState,
-} from "./playback-wire.ts";
 
 export type PlaybackWorkerInitializeCommand = {
   readonly kind: "initialize";
@@ -142,7 +139,7 @@ export type PlaybackWorkerCallbackUrlRestored = {
 
 export type PlaybackWorkerPlaybackState = {
   readonly kind: "playback-state";
-  readonly state: PlaybackWireState;
+  readonly state: PlaybackState;
 };
 
 export type PlaybackWorkerEvent =
@@ -151,11 +148,6 @@ export type PlaybackWorkerEvent =
   | PlaybackWorkerFatalInitializationFailure
   | PlaybackWorkerPlaybackState
   | PlaybackWorkerSafeDiagnostic;
-
-export type PlaybackWorkerEventParseFailure = {
-  readonly kind: "invalid-playback-worker-event";
-  readonly code: WorkerProtocolParseCode;
-};
 
 const noDiagnosticMetadata: PlaybackWorkerDiagnosticMetadata = Object.freeze({
   kind: "none",
@@ -215,39 +207,6 @@ export function createPlaybackWorkerSafeDiagnostic(options: {
 
 export function noPlaybackWorkerDiagnosticMetadata(): PlaybackWorkerDiagnosticMetadata {
   return noDiagnosticMetadata;
-}
-
-export function parsePlaybackWorkerEvent(
-  input: unknown,
-): Result<PlaybackWorkerEvent, PlaybackWorkerEventParseFailure> {
-  try {
-    const source = parseObject(input, eventParseFailure);
-    if (source.kind === "failure") {
-      return source;
-    }
-
-    const kind = readRequiredString(source.value, "kind", eventParseFailure);
-    if (kind.kind === "failure") {
-      return kind;
-    }
-
-    switch (kind.value) {
-      case "authorization-redirect":
-        return parseAuthorizationRedirectEvent(source.value);
-      case "callback-url-restored":
-        return parseCallbackUrlRestoredEvent(source.value);
-      case "playback-state":
-        return parsePlaybackStateEvent(source.value);
-      case "safe-diagnostic":
-        return parseSafeDiagnosticEvent(source.value);
-      case "fatal-initialization-failure":
-        return parseFatalInitializationFailureEvent(source.value);
-      default:
-        return failed(eventParseFailure("invalid-kind"));
-    }
-  } catch {
-    return failed(eventParseFailure("expected-object"));
-  }
 }
 
 export function createPlaybackWorkerFatalInitializationFailure(
@@ -434,329 +393,6 @@ function parseVisibilityChangeCommand(
   }
 }
 
-function parseAuthorizationRedirectEvent(
-  source: object,
-): Result<
-  PlaybackWorkerAuthorizationRedirect,
-  PlaybackWorkerEventParseFailure
-> {
-  const exact = parseExactObject(source, ["kind", "url"], eventParseFailure);
-  if (exact.kind === "failure") {
-    return exact;
-  }
-
-  const url = readRequiredNonEmptyString(exact.value, "url", eventParseFailure);
-  if (url.kind === "failure") {
-    return url;
-  }
-
-  const event: PlaybackWorkerAuthorizationRedirect = {
-    kind: "authorization-redirect",
-    url: url.value,
-  };
-
-  return succeeded(Object.freeze(event));
-}
-
-function parseCallbackUrlRestoredEvent(
-  source: object,
-): Result<PlaybackWorkerCallbackUrlRestored, PlaybackWorkerEventParseFailure> {
-  const exact = parseExactObject(source, ["kind", "url"], eventParseFailure);
-  if (exact.kind === "failure") {
-    return exact;
-  }
-
-  const url = readRequiredNonEmptyString(exact.value, "url", eventParseFailure);
-  if (url.kind === "failure") {
-    return url;
-  }
-
-  const event: PlaybackWorkerCallbackUrlRestored = {
-    kind: "callback-url-restored",
-    url: url.value,
-  };
-
-  return succeeded(Object.freeze(event));
-}
-
-function parsePlaybackStateEvent(
-  source: object,
-): Result<PlaybackWorkerPlaybackState, PlaybackWorkerEventParseFailure> {
-  const exact = parseExactObject(source, ["kind", "state"], eventParseFailure);
-  if (exact.kind === "failure") {
-    return exact;
-  }
-
-  const stateValue = readRequiredDataProperty(
-    exact.value,
-    "state",
-    eventParseFailure,
-  );
-  if (stateValue.kind === "failure") {
-    return stateValue;
-  }
-
-  const state = parsePlaybackWireState(stateValue.value);
-  if (state.kind === "failure") {
-    return failed(eventParseFailure("invalid-value"));
-  }
-
-  const event: PlaybackWorkerPlaybackState = {
-    kind: "playback-state",
-    state: state.value,
-  };
-
-  return succeeded(Object.freeze(event));
-}
-
-function parseSafeDiagnosticEvent(
-  source: object,
-): Result<PlaybackWorkerSafeDiagnostic, PlaybackWorkerEventParseFailure> {
-  const exact = parseExactObject(
-    source,
-    ["kind", "operation", "code", "metadata"],
-    eventParseFailure,
-  );
-  if (exact.kind === "failure") {
-    return exact;
-  }
-
-  const operationValue = readRequiredString(
-    exact.value,
-    "operation",
-    eventParseFailure,
-  );
-  if (operationValue.kind === "failure") {
-    return operationValue;
-  }
-
-  const operation = parseDiagnosticOperation(operationValue.value);
-  if (operation.kind === "failure") {
-    return operation;
-  }
-
-  const codeValue = readRequiredString(exact.value, "code", eventParseFailure);
-  if (codeValue.kind === "failure") {
-    return codeValue;
-  }
-
-  const code = parseDiagnosticCode(codeValue.value);
-  if (code.kind === "failure") {
-    return code;
-  }
-
-  const metadataValue = readRequiredDataProperty(
-    exact.value,
-    "metadata",
-    eventParseFailure,
-  );
-  if (metadataValue.kind === "failure") {
-    return metadataValue;
-  }
-
-  const metadata = parseDiagnosticMetadata(metadataValue.value);
-  if (metadata.kind === "failure") {
-    return metadata;
-  }
-
-  return succeeded(
-    createPlaybackWorkerSafeDiagnostic({
-      operation: operation.value,
-      code: code.value,
-      metadata: metadata.value,
-    }),
-  );
-}
-
-function parseFatalInitializationFailureEvent(
-  source: object,
-): Result<
-  PlaybackWorkerFatalInitializationFailure,
-  PlaybackWorkerEventParseFailure
-> {
-  const exact = parseExactObject(source, ["kind", "code"], eventParseFailure);
-  if (exact.kind === "failure") {
-    return exact;
-  }
-
-  const code = readRequiredString(exact.value, "code", eventParseFailure);
-  if (code.kind === "failure") {
-    return code;
-  }
-
-  switch (code.value) {
-    case "browser-capability-unavailable":
-    case "invalid-public-configuration":
-    case "worker-initialization-failed":
-      return succeeded(
-        createPlaybackWorkerFatalInitializationFailure(code.value),
-      );
-    default:
-      return failed(eventParseFailure("invalid-value"));
-  }
-}
-
-function parseDiagnosticOperation(
-  value: string,
-): Result<PlaybackWorkerDiagnosticOperation, PlaybackWorkerEventParseFailure> {
-  switch (value) {
-    case "authorization":
-    case "command":
-    case "initialization":
-    case "playback-poll":
-    case "scheduler":
-    case "storage":
-    case "token-refresh":
-      return succeeded(value);
-    default:
-      return failed(eventParseFailure("invalid-value"));
-  }
-}
-
-function parseDiagnosticCode(
-  value: string,
-): Result<PlaybackWorkerDiagnosticCode, PlaybackWorkerEventParseFailure> {
-  switch (value) {
-    case "authorization-denied":
-    case "authorization-provider-failure":
-    case "authorization-required":
-    case "authorization-transient-failure":
-    case "command-not-allowed":
-    case "invalid-callback-url":
-    case "invalid-command":
-    case "invalid-display-return-configuration":
-    case "invalid-public-configuration":
-    case "invalid-retry-after":
-    case "invalid-runtime-transition":
-    case "playback-network-failure":
-    case "playback-payload-invalid":
-    case "playback-permission-denied":
-    case "playback-rate-limited":
-    case "playback-server-failure":
-    case "playback-unauthorized":
-    case "runtime-operation-failed":
-    case "scheduler-failure":
-    case "storage-failure":
-    case "unexpected-playback-status":
-    case "unsupported-playback-result":
-      return succeeded(value);
-    default:
-      return failed(eventParseFailure("invalid-value"));
-  }
-}
-
-function parseDiagnosticMetadata(
-  input: unknown,
-): Result<PlaybackWorkerDiagnosticMetadata, PlaybackWorkerEventParseFailure> {
-  const source = parseObject(input, eventParseFailure);
-  if (source.kind === "failure") {
-    return source;
-  }
-
-  const kind = readRequiredString(source.value, "kind", eventParseFailure);
-  if (kind.kind === "failure") {
-    return kind;
-  }
-
-  switch (kind.value) {
-    case "none": {
-      const exact = parseExactObject(source.value, ["kind"], eventParseFailure);
-      if (exact.kind === "failure") {
-        return exact;
-      }
-
-      return succeeded(noPlaybackWorkerDiagnosticMetadata());
-    }
-    case "http-status": {
-      const exact = parseExactObject(
-        source.value,
-        ["kind", "status"],
-        eventParseFailure,
-      );
-      if (exact.kind === "failure") {
-        return exact;
-      }
-
-      const status = readRequiredSafeHttpStatus(
-        exact.value,
-        "status",
-        eventParseFailure,
-      );
-      if (status.kind === "failure") {
-        return status;
-      }
-
-      const metadata: PlaybackWorkerDiagnosticMetadata = {
-        kind: "http-status",
-        status: status.value,
-      };
-      return succeeded(Object.freeze(metadata));
-    }
-    case "retry-after": {
-      const exact = parseExactObject(
-        source.value,
-        ["kind", "retryAfterMilliseconds"],
-        eventParseFailure,
-      );
-      if (exact.kind === "failure") {
-        return exact;
-      }
-
-      const retryAfterMilliseconds = readRequiredRetryAfterMilliseconds(
-        exact.value,
-        "retryAfterMilliseconds",
-        eventParseFailure,
-      );
-      if (retryAfterMilliseconds.kind === "failure") {
-        return retryAfterMilliseconds;
-      }
-
-      const metadata: PlaybackWorkerDiagnosticMetadata = {
-        kind: "retry-after",
-        retryAfterMilliseconds: retryAfterMilliseconds.value,
-      };
-      return succeeded(Object.freeze(metadata));
-    }
-    case "http-status-and-retry-after": {
-      const exact = parseExactObject(
-        source.value,
-        ["kind", "status", "retryAfterMilliseconds"],
-        eventParseFailure,
-      );
-      if (exact.kind === "failure") {
-        return exact;
-      }
-
-      const status = readRequiredSafeHttpStatus(
-        exact.value,
-        "status",
-        eventParseFailure,
-      );
-      if (status.kind === "failure") {
-        return status;
-      }
-
-      const retryAfterMilliseconds = readRequiredRetryAfterMilliseconds(
-        exact.value,
-        "retryAfterMilliseconds",
-        eventParseFailure,
-      );
-      if (retryAfterMilliseconds.kind === "failure") {
-        return retryAfterMilliseconds;
-      }
-
-      const metadata: PlaybackWorkerDiagnosticMetadata = {
-        kind: "http-status-and-retry-after",
-        status: status.value,
-        retryAfterMilliseconds: retryAfterMilliseconds.value,
-      };
-      return succeeded(Object.freeze(metadata));
-    }
-    default:
-      return failed(eventParseFailure("invalid-value"));
-  }
-}
-
 function parseObject<Failure>(
   input: unknown,
   createFailure: (code: WorkerProtocolParseCode) => Failure,
@@ -838,50 +474,6 @@ function readRequiredNonEmptyString<Failure>(
   return value;
 }
 
-function readRequiredSafeHttpStatus<Failure>(
-  source: object,
-  fieldName: string,
-  createFailure: (code: WorkerProtocolParseCode) => Failure,
-): Result<number, Failure> {
-  const value = readRequiredDataProperty(source, fieldName, createFailure);
-  if (value.kind === "failure") {
-    return value;
-  }
-
-  if (
-    typeof value.value !== "number" ||
-    !Number.isSafeInteger(value.value) ||
-    value.value < 100 ||
-    value.value > 599
-  ) {
-    return failed(createFailure("invalid-value"));
-  }
-
-  return succeeded(value.value);
-}
-
-function readRequiredRetryAfterMilliseconds<Failure>(
-  source: object,
-  fieldName: string,
-  createFailure: (code: WorkerProtocolParseCode) => Failure,
-): Result<number, Failure> {
-  const value = readRequiredDataProperty(source, fieldName, createFailure);
-  if (value.kind === "failure") {
-    return value;
-  }
-
-  if (
-    typeof value.value !== "number" ||
-    !Number.isSafeInteger(value.value) ||
-    value.value < 0 ||
-    value.value > maximumPlatformTimerDelayMilliseconds
-  ) {
-    return failed(createFailure("expected-non-negative-safe-integer"));
-  }
-
-  return succeeded(value.value);
-}
-
 function sanitizeDiagnosticMetadata(
   metadata: PlaybackWorkerDiagnosticMetadata,
 ): PlaybackWorkerDiagnosticMetadata {
@@ -941,17 +533,6 @@ function commandParseFailure(
 ): PlaybackWorkerCommandParseFailure {
   const failure: PlaybackWorkerCommandParseFailure = {
     kind: "invalid-playback-worker-command",
-    code,
-  };
-
-  return Object.freeze(failure);
-}
-
-function eventParseFailure(
-  code: WorkerProtocolParseCode,
-): PlaybackWorkerEventParseFailure {
-  const failure: PlaybackWorkerEventParseFailure = {
-    kind: "invalid-playback-worker-event",
     code,
   };
 

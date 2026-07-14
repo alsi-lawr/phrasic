@@ -1,12 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Result } from "../../../domain/playback.ts";
-import {
-  createPlaybackWorkerFatalInitializationFailure,
-  createPlaybackWorkerSafeDiagnostic,
-  parsePlaybackWorkerCommand,
-  parsePlaybackWorkerEvent,
-} from "../../../browser/worker/protocol.ts";
+import { parsePlaybackWorkerCommand } from "../../../browser/worker/protocol.ts";
 
 test("worker commands are manually validated as exact protocol messages", () => {
   const commands: ReadonlyArray<unknown> = [
@@ -66,95 +61,6 @@ test("unknown, extra, and malformed worker commands are rejected without inspect
       assert.equal(parsed.error.kind, "invalid-playback-worker-command");
     }
   }
-});
-
-test("worker events carry only validated provider-neutral state, redirects, and diagnostics", () => {
-  const playback = expectSuccess(
-    parsePlaybackWorkerEvent({
-      kind: "playback-state",
-      state: { kind: "empty" },
-    }),
-  );
-  const diagnostic = expectSuccess(
-    parsePlaybackWorkerEvent({
-      kind: "safe-diagnostic",
-      operation: "playback-poll",
-      code: "playback-rate-limited",
-      metadata: {
-        kind: "http-status-and-retry-after",
-        status: 429,
-        retryAfterMilliseconds: 7_000,
-      },
-    }),
-  );
-  const callbackRestoration = expectSuccess(
-    parsePlaybackWorkerEvent({
-      kind: "callback-url-restored",
-      url: "https://nowplaying.example/spotify/?width=1280&setup=1",
-    }),
-  );
-  const leaked = parsePlaybackWorkerEvent({
-    kind: "playback-state",
-    state: { kind: "empty" },
-    accessToken: "token-value",
-  });
-  const capabilityFailure = expectSuccess(
-    parsePlaybackWorkerEvent(
-      createPlaybackWorkerFatalInitializationFailure(
-        "browser-capability-unavailable",
-      ),
-    ),
-  );
-  const leakedDiagnostic = parsePlaybackWorkerEvent({
-    kind: "safe-diagnostic",
-    operation: "playback-poll",
-    code: "playback-payload-invalid",
-    metadata: { kind: "none" },
-    payload: { access_token: "token-value" },
-  });
-  const callbackCredentialDiagnostic = parsePlaybackWorkerEvent({
-    kind: "safe-diagnostic",
-    operation: "authorization",
-    code: "authorization-denied",
-    metadata: { kind: "none" },
-    callbackUrl:
-      "https://nowplaying.example/spotify/?code=callback-code-sentinel&state=callback-state-sentinel",
-  });
-  const createdDiagnostic = createPlaybackWorkerSafeDiagnostic({
-    operation: "authorization",
-    code: "authorization-denied",
-    metadata: { kind: "none" },
-  });
-
-  assert.deepEqual(playback, {
-    kind: "playback-state",
-    state: { kind: "empty" },
-  });
-  assert.deepEqual(diagnostic, {
-    kind: "safe-diagnostic",
-    operation: "playback-poll",
-    code: "playback-rate-limited",
-    metadata: {
-      kind: "http-status-and-retry-after",
-      status: 429,
-      retryAfterMilliseconds: 7_000,
-    },
-  });
-  assert.deepEqual(callbackRestoration, {
-    kind: "callback-url-restored",
-    url: "https://nowplaying.example/spotify/?width=1280&setup=1",
-  });
-  assert.equal(leaked.kind, "failure");
-  assert.deepEqual(capabilityFailure, {
-    kind: "fatal-initialization-failure",
-    code: "browser-capability-unavailable",
-  });
-  assert.equal(leakedDiagnostic.kind, "failure");
-  assert.equal(callbackCredentialDiagnostic.kind, "failure");
-  assert.doesNotMatch(
-    JSON.stringify(createdDiagnostic),
-    /callback-(?:code|state)-sentinel/,
-  );
 });
 
 function expectSuccess<Value, Failure>(result: Result<Value, Failure>): Value {

@@ -1,15 +1,9 @@
 import {
-  deserializePlaybackWireState,
-  type PlaybackWireState,
-} from "./worker/playback-wire.ts";
-import {
-  parsePlaybackWorkerEvent,
   type PlaybackWorkerCommand,
+  type PlaybackWorkerEvent,
 } from "./worker/protocol.ts";
 import {
   initialPlaybackState,
-  providerFailure,
-  transitionPlaybackState,
   type PlaybackState,
 } from "../domain/playback.ts";
 import type { BrowserConfigurationResponse } from "./configuration-response.ts";
@@ -25,7 +19,9 @@ const displayQueryParameterNames: ReadonlyArray<string> = Object.freeze([
 
 export type BrowserPlaybackWorker = {
   readonly onError: (listener: () => void) => () => void;
-  readonly onMessage: (listener: (message: unknown) => void) => () => void;
+  readonly onMessage: (
+    listener: (message: PlaybackWorkerEvent) => void,
+  ) => () => void;
   readonly postMessage: (command: PlaybackWorkerCommand) => void;
   readonly terminate: () => void;
 };
@@ -256,26 +252,21 @@ export function createBrowserPlaybackApplication(
     forwardVisibilityChange();
   }
 
-  function receiveWorkerMessage(message: unknown): void {
-    const event = parsePlaybackWorkerEvent(message);
-    if (event.kind === "failure") {
-      return;
-    }
-
-    switch (event.value.kind) {
+  function receiveWorkerMessage(message: PlaybackWorkerEvent): void {
+    switch (message.kind) {
       case "playback-state":
-        commitPlaybackWireState(event.value.state);
+        replaceSnapshot(playbackSnapshot(message.state));
         return;
       case "authorization-redirect":
-        navigateToAuthorization(event.value.url);
+        navigateToAuthorization(message.url);
         return;
       case "callback-url-restored":
-        restoreCallbackUrl(event.value.url);
+        restoreCallbackUrl(message.url);
         return;
       case "fatal-initialization-failure":
         replaceSnapshot(
           fatalSnapshot(
-            event.value.code === "invalid-public-configuration"
+            message.code === "invalid-public-configuration"
               ? "configuration-unavailable"
               : "browser-capability-unavailable",
           ),
@@ -284,16 +275,6 @@ export function createBrowserPlaybackApplication(
       case "safe-diagnostic":
         return;
     }
-  }
-
-  function commitPlaybackWireState(state: PlaybackWireState): void {
-    const deserialized = deserializePlaybackWireState(state);
-    if (deserialized.kind === "failure") {
-      replaceSnapshot(playbackSnapshot(malformedWorkerPlaybackState()));
-      return;
-    }
-
-    replaceSnapshot(playbackSnapshot(deserialized.value));
   }
 
   function navigateToAuthorization(input: string): void {
@@ -487,20 +468,6 @@ function frozenWidthDisplayQuery(width: number): DisplayQuery {
 
 function frozenWidthAndSetupDisplayQuery(width: number): DisplayQuery {
   return Object.freeze({ kind: "width-and-setup", width });
-}
-
-function malformedWorkerPlaybackState(): PlaybackState {
-  const failed = transitionPlaybackState(initialPlaybackState(), {
-    kind: "failure",
-    failure: providerFailure("malformed-response"),
-  });
-  if (failed.kind === "success") {
-    return failed.value;
-  }
-
-  throw new Error(
-    "The initial playback state must accept a failure transition.",
-  );
 }
 
 function playbackSnapshot(

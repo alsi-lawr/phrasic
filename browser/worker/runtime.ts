@@ -16,7 +16,6 @@ import {
   type PlaybackEvent,
   type PlaybackState,
 } from "../../domain/playback.ts";
-import { serializePlaybackState } from "./playback-wire.ts";
 import {
   type PlaybackProviderPort,
   type PlaybackProviderResult,
@@ -1084,7 +1083,7 @@ export function createPlaybackWorkerRuntime(
   function emitPlaybackState(): void {
     const event: PlaybackWorkerEvent = {
       kind: "playback-state",
-      state: serializePlaybackState(playbackState),
+      state: playbackState,
     };
     ports.events.emit(Object.freeze(event));
   }

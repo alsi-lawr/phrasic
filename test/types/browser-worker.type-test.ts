@@ -1,11 +1,11 @@
-import type { PlaybackWireState } from "../../browser/worker/playback-wire.ts";
+import type { PlaybackState } from "../../domain/playback.ts";
 import type {
   PlaybackWorkerCommand,
   PlaybackWorkerEvent,
   PlaybackWorkerSafeDiagnostic,
 } from "../../browser/worker/protocol.ts";
 
-const wireState: PlaybackWireState = { kind: "empty" };
+declare const playbackState: PlaybackState;
 
 const initialize: PlaybackWorkerCommand = {
   kind: "initialize",
@@ -20,7 +20,7 @@ const initialize: PlaybackWorkerCommand = {
 
 const playbackEvent: PlaybackWorkerEvent = {
   kind: "playback-state",
-  state: wireState,
+  state: playbackState,
 };
 
 const callbackRestoration: PlaybackWorkerEvent = {
@@ -47,8 +47,8 @@ const tokenBearingCommand: PlaybackWorkerCommand = {
 
 const tokenBearingEvent: PlaybackWorkerEvent = {
   kind: "playback-state",
-  state: wireState,
-  // @ts-expect-error Worker playback events expose only provider-neutral wire state.
+  state: playbackState,
+  // @ts-expect-error Worker playback events cannot expose bearer tokens.
   accessToken: "token-value",
 };
 

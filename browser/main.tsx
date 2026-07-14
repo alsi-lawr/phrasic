@@ -4,6 +4,7 @@ import {
   type BrowserPlaybackApplicationPorts,
   type BrowserPlaybackWorker,
 } from "./application.ts";
+import type { PlaybackWorkerEvent } from "./worker/protocol.ts";
 import { fetchBrowserConfiguration } from "./configuration-fetch.ts";
 import NowPlayingOverlay from "../components/overlay/NowPlayingOverlay.tsx";
 import { spotifyOverlayPresentation } from "./providers/spotify-presentation.ts";
@@ -86,8 +87,8 @@ function createPlaybackWorker(): BrowserPlaybackWorker {
         worker.removeEventListener("error", onError);
       };
     },
-    onMessage(listener: (message: unknown) => void): () => void {
-      const onMessage = (event: MessageEvent<unknown>): void => {
+    onMessage(listener: (message: PlaybackWorkerEvent) => void): () => void {
+      const onMessage = (event: MessageEvent<PlaybackWorkerEvent>): void => {
         listener(event.data);
       };
       worker.addEventListener("message", onMessage);
