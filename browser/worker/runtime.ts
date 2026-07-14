@@ -108,15 +108,14 @@ type AccessTokenState =
       readonly refreshAtEpochMilliseconds: number;
     };
 
-type ScheduledWork =
-  | {
-      readonly kind: "none";
-    }
-  | {
-      readonly kind: "scheduled";
-      readonly task: PlaybackWorkerScheduledTask;
-      readonly ticket: number;
-    };
+type ScheduledTaskSlot = {
+  readonly cancel: () => void;
+  readonly isScheduled: () => boolean;
+  readonly schedule: (
+    delayMilliseconds: number,
+    run: () => Promise<void>,
+  ) => boolean;
+};
 
 type ActiveOperation =
   | {
@@ -169,13 +168,17 @@ export function createPlaybackWorkerRuntime(
   let refreshFlight: RefreshFlight = frozenIdleRefreshFlight();
   let queuedWork: Promise<void> = Promise.resolve();
   let retryPosition = 0;
-  let pollSchedule: ScheduledWork = frozenNoScheduledWork();
-  let refreshSchedule: ScheduledWork = frozenNoScheduledWork();
-  let retrySchedule: ScheduledWork = frozenNoScheduledWork();
-  let pollTicket = 0;
-  let refreshTicket = 0;
-  let retryTicket = 0;
   let operationEpoch = 0;
+
+  const schedulerFailure = (): void => {
+    emitDiagnostic("scheduler", "scheduler-failure");
+  };
+  const pollSlot = createScheduledTaskSlot(ports.scheduler, schedulerFailure);
+  const refreshSlot = createScheduledTaskSlot(
+    ports.scheduler,
+    schedulerFailure,
+  );
+  const retrySlot = createScheduledTaskSlot(ports.scheduler, schedulerFailure);
 
   const runtime: PlaybackWorkerRuntime = {
     receive(message: PlaybackWorkerCommand): Promise<void> {
@@ -581,7 +584,7 @@ export function createPlaybackWorkerRuntime(
         return;
       }
 
-      if (refreshSchedule.kind === "none") {
+      if (!refreshSlot.isScheduled()) {
         scheduleRefreshForAccessToken();
       }
 
@@ -634,7 +637,7 @@ export function createPlaybackWorkerRuntime(
           return;
         }
 
-        if (pollSchedule.kind === "none") {
+        if (!pollSlot.isScheduled()) {
           schedulePoll(0);
         }
         return;
@@ -885,8 +888,8 @@ export function createPlaybackWorkerRuntime(
     }
   }
 
-  async function runScheduledRefresh(ticket: number): Promise<void> {
-    if (!canPerformNetworkWork() || refreshTicket !== ticket) {
+  async function runScheduledRefresh(): Promise<void> {
+    if (!canPerformNetworkWork()) {
       return;
     }
 
@@ -919,8 +922,8 @@ export function createPlaybackWorkerRuntime(
     }
   }
 
-  async function runScheduledRetry(ticket: number): Promise<void> {
-    if (!canPerformNetworkWork() || retryTicket !== ticket) {
+  async function runScheduledRetry(): Promise<void> {
+    if (!canPerformNetworkWork()) {
       return;
     }
 
@@ -1077,22 +1080,13 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    clearPollSchedule();
-    pollTicket += 1;
-    const ticket = pollTicket;
-    const scheduled = scheduleWork(delayMilliseconds, (): Promise<void> => {
-      if (!canPerformNetworkWork() || pollTicket !== ticket) {
+    pollSlot.schedule(delayMilliseconds, (): Promise<void> => {
+      if (!canPerformNetworkWork()) {
         return Promise.resolve();
       }
 
-      pollSchedule = frozenNoScheduledWork();
       return enqueue(recoverConnection);
     });
-    if (scheduled.kind === "failure") {
-      return;
-    }
-
-    pollSchedule = frozenScheduledWork(ticket, scheduled.value);
   }
 
   function scheduleRefreshForAccessToken(): void {
@@ -1114,22 +1108,13 @@ export function createPlaybackWorkerRuntime(
       remainingDelay,
       maximumScheduledDelayMilliseconds,
     );
-    clearRefreshSchedule();
-    refreshTicket += 1;
-    const ticket = refreshTicket;
-    const scheduled = scheduleWork(delayMilliseconds, (): Promise<void> => {
-      if (!canPerformNetworkWork() || refreshTicket !== ticket) {
+    refreshSlot.schedule(delayMilliseconds, (): Promise<void> => {
+      if (!canPerformNetworkWork()) {
         return Promise.resolve();
       }
 
-      refreshSchedule = frozenNoScheduledWork();
-      return enqueue(() => runScheduledRefresh(ticket));
+      return enqueue(runScheduledRefresh);
     });
-    if (scheduled.kind === "failure") {
-      return;
-    }
-
-    refreshSchedule = frozenScheduledWork(ticket, scheduled.value);
   }
 
   function scheduleRetry(delayMilliseconds: number): void {
@@ -1137,44 +1122,15 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    clearPollSchedule();
-    clearRefreshSchedule();
-    clearRetrySchedule();
-    retryTicket += 1;
-    const ticket = retryTicket;
-    const scheduled = scheduleWork(delayMilliseconds, (): Promise<void> => {
-      if (!canPerformNetworkWork() || retryTicket !== ticket) {
+    pollSlot.cancel();
+    refreshSlot.cancel();
+    retrySlot.schedule(delayMilliseconds, (): Promise<void> => {
+      if (!canPerformNetworkWork()) {
         return Promise.resolve();
       }
 
-      retrySchedule = frozenNoScheduledWork();
-      return enqueue(() => runScheduledRetry(ticket));
+      return enqueue(runScheduledRetry);
     });
-    if (scheduled.kind === "failure") {
-      return;
-    }
-
-    retrySchedule = frozenScheduledWork(ticket, scheduled.value);
-  }
-
-  function scheduleWork(
-    delayMilliseconds: number,
-    run: () => Promise<void>,
-  ):
-    | {
-        readonly kind: "success";
-        readonly value: PlaybackWorkerScheduledTask;
-      }
-    | {
-        readonly kind: "failure";
-      } {
-    try {
-      const task = ports.scheduler.schedule({ delayMilliseconds, run });
-      return Object.freeze({ kind: "success", value: task });
-    } catch {
-      emitDiagnostic("scheduler", "scheduler-failure");
-      return Object.freeze({ kind: "failure" });
-    }
   }
 
   function cancelRuntimeWork(): void {
@@ -1187,39 +1143,9 @@ export function createPlaybackWorkerRuntime(
   }
 
   function cancelAllSchedules(): void {
-    clearPollSchedule();
-    clearRefreshSchedule();
-    clearRetrySchedule();
-  }
-
-  function clearPollSchedule(): void {
-    pollTicket += 1;
-    cancelScheduledWork(pollSchedule);
-    pollSchedule = frozenNoScheduledWork();
-  }
-
-  function clearRefreshSchedule(): void {
-    refreshTicket += 1;
-    cancelScheduledWork(refreshSchedule);
-    refreshSchedule = frozenNoScheduledWork();
-  }
-
-  function clearRetrySchedule(): void {
-    retryTicket += 1;
-    cancelScheduledWork(retrySchedule);
-    retrySchedule = frozenNoScheduledWork();
-  }
-
-  function cancelScheduledWork(work: ScheduledWork): void {
-    if (work.kind === "none") {
-      return;
-    }
-
-    try {
-      work.task.cancel();
-    } catch {
-      emitDiagnostic("scheduler", "scheduler-failure");
-    }
+    pollSlot.cancel();
+    refreshSlot.cancel();
+    retrySlot.cancel();
   }
 
   function startOperation(): RuntimeOperation {
@@ -1435,15 +1361,65 @@ function frozenAvailableAccessToken(input: {
   return Object.freeze({ kind: "available", ...input });
 }
 
-function frozenNoScheduledWork(): ScheduledWork {
-  return Object.freeze({ kind: "none" });
-}
+function createScheduledTaskSlot(
+  scheduler: PlaybackWorkerSchedulerPort,
+  onFailure: () => void,
+): ScheduledTaskSlot {
+  let task: PlaybackWorkerScheduledTask | undefined;
+  let generation = 0;
 
-function frozenScheduledWork(
-  ticket: number,
-  task: PlaybackWorkerScheduledTask,
-): ScheduledWork {
-  return Object.freeze({ kind: "scheduled", ticket, task });
+  const cancel = (): void => {
+    generation += 1;
+    const scheduledTask = task;
+    task = undefined;
+    if (scheduledTask === undefined) {
+      return;
+    }
+
+    try {
+      scheduledTask.cancel();
+    } catch {
+      onFailure();
+    }
+  };
+
+  const isScheduled = (): boolean => task !== undefined;
+
+  const schedule = (
+    delayMilliseconds: number,
+    run: () => Promise<void>,
+  ): boolean => {
+    cancel();
+    const scheduledGeneration = generation;
+    let invokedBeforeScheduleReturned = false;
+
+    try {
+      const scheduledTask = scheduler.schedule({
+        delayMilliseconds,
+        run(): Promise<void> {
+          if (generation !== scheduledGeneration) {
+            return Promise.resolve();
+          }
+
+          invokedBeforeScheduleReturned = true;
+          task = undefined;
+          return run();
+        },
+      });
+      if (
+        generation === scheduledGeneration &&
+        !invokedBeforeScheduleReturned
+      ) {
+        task = scheduledTask;
+      }
+      return true;
+    } catch {
+      onFailure();
+      return false;
+    }
+  };
+
+  return Object.freeze({ cancel, isScheduled, schedule });
 }
 
 function frozenNoActiveOperation(): ActiveOperation {

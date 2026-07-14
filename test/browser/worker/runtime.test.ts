@@ -816,6 +816,34 @@ test("visibility suspension cancels scheduled work and resumes with one delibera
   assert.deepEqual(fixture.scheduler.activeDelays(), [5_000, 3_540_000]);
 });
 
+test("a synchronous scheduler callback does not leave a phantom scheduled task", async () => {
+  const storage = new MemorySpotifyAuthStorage();
+  await storage.seedRefreshToken("stored-refresh");
+  const clock = new FakeClock(1_000_000);
+  const scheduler = new SynchronousFirstScheduler();
+  const events: PlaybackWorkerEvent[] = [];
+  const runtime = createRuntime({
+    storage,
+    scheduler,
+    clock,
+    events,
+    authFetch: new QueuedSpotifyAuthFetch([tokenResponse("initial-access")]),
+    spotify: new QueuedSpotifyTransport([playbackResult(playingTrackPayload)]),
+  });
+
+  await runtime.receive(initializeCommand());
+  await scheduler.waitForSynchronousCallback();
+  await runtime.receive({ kind: "visibility-change", visibility: "hidden" });
+
+  assert.equal(
+    events.some(
+      (event) =>
+        event.kind === "safe-diagnostic" && event.code === "scheduler-failure",
+    ),
+    false,
+  );
+});
+
 type RuntimeFixture = {
   readonly authFetch: QueuedSpotifyAuthFetch;
   readonly clock: FakeClock;
@@ -843,7 +871,7 @@ type RuntimeDependencies = {
   readonly authFetch: SpotifyAuthFetchPort;
   readonly clock: FakeClock;
   readonly events: PlaybackWorkerEvent[];
-  readonly scheduler: FakeScheduler;
+  readonly scheduler: PlaybackWorkerSchedulerPort;
   readonly spotify: PlaybackProviderPort;
   readonly storage: MemorySpotifyAuthStorage;
 };
@@ -1459,6 +1487,40 @@ class FakeScheduler implements PlaybackWorkerSchedulerPort {
       cancel(): void {
         entry.cancelled = true;
       },
+    });
+  }
+}
+
+class SynchronousFirstScheduler implements PlaybackWorkerSchedulerPort {
+  private hasScheduled = false;
+  private synchronousCallback: Promise<void> | undefined;
+
+  async waitForSynchronousCallback(): Promise<void> {
+    if (this.synchronousCallback === undefined) {
+      throw new Error("Expected a synchronous callback.");
+    }
+
+    await this.synchronousCallback;
+  }
+
+  schedule(options: {
+    readonly delayMilliseconds: number;
+    readonly run: () => Promise<void>;
+  }): { readonly cancel: () => void } {
+    if (!this.hasScheduled) {
+      this.hasScheduled = true;
+      this.synchronousCallback = options.run();
+      return Object.freeze({
+        cancel(): void {
+          throw new Error(
+            "A synchronously completed task must not be cancelled.",
+          );
+        },
+      });
+    }
+
+    return Object.freeze({
+      cancel(): void {},
     });
   }
 }
