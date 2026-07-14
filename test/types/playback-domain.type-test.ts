@@ -1,9 +1,9 @@
 import {
   availableOriginalArtwork,
-  Collection,
-  Creator,
-  ProviderLink,
-  TrackItem,
+  createEpisodeItem,
+  createPlaybackSnapshot,
+  createProviderLink,
+  createTrackItem,
   parseDisplayText,
   parseOriginalArtworkUrl,
   parsePlaybackDurationMilliseconds,
@@ -12,10 +12,14 @@ import {
   parseProviderId,
   parseProviderItemId,
   type ProviderCollectionId,
+  type Collection,
+  type Creator,
+  type NowPlayingItem,
   type ProviderId,
   type ProviderItemId,
   type PlaybackPositionMilliseconds,
   type Result,
+  type Show,
 } from "../../domain/playback.ts";
 
 const providerId = expectSuccess(parseProviderId("spotify"));
@@ -28,22 +32,22 @@ const artwork = availableOriginalArtwork(
   expectSuccess(parseOriginalArtworkUrl("https://spotify.example/artwork.jpg")),
 );
 const link = expectSuccess(
-  ProviderLink.create({
+  createProviderLink({
     providerId,
     href: "https://spotify.example/items/track-1",
   }),
 );
-const creator = Creator.create({
+const creator: Creator = {
   name: text,
   links: [link],
-});
-const collection = Collection.create({
+};
+const collection: Collection = {
   id: collectionId,
   title: text,
   links: [link],
-});
+};
 const track = expectSuccess(
-  TrackItem.create({
+  createTrackItem({
     providerId,
     itemId,
     title: text,
@@ -52,6 +56,25 @@ const track = expectSuccess(
     artwork,
     links: [link],
   }),
+);
+const show: Show = {
+  id: collectionId,
+  title: text,
+  publisher: text,
+  links: [link],
+};
+const episode = expectSuccess(
+  createEpisodeItem({
+    providerId,
+    itemId,
+    title: text,
+    show,
+    artwork,
+    links: [link],
+  }),
+);
+const snapshot = expectSuccess(
+  createPlaybackSnapshot({ item: track, position, duration }),
 );
 // @ts-expect-error Plain strings are not validated provider IDs.
 const plainStringProviderId: ProviderId = "spotify";
@@ -79,6 +102,25 @@ providerId[0] = "x";
 track.title = text;
 // @ts-expect-error Track artist collections are readonly after construction.
 track.artists.push(creator);
+// @ts-expect-error Provider link fields are readonly after construction.
+link.href = "https://spotify.example/items/track-2";
+// @ts-expect-error Creator fields are readonly after construction.
+creator.name = text;
+// @ts-expect-error Collection fields are readonly after construction.
+collection.title = text;
+// @ts-expect-error Episode fields are readonly after construction.
+episode.show = show;
+// @ts-expect-error Playback snapshot fields are readonly after construction.
+snapshot.position = position;
+
+function itemTitle(item: NowPlayingItem): string {
+  switch (item.kind) {
+    case "track":
+      return item.collection.title;
+    case "episode":
+      return item.show.title;
+  }
+}
 
 void plainStringProviderId;
 void plainStringProviderItemId;
@@ -90,6 +132,7 @@ void collectionAsItemId;
 void itemAsCollectionId;
 void collectionAsProviderId;
 void durationAsPosition;
+void itemTitle;
 void position;
 
 function expectSuccess<Value, Failure>(result: Result<Value, Failure>): Value {

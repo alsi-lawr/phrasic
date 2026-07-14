@@ -11,13 +11,10 @@ import type {
   PlaybackProviderResult,
 } from "../providers/provider.ts";
 import {
-  Collection,
-  Creator,
-  EpisodeItem,
-  PlaybackSnapshot,
-  ProviderLink,
-  Show,
-  TrackItem,
+  createEpisodeItem,
+  createPlaybackSnapshot,
+  createProviderLink,
+  createTrackItem,
   availableOriginalArtwork,
   parseDisplayText,
   parseOriginalArtworkUrl,
@@ -28,9 +25,13 @@ import {
   parseProviderItemId,
   unavailableOriginalArtwork,
   type NowPlayingItem,
+  type Collection,
+  type Creator,
   type OriginalArtwork,
   type PlaybackState,
+  type PlaybackSnapshot,
   type ProviderId,
+  type Show,
 } from "../../domain/playback.ts";
 import type {
   FakeControlCommand,
@@ -346,16 +347,16 @@ function trackFromCommand(
     return Object.freeze({ kind: "failure" });
   }
 
-  const track = TrackItem.create({
+  const track = createTrackItem({
     providerId,
     itemId: itemId.value,
     title: title.value,
     artists: creators.value,
-    collection: Collection.create({
+    collection: {
       id: collectionId.value,
       title: collectionTitle.value,
       links: [collectionLink.value],
-    }),
+    } satisfies Collection,
     artwork: artwork.value,
     links: [itemLink.value],
   });
@@ -391,16 +392,16 @@ function episodeFromCommand(
     return Object.freeze({ kind: "failure" });
   }
 
-  const episode = EpisodeItem.create({
+  const episode = createEpisodeItem({
     providerId,
     itemId: itemId.value,
     title: title.value,
-    show: Show.create({
+    show: {
       id: showId.value,
       title: showTitle.value,
       publisher: publisher.value,
       links: [showLink.value],
-    }),
+    } satisfies Show,
     artwork: artwork.value,
     links: [itemLink.value],
   });
@@ -423,14 +424,14 @@ function fakeCreators(
       return Object.freeze({ kind: "failure" });
     }
 
-    creators.push(Creator.create({ name: name.value, links: [link.value] }));
+    creators.push({ name: name.value, links: [link.value] } satisfies Creator);
   }
 
   return Object.freeze({ kind: "success", value: Object.freeze(creators) });
 }
 
 function providerLink(providerId: ProviderId, href: string) {
-  return ProviderLink.create({ providerId, href });
+  return createProviderLink({ providerId, href });
 }
 
 function originalArtwork(
@@ -461,7 +462,7 @@ function fakeSnapshot(item: NowPlayingItem) {
     return Object.freeze({ kind: "failure" });
   }
 
-  return PlaybackSnapshot.create({
+  return createPlaybackSnapshot({
     item,
     position: position.value,
     duration: duration.value,

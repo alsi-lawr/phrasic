@@ -1,15 +1,12 @@
 import {
   authorizationFailure,
   availableOriginalArtwork,
-  Collection,
-  Creator,
-  EpisodeItem,
+  createEpisodeItem,
+  createPlaybackSnapshot,
+  createProviderLink,
+  createTrackItem,
   initialPlaybackState,
-  PlaybackSnapshot,
   providerFailure,
-  ProviderLink,
-  Show,
-  TrackItem,
   transitionPlaybackState,
   unavailableOriginalArtwork,
   parseDisplayText,
@@ -21,13 +18,18 @@ import {
   parseProviderItemId,
   type AuthorizationRequiredReason,
   type ArtworkUnavailableReason,
+  type Collection,
+  type Creator,
   type LastPlaybackItem,
   type NowPlayingItem,
   type OriginalArtwork,
   type PlaybackEvent,
   type PlaybackFailure,
+  type PlaybackSnapshot,
   type PlaybackState,
   type Result,
+  type ProviderLink,
+  type Show,
   type UnsupportedPlaybackReason,
 } from "../../domain/playback.ts";
 
@@ -488,7 +490,7 @@ function deserializePlaybackWireSnapshot(
   }
 
   return deserializeDomainResult(
-    PlaybackSnapshot.create({
+    createPlaybackSnapshot({
       item: item.value,
       position: position.value,
       duration: duration.value,
@@ -514,7 +516,7 @@ function zeroPlaybackSnapshot(
   }
 
   return deserializeDomainResult(
-    PlaybackSnapshot.create({
+    createPlaybackSnapshot({
       item,
       position: position.value,
       duration: duration.value,
@@ -574,7 +576,7 @@ function deserializePlaybackWireTrackItem(
   }
 
   return deserializeDomainResult(
-    TrackItem.create({
+    createTrackItem({
       providerId: providerId.value,
       itemId: itemId.value,
       title: title.value,
@@ -620,7 +622,7 @@ function deserializePlaybackWireEpisodeItem(
   }
 
   return deserializeDomainResult(
-    EpisodeItem.create({
+    createEpisodeItem({
       providerId: providerId.value,
       itemId: itemId.value,
       title: title.value,
@@ -660,12 +662,10 @@ function deserializePlaybackWireCreator(
     return links;
   }
 
-  return succeeded(
-    Creator.create({
-      name: name.value,
-      links: links.value,
-    }),
-  );
+  return succeeded({
+    name: name.value,
+    links: links.value,
+  } satisfies Creator);
 }
 
 function deserializePlaybackWireCollection(
@@ -686,13 +686,11 @@ function deserializePlaybackWireCollection(
     return links;
   }
 
-  return succeeded(
-    Collection.create({
-      id: id.value,
-      title: title.value,
-      links: links.value,
-    }),
-  );
+  return succeeded({
+    id: id.value,
+    title: title.value,
+    links: links.value,
+  } satisfies Collection);
 }
 
 function deserializePlaybackWireShow(
@@ -718,14 +716,12 @@ function deserializePlaybackWireShow(
     return links;
   }
 
-  return succeeded(
-    Show.create({
-      id: id.value,
-      title: title.value,
-      publisher: publisher.value,
-      links: links.value,
-    }),
-  );
+  return succeeded({
+    id: id.value,
+    title: title.value,
+    publisher: publisher.value,
+    links: links.value,
+  } satisfies Show);
 }
 
 function deserializePlaybackWireArtwork(
@@ -760,7 +756,7 @@ function deserializePlaybackWireLinks(
     }
 
     const value = deserializeDomainResult(
-      ProviderLink.create({
+      createProviderLink({
         providerId: providerId.value,
         href: link.href,
       }),

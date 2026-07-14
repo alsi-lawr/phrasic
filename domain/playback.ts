@@ -291,34 +291,22 @@ export type ProviderLinkInput = {
   readonly href: unknown;
 };
 
-export class ProviderLink {
-  private readonly linkedProviderId: ProviderId;
-  private readonly linkedHref: string;
+export type ProviderLink = {
+  readonly providerId: ProviderId;
+  readonly href: string;
+};
 
-  private constructor(providerId: ProviderId, href: string) {
-    this.linkedProviderId = providerId;
-    this.linkedHref = href;
-    Object.freeze(this);
+export function createProviderLink(
+  input: ProviderLinkInput,
+): Result<ProviderLink, ValueValidationError> {
+  const result = validateHttpUrl("provider-link", input.href);
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get providerId(): ProviderId {
-    return this.linkedProviderId;
-  }
-
-  public get href(): string {
-    return this.linkedHref;
-  }
-
-  public static create(
-    input: ProviderLinkInput,
-  ): Result<ProviderLink, ValueValidationError> {
-    const result = validateHttpUrl("provider-link", input.href);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new ProviderLink(input.providerId, result.value));
-  }
+  return succeeded(
+    Object.freeze({ providerId: input.providerId, href: result.value }),
+  );
 }
 
 export type OriginalArtwork =
@@ -351,74 +339,23 @@ export function unavailableOriginalArtwork(
   return Object.freeze(artwork);
 }
 
-export type CreatorInput = {
+export type Creator = {
   readonly name: DisplayText;
   readonly links: ReadonlyArray<ProviderLink>;
 };
 
-export class Creator {
-  public readonly name: DisplayText;
-  public readonly links: ReadonlyArray<ProviderLink>;
-
-  private constructor(input: CreatorInput) {
-    this.name = input.name;
-    this.links = freezeArray(input.links);
-    Object.freeze(this);
-  }
-
-  public static create(input: CreatorInput): Creator {
-    return new Creator(input);
-  }
-}
-
-export type CollectionInput = {
+export type Collection = {
   readonly id: ProviderCollectionId;
   readonly title: DisplayText;
   readonly links: ReadonlyArray<ProviderLink>;
 };
 
-export class Collection {
-  public readonly id: ProviderCollectionId;
-  public readonly title: DisplayText;
-  public readonly links: ReadonlyArray<ProviderLink>;
-
-  private constructor(input: CollectionInput) {
-    this.id = input.id;
-    this.title = input.title;
-    this.links = freezeArray(input.links);
-    Object.freeze(this);
-  }
-
-  public static create(input: CollectionInput): Collection {
-    return new Collection(input);
-  }
-}
-
-export type ShowInput = {
+export type Show = {
   readonly id: ProviderCollectionId;
   readonly title: DisplayText;
   readonly publisher: DisplayText;
   readonly links: ReadonlyArray<ProviderLink>;
 };
-
-export class Show {
-  public readonly id: ProviderCollectionId;
-  public readonly title: DisplayText;
-  public readonly publisher: DisplayText;
-  public readonly links: ReadonlyArray<ProviderLink>;
-
-  private constructor(input: ShowInput) {
-    this.id = input.id;
-    this.title = input.title;
-    this.publisher = input.publisher;
-    this.links = freezeArray(input.links);
-    Object.freeze(this);
-  }
-
-  public static create(input: ShowInput): Show {
-    return new Show(input);
-  }
-}
 
 export type TrackItemInput = {
   readonly providerId: ProviderId;
@@ -430,49 +367,30 @@ export type TrackItemInput = {
   readonly links: ReadonlyArray<ProviderLink>;
 };
 
-export class TrackItem {
-  private readonly itemKind = "track" as const;
-  public readonly providerId: ProviderId;
-  public readonly itemId: ProviderItemId;
-  public readonly title: DisplayText;
-  public readonly artists: ReadonlyArray<Creator>;
-  public readonly collection: Collection;
-  public readonly artwork: OriginalArtwork;
-  public readonly links: ReadonlyArray<ProviderLink>;
+export type TrackItem = {
+  readonly kind: "track";
+  readonly providerId: ProviderId;
+  readonly itemId: ProviderItemId;
+  readonly title: DisplayText;
+  readonly artists: ReadonlyArray<Creator>;
+  readonly collection: Collection;
+  readonly artwork: OriginalArtwork;
+  readonly links: ReadonlyArray<ProviderLink>;
+};
 
-  private constructor(input: TrackItemInput) {
-    this.providerId = input.providerId;
-    this.itemId = input.itemId;
-    this.title = input.title;
-    this.artists = freezeArray(input.artists);
-    this.collection = input.collection;
-    this.artwork = input.artwork;
-    this.links = freezeArray(input.links);
-    Object.freeze(this);
+export function createTrackItem(
+  input: TrackItemInput,
+): Result<TrackItem, ItemConstructionError> {
+  if (input.artists.length === 0) {
+    return failed(invalidItem("track", "missing-creators"));
   }
 
-  public get kind(): "track" {
-    return this.itemKind;
+  const linksError = providerLinksError(input.providerId, input.links, "track");
+  if (linksError.kind === "failure") {
+    return linksError;
   }
 
-  public static create(
-    input: TrackItemInput,
-  ): Result<TrackItem, ItemConstructionError> {
-    if (input.artists.length === 0) {
-      return failed(invalidItem("track", "missing-creators"));
-    }
-
-    const linksError = providerLinksError(
-      input.providerId,
-      input.links,
-      "track",
-    );
-    if (linksError.kind === "failure") {
-      return linksError;
-    }
-
-    return succeeded(new TrackItem(input));
-  }
+  return succeeded(Object.freeze({ kind: "track", ...input }));
 }
 
 export type EpisodeItemInput = {
@@ -484,43 +402,29 @@ export type EpisodeItemInput = {
   readonly links: ReadonlyArray<ProviderLink>;
 };
 
-export class EpisodeItem {
-  private readonly itemKind = "episode" as const;
-  public readonly providerId: ProviderId;
-  public readonly itemId: ProviderItemId;
-  public readonly title: DisplayText;
-  public readonly show: Show;
-  public readonly artwork: OriginalArtwork;
-  public readonly links: ReadonlyArray<ProviderLink>;
+export type EpisodeItem = {
+  readonly kind: "episode";
+  readonly providerId: ProviderId;
+  readonly itemId: ProviderItemId;
+  readonly title: DisplayText;
+  readonly show: Show;
+  readonly artwork: OriginalArtwork;
+  readonly links: ReadonlyArray<ProviderLink>;
+};
 
-  private constructor(input: EpisodeItemInput) {
-    this.providerId = input.providerId;
-    this.itemId = input.itemId;
-    this.title = input.title;
-    this.show = input.show;
-    this.artwork = input.artwork;
-    this.links = freezeArray(input.links);
-    Object.freeze(this);
+export function createEpisodeItem(
+  input: EpisodeItemInput,
+): Result<EpisodeItem, ItemConstructionError> {
+  const linksError = providerLinksError(
+    input.providerId,
+    input.links,
+    "episode",
+  );
+  if (linksError.kind === "failure") {
+    return linksError;
   }
 
-  public get kind(): "episode" {
-    return this.itemKind;
-  }
-
-  public static create(
-    input: EpisodeItemInput,
-  ): Result<EpisodeItem, ItemConstructionError> {
-    const linksError = providerLinksError(
-      input.providerId,
-      input.links,
-      "episode",
-    );
-    if (linksError.kind === "failure") {
-      return linksError;
-    }
-
-    return succeeded(new EpisodeItem(input));
-  }
+  return succeeded(Object.freeze({ kind: "episode", ...input }));
 }
 
 export type NowPlayingItem = EpisodeItem | TrackItem;
@@ -531,42 +435,23 @@ export type PlaybackSnapshotInput = {
   readonly duration: PlaybackDurationMilliseconds;
 };
 
-export class PlaybackSnapshot {
-  private readonly snapshotItem: NowPlayingItem;
-  private readonly snapshotPosition: PlaybackPositionMilliseconds;
-  private readonly snapshotDuration: PlaybackDurationMilliseconds;
+export type PlaybackSnapshot = {
+  readonly item: NowPlayingItem;
+  readonly position: PlaybackPositionMilliseconds;
+  readonly duration: PlaybackDurationMilliseconds;
+};
 
-  private constructor(input: PlaybackSnapshotInput) {
-    this.snapshotItem = input.item;
-    this.snapshotPosition = input.position;
-    this.snapshotDuration = input.duration;
-    Object.freeze(this);
+export function createPlaybackSnapshot(
+  input: PlaybackSnapshotInput,
+): Result<PlaybackSnapshot, PlaybackSnapshotError> {
+  if (input.position > input.duration) {
+    return failed({
+      kind: "invalid-playback-snapshot",
+      reason: "position-exceeds-duration",
+    });
   }
 
-  public get item(): NowPlayingItem {
-    return this.snapshotItem;
-  }
-
-  public get position(): PlaybackPositionMilliseconds {
-    return this.snapshotPosition;
-  }
-
-  public get duration(): PlaybackDurationMilliseconds {
-    return this.snapshotDuration;
-  }
-
-  public static create(
-    input: PlaybackSnapshotInput,
-  ): Result<PlaybackSnapshot, PlaybackSnapshotError> {
-    if (input.position > input.duration) {
-      return failed({
-        kind: "invalid-playback-snapshot",
-        reason: "position-exceeds-duration",
-      });
-    }
-
-    return succeeded(new PlaybackSnapshot(input));
-  }
+  return succeeded(Object.freeze({ ...input }));
 }
 
 export function authorizationFailure(
@@ -942,12 +827,6 @@ function invalidTransition(
     event: event.kind,
   };
   return failed(Object.freeze(error));
-}
-
-function freezeArray<Value>(
-  values: ReadonlyArray<Value>,
-): ReadonlyArray<Value> {
-  return Object.freeze([...values]);
 }
 
 function freezeState<State extends PlaybackState>(state: State): State {

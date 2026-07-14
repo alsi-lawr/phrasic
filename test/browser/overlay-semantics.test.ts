@@ -10,15 +10,16 @@ import { overlayLiveAnnouncementKey } from "../../components/overlay/overlay-ide
 import {
   parseDisplayText,
   parsePlaybackPositionMilliseconds,
-  PlaybackSnapshot,
-  ProviderLink,
-  TrackItem,
+  createPlaybackSnapshot,
+  createProviderLink,
+  createTrackItem,
   initialPlaybackState,
   parseProviderItemId,
   providerFailure,
   transitionPlaybackState,
   type PlaybackState,
   type Result,
+  type TrackItem,
 } from "../../domain/playback.ts";
 import {
   advertisementPayload,
@@ -198,7 +199,7 @@ test("live announcement keys remain stable across polling and change for item or
   const sameItemPoll: PlaybackState = Object.freeze({
     kind: "playing",
     snapshot: expectSuccess(
-      PlaybackSnapshot.create({
+      createPlaybackSnapshot({
         duration: playing.snapshot.duration,
         item: playing.snapshot.item,
         position: expectSuccess(parsePlaybackPositionMilliseconds(2_000)),
@@ -212,7 +213,7 @@ test("live announcement keys remain stable across polling and change for item or
   const newItem: PlaybackState = Object.freeze({
     kind: "playing",
     snapshot: expectSuccess(
-      PlaybackSnapshot.create({
+      createPlaybackSnapshot({
         duration: playing.snapshot.duration,
         item: changedTrackItem(playing),
         position: playing.snapshot.position,
@@ -222,7 +223,7 @@ test("live announcement keys remain stable across polling and change for item or
   const updatedLinks: PlaybackState = Object.freeze({
     kind: "playing",
     snapshot: expectSuccess(
-      PlaybackSnapshot.create({
+      createPlaybackSnapshot({
         duration: playing.snapshot.duration,
         item: trackWithUpdatedLink(playing),
         position: playing.snapshot.position,
@@ -337,7 +338,7 @@ function changedTrackItem(state: PlaybackState): TrackItem {
   }
 
   return expectSuccess(
-    TrackItem.create({
+    createTrackItem({
       artwork: state.snapshot.item.artwork,
       artists: state.snapshot.item.artists,
       collection: state.snapshot.item.collection,
@@ -355,14 +356,14 @@ function trackWithUpdatedLink(state: PlaybackState): TrackItem {
   }
 
   return expectSuccess(
-    TrackItem.create({
+    createTrackItem({
       artwork: state.snapshot.item.artwork,
       artists: state.snapshot.item.artists,
       collection: state.snapshot.item.collection,
       itemId: state.snapshot.item.itemId,
       links: [
         expectSuccess(
-          ProviderLink.create({
+          createProviderLink({
             href: "https://open.spotify.com/track/track-1?context=updated",
             providerId: state.snapshot.item.providerId,
           }),

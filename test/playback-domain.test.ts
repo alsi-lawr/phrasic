@@ -2,15 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   availableOriginalArtwork,
-  Creator,
-  Collection,
-  EpisodeItem,
+  createEpisodeItem,
+  createPlaybackSnapshot,
+  createProviderLink,
+  createTrackItem,
   initialPlaybackState,
-  PlaybackSnapshot,
   providerFailure,
-  ProviderLink,
-  Show,
-  TrackItem,
   transitionPlaybackState,
   unavailableOriginalArtwork,
   parseDisplayText,
@@ -21,10 +18,17 @@ import {
   parseProviderId,
   parseProviderItemId,
   type OriginalArtwork,
+  type Collection,
+  type Creator,
   type DisplayText,
+  type EpisodeItem,
+  type PlaybackSnapshot,
   type PlaybackState,
   type ProviderId,
+  type ProviderLink,
   type Result,
+  type Show,
+  type TrackItem,
 } from "../domain/playback.ts";
 
 test("validated values reject invalid boundaries and preserve distinct values", () => {
@@ -60,6 +64,25 @@ test("track and episode items retain their distinct metadata", () => {
   const track = makeTrack(availableArtwork());
   const episode = makeEpisode(availableArtwork());
 
+  assert.deepEqual(Object.keys(track), [
+    "kind",
+    "providerId",
+    "itemId",
+    "title",
+    "artists",
+    "collection",
+    "artwork",
+    "links",
+  ]);
+  assert.deepEqual(Object.keys(episode), [
+    "kind",
+    "providerId",
+    "itemId",
+    "title",
+    "show",
+    "artwork",
+    "links",
+  ]);
   assert.equal(track.kind, "track");
   assert.equal(track.title, "Track title");
   assert.equal(track.collection.title, "Collection title");
@@ -91,7 +114,7 @@ test("item construction reports missing creators and mismatched provider links",
   const title = text("Track title");
   const itemId = expectSuccess(parseProviderItemId("track-1"));
   const mismatchedLink = expectSuccess(
-    ProviderLink.create({
+    createProviderLink({
       providerId: otherProvider,
       href: "https://another-provider.example/items/track-1",
     }),
@@ -99,7 +122,7 @@ test("item construction reports missing creators and mismatched provider links",
 
   assert.deepEqual(
     expectFailure(
-      TrackItem.create({
+      createTrackItem({
         providerId: provider,
         itemId,
         title,
@@ -117,7 +140,7 @@ test("item construction reports missing creators and mismatched provider links",
   );
   assert.deepEqual(
     expectFailure(
-      TrackItem.create({
+      createTrackItem({
         providerId: provider,
         itemId,
         title,
@@ -142,7 +165,7 @@ test("playback snapshots reject positions beyond their duration", () => {
 
   assert.deepEqual(
     expectFailure(
-      PlaybackSnapshot.create({
+      createPlaybackSnapshot({
         item: track,
         position,
         duration,
@@ -295,7 +318,7 @@ test("invalid transitions and expected failures use explicit result branches", (
 
 function makeSnapshot(): PlaybackSnapshot {
   return expectSuccess(
-    PlaybackSnapshot.create({
+    createPlaybackSnapshot({
       item: makeTrack(availableArtwork()),
       position: expectSuccess(parsePlaybackPositionMilliseconds(1_250)),
       duration: expectSuccess(parsePlaybackDurationMilliseconds(3_000)),
@@ -309,7 +332,7 @@ function makeTrack(artwork: OriginalArtwork): TrackItem {
     makeProviderLink(provider, "track-1"),
   ];
   return expectSuccess(
-    TrackItem.create({
+    createTrackItem({
       providerId: provider,
       itemId: expectSuccess(parseProviderItemId("track-1")),
       title: text("Track title"),
@@ -327,16 +350,16 @@ function makeEpisode(artwork: OriginalArtwork): EpisodeItem {
     makeProviderLink(provider, "episode-1"),
   ];
   return expectSuccess(
-    EpisodeItem.create({
+    createEpisodeItem({
       providerId: provider,
       itemId: expectSuccess(parseProviderItemId("episode-1")),
       title: text("Episode title"),
-      show: Show.create({
+      show: {
         id: expectSuccess(parseProviderCollectionId("show-1")),
         title: text("Show title"),
         publisher: text("Show publisher"),
         links,
-      }),
+      } satisfies Show,
       artwork,
       links,
     }),
@@ -344,18 +367,18 @@ function makeEpisode(artwork: OriginalArtwork): EpisodeItem {
 }
 
 function makeCreator(provider: ProviderId): Creator {
-  return Creator.create({
+  return {
     name: text("Track artist"),
     links: [makeProviderLink(provider, "artist-1")],
-  });
+  };
 }
 
 function makeCollection(provider: ProviderId): Collection {
-  return Collection.create({
+  return {
     id: expectSuccess(parseProviderCollectionId("collection-1")),
     title: text("Collection title"),
     links: [makeProviderLink(provider, "collection-1")],
-  });
+  };
 }
 
 function makeProvider(): ProviderId {
@@ -364,7 +387,7 @@ function makeProvider(): ProviderId {
 
 function makeProviderLink(provider: ProviderId, itemId: string): ProviderLink {
   return expectSuccess(
-    ProviderLink.create({
+    createProviderLink({
       providerId: provider,
       href: `https://spotify.example/items/${itemId}`,
     }),

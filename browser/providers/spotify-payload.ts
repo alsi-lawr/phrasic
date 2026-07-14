@@ -1,12 +1,9 @@
 import {
   availableOriginalArtwork,
-  Collection,
-  Creator,
-  EpisodeItem,
-  PlaybackSnapshot,
-  ProviderLink,
-  Show,
-  TrackItem,
+  createEpisodeItem,
+  createPlaybackSnapshot,
+  createProviderLink,
+  createTrackItem,
   unavailableOriginalArtwork,
   parseDisplayText,
   parseOriginalArtworkUrl,
@@ -16,6 +13,9 @@ import {
   parseProviderId,
   parseProviderItemId,
   type ArtworkUnavailableReason,
+  type Collection,
+  type Creator,
+  type EpisodeItem,
   type ItemConstructionError,
   type NowPlayingItem,
   type OriginalArtwork,
@@ -23,10 +23,14 @@ import {
   type PlaybackDurationMilliseconds,
   type PlaybackPositionMilliseconds,
   type PlaybackSnapshotError,
+  type PlaybackSnapshot,
   type PlaybackState,
   type ProviderId,
+  type ProviderLink,
   type Result,
   type ValueValidationError,
+  type Show,
+  type TrackItem,
 } from "../../domain/playback.ts";
 
 export type SpotifyArtworkSize = "large" | "medium" | "small";
@@ -331,7 +335,7 @@ function parseTrackItem(
   }
 
   return mapItemConstruction(
-    TrackItem.create({
+    createTrackItem({
       providerId,
       itemId: itemId.value,
       title: title.value,
@@ -401,7 +405,7 @@ function parseEpisodeItem(
   }
 
   return mapItemConstruction(
-    EpisodeItem.create({
+    createEpisodeItem({
       providerId,
       itemId: itemId.value,
       title: title.value,
@@ -460,12 +464,10 @@ function parseCreators(
       return link;
     }
 
-    creators.push(
-      Creator.create({
-        name: name.value,
-        links: [link.value],
-      }),
-    );
+    creators.push({
+      name: name.value,
+      links: [link.value],
+    } satisfies Creator);
   }
 
   return succeeded(Object.freeze(creators));
@@ -511,13 +513,11 @@ function parseCollection(
     return link;
   }
 
-  return succeeded(
-    Collection.create({
-      id: collectionId.value,
-      title: title.value,
-      links: [link.value],
-    }),
-  );
+  return succeeded({
+    id: collectionId.value,
+    title: title.value,
+    links: [link.value],
+  } satisfies Collection);
 }
 
 function parseShow(
@@ -582,14 +582,12 @@ function parseShow(
     return link;
   }
 
-  return succeeded(
-    Show.create({
-      id: showId.value,
-      title: title.value,
-      publisher: publisher.value,
-      links: [link.value],
-    }),
-  );
+  return succeeded({
+    id: showId.value,
+    title: title.value,
+    publisher: publisher.value,
+    links: [link.value],
+  } satisfies Show);
 }
 
 function parseArtwork(
@@ -702,7 +700,7 @@ function parseSpotifyLink(
   }
 
   return mapValueValidation(
-    ProviderLink.create({
+    createProviderLink({
       providerId,
       href: spotifyUrlValue.value,
     }),
@@ -744,7 +742,7 @@ function parseActivePlaybackState(
   duration: PlaybackDurationMilliseconds,
   isPlaying: boolean,
 ): Result<PlaybackState, SpotifyPlaybackParseFailure> {
-  const snapshot = PlaybackSnapshot.create({
+  const snapshot = createPlaybackSnapshot({
     item,
     position,
     duration,
