@@ -9,28 +9,23 @@ import type {
 } from "./browser-integration.ts";
 
 const spotifyAuthorizationOrigin = "https://accounts.spotify.com";
-const spotifyAuthorizationParameterNames: ReadonlyArray<string> = Object.freeze(
-  [
-    "client_id",
-    "response_type",
-    "redirect_uri",
-    "code_challenge_method",
-    "code_challenge",
-    "state",
-    "scope",
-  ],
-);
-const callbackQueryParameterNames: ReadonlyArray<string> = Object.freeze([
+const spotifyAuthorizationParameterNames: ReadonlyArray<string> = [
+  "client_id",
+  "response_type",
+  "redirect_uri",
+  "code_challenge_method",
+  "code_challenge",
+  "state",
+  "scope",
+];
+const callbackQueryParameterNames: ReadonlyArray<string> = [
   "code",
   "error",
   "error_description",
   "error_uri",
   "state",
-]);
-const displayQueryParameterNames: ReadonlyArray<string> = Object.freeze([
-  "width",
-  "setup",
-]);
+];
+const displayQueryParameterNames: ReadonlyArray<string> = ["width", "setup"];
 
 type WorkerPublicConfiguration = {
   readonly spotify: {
@@ -39,54 +34,51 @@ type WorkerPublicConfiguration = {
   };
 };
 
-export const spotifyBrowserIntegration: BrowserPlaybackIntegration =
-  Object.freeze({
-    applicationPath: "/spotify/",
+export const spotifyBrowserIntegration: BrowserPlaybackIntegration = {
+  applicationPath: "/spotify/",
 
-    async prepare(options): Promise<BrowserIntegrationPreparationResult> {
-      const callbackUrl = captureCallbackUrl(options.currentUrl);
-      const configurationUrl = new URL(
-        "/config.json",
-        options.applicationUrl.origin,
-      );
+  async prepare(options): Promise<BrowserIntegrationPreparationResult> {
+    const callbackUrl = captureCallbackUrl(options.currentUrl);
+    const configurationUrl = new URL(
+      "/config.json",
+      options.applicationUrl.origin,
+    );
 
-      try {
-        const response = await options.fetchConfiguration({
-          signal: options.signal,
-          url: configurationUrl,
-        });
-        if (!response.ok) {
-          return preparationFailure();
-        }
-
-        const source = await response.readJson();
-        const configuration = parseSpotifyPublicConfiguration(source, {
-          applicationUrl: options.applicationUrl,
-        });
-        if (configuration.kind === "failure") {
-          return preparationFailure();
-        }
-
-        return Object.freeze({
-          kind: "success",
-          callbackUrl,
-          configuration: serializeWorkerPublicConfiguration(
-            configuration.value,
-          ),
-        });
-      } catch {
+    try {
+      const response = await options.fetchConfiguration({
+        signal: options.signal,
+        url: configurationUrl,
+      });
+      if (!response.ok) {
         return preparationFailure();
       }
-    },
 
-    validateAuthorizationUrl(input, currentUrl): BrowserIntegrationUrlResult {
-      return parseSpotifyAuthorizationUrl(input, currentUrl);
-    },
+      const source = await response.readJson();
+      const configuration = parseSpotifyPublicConfiguration(source, {
+        applicationUrl: options.applicationUrl,
+      });
+      if (configuration.kind === "failure") {
+        return preparationFailure();
+      }
 
-    validateRestoredUrl(input, currentUrl): BrowserIntegrationUrlResult {
-      return parseRestoredCallbackUrl(input, currentUrl);
-    },
-  });
+      return {
+        kind: "success",
+        callbackUrl,
+        configuration: serializeWorkerPublicConfiguration(configuration.value),
+      };
+    } catch {
+      return preparationFailure();
+    }
+  },
+
+  validateAuthorizationUrl(input, currentUrl): BrowserIntegrationUrlResult {
+    return parseSpotifyAuthorizationUrl(input, currentUrl);
+  },
+
+  validateRestoredUrl(input, currentUrl): BrowserIntegrationUrlResult {
+    return parseRestoredCallbackUrl(input, currentUrl);
+  },
+};
 
 function captureCallbackUrl(
   currentUrl: URL,
@@ -98,7 +90,7 @@ function captureCallbackUrl(
     currentUrl.searchParams.has(parameter),
   );
   if (!isCallback) {
-    return Object.freeze({ kind: "unavailable" });
+    return { kind: "unavailable" };
   }
 
   const callbackUrl = new URL(currentUrl);
@@ -106,18 +98,18 @@ function captureCallbackUrl(
     callbackUrl.searchParams.delete(parameter);
   }
 
-  return Object.freeze({ kind: "available", value: callbackUrl.toString() });
+  return { kind: "available", value: callbackUrl.toString() };
 }
 
 function serializeWorkerPublicConfiguration(
   configuration: SpotifyPublicConfiguration,
 ): WorkerPublicConfiguration {
-  return Object.freeze({
-    spotify: Object.freeze({
+  return {
+    spotify: {
       clientId: configuration.spotify.clientId.toAuthorizationParameter(),
       redirectUri: configuration.spotify.redirectUri.toAuthorizationParameter(),
-    }),
-  });
+    },
+  };
 }
 
 function parseSpotifyAuthorizationUrl(
@@ -138,7 +130,7 @@ function parseSpotifyAuthorizationUrl(
       return invalidUrl();
     }
 
-    return Object.freeze({ kind: "valid", value: url });
+    return { kind: "valid", value: url };
   } catch {
     return invalidUrl();
   }
@@ -261,16 +253,16 @@ function parseRestoredCallbackUrl(
       restored.searchParams.set("setup", "1");
     }
 
-    return Object.freeze({ kind: "valid", value: restored });
+    return { kind: "valid", value: restored };
   } catch {
     return invalidUrl();
   }
 }
 
 function preparationFailure(): BrowserIntegrationPreparationResult {
-  return Object.freeze({ kind: "failure" });
+  return { kind: "failure" };
 }
 
 function invalidUrl(): BrowserIntegrationUrlResult {
-  return Object.freeze({ kind: "invalid" });
+  return { kind: "invalid" };
 }

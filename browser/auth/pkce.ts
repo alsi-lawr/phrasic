@@ -73,7 +73,6 @@ export class PkceVerifier {
 
   private constructor(value: string) {
     this.value = value;
-    Object.freeze(this);
   }
 
   static parse(
@@ -100,7 +99,6 @@ export class PkceState {
 
   private constructor(value: string) {
     this.value = value;
-    Object.freeze(this);
   }
 
   static parse(
@@ -127,7 +125,6 @@ export class PkceStateCandidate {
 
   private constructor(value: string) {
     this.value = value;
-    Object.freeze(this);
   }
 
   static parse(
@@ -150,7 +147,6 @@ export class PkceChallenge {
 
   private constructor(value: string) {
     this.value = value;
-    Object.freeze(this);
   }
 
   static fromSha256Digest(digest: Uint8Array): PkceChallenge {
@@ -171,7 +167,6 @@ export class AuthorizationAttemptTimestamp {
 
   private constructor(value: number) {
     this.value = value;
-    Object.freeze(this);
   }
 
   static parse(
@@ -201,7 +196,6 @@ export class DisplayWidth {
 
   private constructor(value: number) {
     this.value = value;
-    Object.freeze(this);
   }
 
   static parse(
@@ -249,7 +243,6 @@ export class PendingAuthorizationAttempt {
     this.pendingCreatedAt = options.createdAt;
     this.pendingExpiresAt = options.expiresAt;
     this.pendingReturnTo = options.returnTo;
-    Object.freeze(this);
   }
 
   static create(
@@ -320,7 +313,6 @@ export class SpotifyAuthorizationCode {
 
   private constructor(value: string) {
     this.value = value;
-    Object.freeze(this);
   }
 
   static parse(
@@ -394,12 +386,12 @@ export type SpotifyAuthorizationCallbackOptions = {
 export function createBrowserPkceCryptoPort(
   webCrypto: Crypto,
 ): BrowserPkceCryptoPort {
-  const randomness: PkceRandomnessPort = Object.freeze({
+  const randomness: PkceRandomnessPort = {
     fill(destination: Uint8Array<ArrayBuffer>): void {
       webCrypto.getRandomValues(destination);
     },
-  });
-  const sha256: PkceSha256Port = Object.freeze({
+  };
+  const sha256: PkceSha256Port = {
     async digest(source: Uint8Array): Promise<Uint8Array> {
       const browserDigestSource = new Uint8Array(source);
       const digest = await webCrypto.subtle.digest(
@@ -408,9 +400,9 @@ export function createBrowserPkceCryptoPort(
       );
       return new Uint8Array(digest);
     },
-  });
+  };
 
-  return Object.freeze({ randomness, sha256 });
+  return { randomness, sha256 };
 }
 
 export async function createPkceAuthorizationAttempt(
@@ -433,7 +425,7 @@ export async function createPkceAuthorizationAttempt(
     challenge,
   };
 
-  return Object.freeze(attempt);
+  return attempt;
 }
 
 async function derivePkceChallenge(options: {
@@ -565,10 +557,10 @@ export function parseDisplayReturnConfiguration(
   const setup = setupValue.value
     ? requestedDisplaySetupMode()
     : notRequestedDisplaySetupMode();
-  const configuration: DisplayReturnConfiguration = Object.freeze({
+  const configuration: DisplayReturnConfiguration = {
     width: width.value,
     setup,
-  });
+  };
 
   return succeeded(configuration);
 }
@@ -615,7 +607,7 @@ export function parseSpotifyAuthorizationCallback(
       state,
     };
 
-    return Object.freeze(denied);
+    return denied;
   }
 
   if (!hasCode) {
@@ -642,7 +634,7 @@ export function parseSpotifyAuthorizationCallback(
     state: state.value,
   };
 
-  return Object.freeze(success);
+  return success;
 }
 
 function generatePkceVerifier(randomness: PkceRandomnessPort): PkceVerifier {
@@ -769,7 +761,7 @@ function requestedDisplaySetupMode(): DisplaySetupMode {
     kind: "setup-requested",
   };
 
-  return Object.freeze(setup);
+  return setup;
 }
 
 function notRequestedDisplaySetupMode(): DisplaySetupMode {
@@ -777,7 +769,7 @@ function notRequestedDisplaySetupMode(): DisplaySetupMode {
     kind: "setup-not-requested",
   };
 
-  return Object.freeze(setup);
+  return setup;
 }
 
 function parseCallbackStateCandidate(
@@ -785,22 +777,22 @@ function parseCallbackStateCandidate(
 ): CallbackStateCandidateOutcome {
   const values = parameters.getAll("state");
   if (values.length === 0) {
-    return frozenCallbackStateOutcome({ kind: "missing-state" });
+    return { kind: "missing-state" };
   }
 
   if (values.length !== 1) {
-    return frozenCallbackStateOutcome({ kind: "malformed-state" });
+    return { kind: "malformed-state" };
   }
 
   const candidate = PkceStateCandidate.parse(values[0]);
   if (candidate.kind === "failure") {
-    return frozenCallbackStateOutcome({ kind: "malformed-state" });
+    return { kind: "malformed-state" };
   }
 
-  return frozenCallbackStateOutcome({
+  return {
     kind: "state-candidate",
     value: candidate.value,
-  });
+  };
 }
 
 function hasUnexpectedCallbackParameter(parameters: URLSearchParams): boolean {
@@ -853,29 +845,25 @@ function malformedCallback(
     code,
   };
 
-  return Object.freeze(callback);
+  return callback;
 }
 
 function failedPkceValue(
   value: PkceValueParseFailure["value"],
 ): ValueParseFailure<PkceValueParseFailure> {
   if (value === "pkce-state") {
-    return failed(
-      Object.freeze({
-        kind: "invalid-pkce-value",
-        value,
-        code: "expected-pkce-state",
-      }),
-    );
-  }
-
-  return failed(
-    Object.freeze({
+    return failed({
       kind: "invalid-pkce-value",
       value,
-      code: "expected-pkce-verifier",
-    }),
-  );
+      code: "expected-pkce-state",
+    });
+  }
+
+  return failed({
+    kind: "invalid-pkce-value",
+    value,
+    code: "expected-pkce-verifier",
+  });
 }
 
 function failedTimestamp(): ValueParseFailure<AuthorizationAttemptTimestampParseFailure> {
@@ -884,7 +872,7 @@ function failedTimestamp(): ValueParseFailure<AuthorizationAttemptTimestampParse
     code: "expected-non-negative-safe-integer",
   };
 
-  return failed(Object.freeze(error));
+  return failed(error);
 }
 
 function failedDisplayConfiguration(
@@ -897,7 +885,7 @@ function failedDisplayConfiguration(
     code,
   };
 
-  return failed(Object.freeze(error));
+  return failed(error);
 }
 
 function failedAuthorizationCode(): ValueParseFailure<SpotifyAuthorizationCodeParseFailure> {
@@ -906,13 +894,7 @@ function failedAuthorizationCode(): ValueParseFailure<SpotifyAuthorizationCodePa
     code: "expected-non-empty-code",
   };
 
-  return failed(Object.freeze(error));
-}
-
-function frozenCallbackStateOutcome(
-  outcome: CallbackStateCandidateOutcome,
-): CallbackStateCandidateOutcome {
-  return Object.freeze(outcome);
+  return failed(error);
 }
 
 function succeeded<Value>(value: Value): ValueParseSuccess<Value> {
@@ -921,7 +903,7 @@ function succeeded<Value>(value: Value): ValueParseSuccess<Value> {
     value,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 function failed<Failure>(error: Failure): ValueParseFailure<Failure> {
@@ -930,5 +912,5 @@ function failed<Failure>(error: Failure): ValueParseFailure<Failure> {
     error,
   };
 
-  return Object.freeze(result);
+  return result;
 }

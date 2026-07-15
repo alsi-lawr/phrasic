@@ -100,27 +100,27 @@ export function useOverlayShellTransition(
     return unreachable(state.phase);
   };
 
-  return Object.freeze({
+  return {
     completeWidthTransition,
     phase: state.phase,
     snapshot: state.snapshot,
-  });
+  };
 }
 
 function initialOverlayShellTransitionState(
   snapshot: BrowserPlaybackApplicationSnapshot,
 ): OverlayShellTransitionState {
-  return Object.freeze({ phase: "stable", snapshot });
+  return { phase: "stable", snapshot };
 }
 
 function immediateOverlayShellTransition(
   snapshot: BrowserPlaybackApplicationSnapshot,
 ): OverlayShellTransition {
-  return Object.freeze({
+  return {
     completeWidthTransition: noOperation,
     phase: "stable",
     snapshot,
-  });
+  };
 }
 
 function overlayShellTransitionReducer(
@@ -129,13 +129,13 @@ function overlayShellTransitionReducer(
 ): OverlayShellTransitionState {
   switch (action.kind) {
     case "begin-collapse":
-      return Object.freeze({ ...state, phase: "collapsing" });
+      return { ...state, phase: "collapsing" };
     case "finish-opening":
-      return Object.freeze({ ...state, phase: "stable" });
+      return { ...state, phase: "stable" };
     case "show-snapshot":
-      return Object.freeze({ phase: "opening", snapshot: action.snapshot });
+      return { phase: "opening", snapshot: action.snapshot };
     case "synchronize":
-      return Object.freeze({ phase: "stable", snapshot: action.snapshot });
+      return { phase: "stable", snapshot: action.snapshot };
   }
 
   return unreachable(action);

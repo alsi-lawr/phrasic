@@ -7,7 +7,10 @@ import {
   type BrowserPlaybackWorker,
 } from "../../browser/application.ts";
 import type { BrowserConfigurationResponse } from "../../browser/configuration-response.ts";
-import type { PlaybackWorkerCommand } from "../../browser/worker/protocol.ts";
+import type {
+  PlaybackWorkerCommand,
+  PlaybackWorkerEvent,
+} from "../../browser/worker/protocol.ts";
 import { spotifyBrowserIntegration } from "../../browser/integrations/spotify-browser-integration.ts";
 
 test("the browser application waits for a validated callback restoration before replacing its URL", async () => {
@@ -45,15 +48,6 @@ test("the browser application waits for a validated callback restoration before 
       clientId: "browser-client-id",
       redirectUri: "https://nowplaying.example/spotify/",
     },
-  });
-
-  fixture.worker.emitMessage({
-    kind: "playback-state",
-    state: { kind: "empty", accessToken: "must-not-reach-react" },
-  });
-  assert.deepEqual(fixture.application.getSnapshot(), {
-    kind: "playback",
-    state: { kind: "initializing" },
   });
 
   fixture.worker.emitMessage({
@@ -547,7 +541,9 @@ async function settleApplicationWork(): Promise<void> {
 
 class FakeWorker implements BrowserPlaybackWorker {
   private readonly errorListeners = new Set<() => void>();
-  private readonly messageListeners = new Set<(message: unknown) => void>();
+  private readonly messageListeners = new Set<
+    (message: PlaybackWorkerEvent) => void
+  >();
   private readonly postedCommands: PlaybackWorkerCommand[] = [];
   private didTerminate = false;
 
@@ -559,7 +555,7 @@ class FakeWorker implements BrowserPlaybackWorker {
     return this.didTerminate;
   }
 
-  emitMessage(message: unknown): void {
+  emitMessage(message: PlaybackWorkerEvent): void {
     for (const listener of this.messageListeners) {
       listener(message);
     }
@@ -572,7 +568,7 @@ class FakeWorker implements BrowserPlaybackWorker {
     };
   }
 
-  onMessage(listener: (message: unknown) => void): () => void {
+  onMessage(listener: (message: PlaybackWorkerEvent) => void): () => void {
     this.messageListeners.add(listener);
     return (): void => {
       this.messageListeners.delete(listener);

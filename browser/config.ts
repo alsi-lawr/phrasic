@@ -44,7 +44,6 @@ export class SpotifyClientId {
 
   private constructor(value: string) {
     this.value = value;
-    Object.freeze(this);
   }
 
   static parse(input: unknown): ConfigurationParseResult<SpotifyClientId> {
@@ -69,7 +68,6 @@ export class SpotifyRedirectUri {
   private constructor(value: string, origin: string) {
     this.value = value;
     this.origin = origin;
-    Object.freeze(this);
   }
 
   static parse(
@@ -213,12 +211,12 @@ export function parseSpotifyPublicConfiguration(
     return redirectUri;
   }
 
-  const configuration: SpotifyPublicConfiguration = Object.freeze({
-    spotify: Object.freeze({
+  const configuration: SpotifyPublicConfiguration = {
+    spotify: {
       clientId: clientId.value,
       redirectUri: redirectUri.value,
-    }),
-  });
+    },
+  };
 
   return succeeded(configuration);
 }
@@ -310,7 +308,7 @@ function succeeded<Value>(value: Value): ConfigurationParseSuccess<Value> {
     value,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 function failed(
@@ -321,7 +319,7 @@ function failed(
     error,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 function configurationFailure(
@@ -334,5 +332,5 @@ function configurationFailure(
     code,
   };
 
-  return Object.freeze(failure);
+  return failure;
 }

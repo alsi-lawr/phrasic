@@ -12,11 +12,12 @@ import {
 } from "../../components/overlay/overlay-identities.ts";
 import { overlayMotionDecisionForPreference } from "../../components/overlay/overlay-motion.ts";
 import {
-  DisplayText,
-  PlaybackSnapshot,
-  TrackItem,
+  parseDisplayText,
+  createPlaybackSnapshot,
+  createTrackItem,
   type PlaybackState,
   type Result,
+  type TrackItem,
 } from "../../domain/playback.ts";
 import {
   pausedEpisodePayload,
@@ -81,20 +82,20 @@ test("marquee identity stays stable for a normalized item whose title changes", 
 
   const originalTrack = playingTrack(originalState);
   const changedTrack = expectSuccess(
-    TrackItem.create({
+    createTrackItem({
       artwork: originalTrack.artwork,
       artists: originalTrack.artists,
       collection: originalTrack.collection,
       itemId: originalTrack.itemId,
       links: originalTrack.links,
       providerId: originalTrack.providerId,
-      title: expectSuccess(DisplayText.create("Updated track title")),
+      title: expectSuccess(parseDisplayText("Updated track title")),
     }),
   );
   const changedState: PlaybackState = Object.freeze({
     kind: "playing",
     snapshot: expectSuccess(
-      PlaybackSnapshot.create({
+      createPlaybackSnapshot({
         duration: originalState.snapshot.duration,
         item: changedTrack,
         position: originalState.snapshot.position,

@@ -1,31 +1,25 @@
 import {
-  deserializePlaybackWireState,
-  type PlaybackWireState,
-} from "./worker/playback-wire.ts";
-import {
-  parsePlaybackWorkerEvent,
   type PlaybackWorkerCommand,
+  type PlaybackWorkerEvent,
 } from "./worker/protocol.ts";
 import {
   initialPlaybackState,
-  providerFailure,
-  transitionPlaybackState,
   type PlaybackState,
 } from "../domain/playback.ts";
 import type { BrowserConfigurationResponse } from "./configuration-response.ts";
+import type { AuthorizationReturnTarget } from "./auth/provider.ts";
 import type { BrowserPlaybackIntegration } from "./integrations/browser-integration.ts";
 
 const defaultDisplayWidth = 1_920;
 const minimumDisplayWidth = 320;
 const maximumDisplayWidth = 7_680;
-const displayQueryParameterNames: ReadonlyArray<string> = Object.freeze([
-  "width",
-  "setup",
-]);
+const displayQueryParameterNames: ReadonlyArray<string> = ["width", "setup"];
 
 export type BrowserPlaybackWorker = {
   readonly onError: (listener: () => void) => () => void;
-  readonly onMessage: (listener: (message: unknown) => void) => () => void;
+  readonly onMessage: (
+    listener: (message: PlaybackWorkerEvent) => void,
+  ) => () => void;
   readonly postMessage: (command: PlaybackWorkerCommand) => void;
   readonly terminate: () => void;
 };
@@ -107,7 +101,7 @@ type DisplayQuery =
 export function createBrowserPlaybackApplication(
   ports: BrowserPlaybackApplicationPorts,
 ): BrowserPlaybackApplication {
-  let runtime: ApplicationRuntime = Object.freeze({ kind: "not-started" });
+  let runtime: ApplicationRuntime = { kind: "not-started" };
   let snapshot: BrowserPlaybackApplicationSnapshot = playbackSnapshot(
     initialPlaybackState(),
   );
@@ -132,7 +126,7 @@ export function createBrowserPlaybackApplication(
       }
 
       const active = runtime;
-      runtime = Object.freeze({ kind: "disposed" });
+      runtime = { kind: "disposed" };
       active.abortController.abort();
       active.removeErrorListener();
       active.removeMessageListener();
@@ -197,16 +191,15 @@ export function createBrowserPlaybackApplication(
         forwardVisibilityChange,
       );
       const removePageHideListener = ports.onPageHide(application.dispose);
-      const active: Extract<ApplicationRuntime, { readonly kind: "active" }> =
-        Object.freeze({
-          kind: "active",
-          abortController,
-          removeErrorListener,
-          removeMessageListener,
-          removePageHideListener,
-          removeVisibilityListener,
-          worker,
-        });
+      const active: Extract<ApplicationRuntime, { readonly kind: "active" }> = {
+        kind: "active",
+        abortController,
+        removeErrorListener,
+        removeMessageListener,
+        removePageHideListener,
+        removeVisibilityListener,
+        worker,
+      };
       runtime = active;
       void initialize(active, currentUrl, applicationUrl);
     },
@@ -220,7 +213,7 @@ export function createBrowserPlaybackApplication(
     },
   };
 
-  return Object.freeze(application);
+  return application;
 
   async function initialize(
     active: Extract<ApplicationRuntime, { readonly kind: "active" }>,
@@ -256,26 +249,21 @@ export function createBrowserPlaybackApplication(
     forwardVisibilityChange();
   }
 
-  function receiveWorkerMessage(message: unknown): void {
-    const event = parsePlaybackWorkerEvent(message);
-    if (event.kind === "failure") {
-      return;
-    }
-
-    switch (event.value.kind) {
+  function receiveWorkerMessage(message: PlaybackWorkerEvent): void {
+    switch (message.kind) {
       case "playback-state":
-        commitPlaybackWireState(event.value.state);
+        replaceSnapshot(playbackSnapshot(message.state));
         return;
       case "authorization-redirect":
-        navigateToAuthorization(event.value.url);
+        navigateToAuthorization(message.url);
         return;
       case "callback-url-restored":
-        restoreCallbackUrl(event.value.url);
+        restoreCallbackUrl(message.url);
         return;
       case "fatal-initialization-failure":
         replaceSnapshot(
           fatalSnapshot(
-            event.value.code === "invalid-public-configuration"
+            message.code === "invalid-public-configuration"
               ? "configuration-unavailable"
               : "browser-capability-unavailable",
           ),
@@ -284,16 +272,6 @@ export function createBrowserPlaybackApplication(
       case "safe-diagnostic":
         return;
     }
-  }
-
-  function commitPlaybackWireState(state: PlaybackWireState): void {
-    const deserialized = deserializePlaybackWireState(state);
-    if (deserialized.kind === "failure") {
-      replaceSnapshot(playbackSnapshot(malformedWorkerPlaybackState()));
-      return;
-    }
-
-    replaceSnapshot(playbackSnapshot(deserialized.value));
   }
 
   function navigateToAuthorization(input: string): void {
@@ -364,10 +342,10 @@ export function createBrowserPlaybackApplication(
         readonly kind: "unavailable";
       } {
     if (runtime.kind !== "active") {
-      return Object.freeze({ kind: "unavailable" });
+      return { kind: "unavailable" };
     }
 
-    return Object.freeze({ kind: "available", value: runtime });
+    return { kind: "available", value: runtime };
   }
 
   function isCurrent(
@@ -388,12 +366,14 @@ export function createBrowserPlaybackApplication(
   }
 }
 
-function displayReturnConfiguration(currentUrl: URL): unknown {
+function displayReturnConfiguration(
+  currentUrl: URL,
+): AuthorizationReturnTarget {
   const display = parseDisplayQuery(currentUrl.searchParams);
   const width = displayWidth(display);
   const setup = displaySetupRequested(display);
 
-  return Object.freeze({ width, setup });
+  return { width, setup };
 }
 
 function displayWidth(display: DisplayQuery): number {
@@ -432,27 +412,27 @@ function parseDisplayQuery(parameters: URLSearchParams): DisplayQuery {
       continue;
     }
 
-    return frozenInvalidDisplayQuery();
+    return invalidDisplayQuery();
   }
 
   const widthValues = parameters.getAll("width");
   const setupValues = parameters.getAll("setup");
   if (widthValues.length > 1 || setupValues.length > 1) {
-    return frozenInvalidDisplayQuery();
+    return invalidDisplayQuery();
   }
 
   const hasSetup = setupValues.length === 1;
   if (hasSetup && setupValues[0] !== "1") {
-    return frozenInvalidDisplayQuery();
+    return invalidDisplayQuery();
   }
 
   if (widthValues.length === 0) {
-    return hasSetup ? frozenSetupDisplayQuery() : frozenNoDisplayQuery();
+    return hasSetup ? setupDisplayQuery() : noDisplayQuery();
   }
 
   const widthValue = widthValues[0];
   if (widthValue === undefined || !/^\d+$/.test(widthValue)) {
-    return frozenInvalidDisplayQuery();
+    return invalidDisplayQuery();
   }
 
   const width = Number(widthValue);
@@ -461,52 +441,36 @@ function parseDisplayQuery(parameters: URLSearchParams): DisplayQuery {
     width < minimumDisplayWidth ||
     width > maximumDisplayWidth
   ) {
-    return frozenInvalidDisplayQuery();
+    return invalidDisplayQuery();
   }
 
-  return hasSetup
-    ? frozenWidthAndSetupDisplayQuery(width)
-    : frozenWidthDisplayQuery(width);
+  return hasSetup ? widthAndSetupDisplayQuery(width) : widthDisplayQuery(width);
 }
 
-function frozenInvalidDisplayQuery(): DisplayQuery {
-  return Object.freeze({ kind: "invalid" });
+function invalidDisplayQuery(): DisplayQuery {
+  return { kind: "invalid" };
 }
 
-function frozenNoDisplayQuery(): DisplayQuery {
-  return Object.freeze({ kind: "none" });
+function noDisplayQuery(): DisplayQuery {
+  return { kind: "none" };
 }
 
-function frozenSetupDisplayQuery(): DisplayQuery {
-  return Object.freeze({ kind: "setup" });
+function setupDisplayQuery(): DisplayQuery {
+  return { kind: "setup" };
 }
 
-function frozenWidthDisplayQuery(width: number): DisplayQuery {
-  return Object.freeze({ kind: "width", width });
+function widthDisplayQuery(width: number): DisplayQuery {
+  return { kind: "width", width };
 }
 
-function frozenWidthAndSetupDisplayQuery(width: number): DisplayQuery {
-  return Object.freeze({ kind: "width-and-setup", width });
-}
-
-function malformedWorkerPlaybackState(): PlaybackState {
-  const failed = transitionPlaybackState(initialPlaybackState(), {
-    kind: "failure",
-    failure: providerFailure("malformed-response"),
-  });
-  if (failed.kind === "success") {
-    return failed.value;
-  }
-
-  throw new Error(
-    "The initial playback state must accept a failure transition.",
-  );
+function widthAndSetupDisplayQuery(width: number): DisplayQuery {
+  return { kind: "width-and-setup", width };
 }
 
 function playbackSnapshot(
   state: PlaybackState,
 ): BrowserPlaybackApplicationSnapshot {
-  return Object.freeze({ kind: "playback", state });
+  return { kind: "playback", state };
 }
 
 function fatalSnapshot(
@@ -515,5 +479,5 @@ function fatalSnapshot(
     { readonly kind: "fatal" }
   >["reason"],
 ): BrowserPlaybackApplicationSnapshot {
-  return Object.freeze({ kind: "fatal", reason });
+  return { kind: "fatal", reason };
 }

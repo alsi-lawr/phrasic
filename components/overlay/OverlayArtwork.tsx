@@ -65,7 +65,7 @@ function lastItemArtworkIdentity(item: LastPlaybackItem): string {
     case "available":
       switch (item.item.artwork.kind) {
         case "available": {
-          const url = item.item.artwork.url.value;
+          const url = item.item.artwork.url;
           return `artwork:available:${url.length}:${url}`;
         }
         case "unavailable":
@@ -164,7 +164,7 @@ function CurrentArtwork({ item, motion }: CurrentArtworkProps): ReactElement {
     case "available":
       return (
         <image
-          href={item.artwork.url.value}
+          href={item.artwork.url}
           x={overlayArtworkRectangle.x}
           y={overlayArtworkRectangle.y}
           width={overlayArtworkRectangle.width}

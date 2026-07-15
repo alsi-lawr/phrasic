@@ -1,11 +1,11 @@
-import type { PlaybackWireState } from "../../browser/worker/playback-wire.ts";
+import type { PlaybackState } from "../../domain/playback.ts";
 import type {
   PlaybackWorkerCommand,
   PlaybackWorkerEvent,
   PlaybackWorkerSafeDiagnostic,
 } from "../../browser/worker/protocol.ts";
 
-const wireState: PlaybackWireState = { kind: "empty" };
+declare const playbackState: PlaybackState;
 
 const initialize: PlaybackWorkerCommand = {
   kind: "initialize",
@@ -18,9 +18,23 @@ const initialize: PlaybackWorkerCommand = {
   },
 };
 
+const beginAuthorization: PlaybackWorkerCommand = {
+  kind: "begin-authorization",
+  returnTo: { setup: true, width: 1_280 },
+};
+
+const invalidBeginAuthorization: PlaybackWorkerCommand = {
+  kind: "begin-authorization",
+  returnTo: {
+    setup: true,
+    // @ts-expect-error Worker authorization commands require a numeric display width.
+    width: "1_280",
+  },
+};
+
 const playbackEvent: PlaybackWorkerEvent = {
   kind: "playback-state",
-  state: wireState,
+  state: playbackState,
 };
 
 const callbackRestoration: PlaybackWorkerEvent = {
@@ -47,8 +61,8 @@ const tokenBearingCommand: PlaybackWorkerCommand = {
 
 const tokenBearingEvent: PlaybackWorkerEvent = {
   kind: "playback-state",
-  state: wireState,
-  // @ts-expect-error Worker playback events expose only provider-neutral wire state.
+  state: playbackState,
+  // @ts-expect-error Worker playback events cannot expose bearer tokens.
   accessToken: "token-value",
 };
 
@@ -105,6 +119,8 @@ const rawErrorBearingDiagnostic: PlaybackWorkerSafeDiagnostic = {
 };
 
 void initialize;
+void beginAuthorization;
+void invalidBeginAuthorization;
 void playbackEvent;
 void callbackRestoration;
 void diagnostic;

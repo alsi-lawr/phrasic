@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { SpotifyAccessToken } from "../../../browser/auth/token.ts";
-import type { PlaybackProviderPort } from "../../../browser/providers/registry.ts";
+import type { PlaybackProviderPort } from "../../../browser/providers/provider.ts";
 import { createSpotifyPlaybackProvider } from "../../../browser/providers/spotify.ts";
 import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";
 import {
@@ -67,7 +67,7 @@ test("the Spotify playback provider normalizes 200 track and episode playback th
     },
   ]);
   assert.equal(fixture.scheduler.cancelledDeadlineCount, 2);
-  assert.equal(provider.providerId.value, "spotify");
+  assert.equal(provider.providerId, "spotify");
 });
 
 test("the Spotify playback provider keeps non-playback HTTP outcomes provider-safe", async () => {

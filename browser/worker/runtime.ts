@@ -1,5 +1,4 @@
 import {
-  parseAuthorizationReturnTarget,
   type AuthorizationConnectionResult,
   type AuthorizationProviderPort,
   type AuthorizationSessionPort,
@@ -15,19 +14,17 @@ import {
   transitionPlaybackState,
   type PlaybackEvent,
   type PlaybackState,
-  type ProviderId,
 } from "../../domain/playback.ts";
-import { serializePlaybackState } from "./playback-wire.ts";
 import {
-  type PlaybackProviderRegistry,
+  type PlaybackProviderPort,
   type PlaybackProviderResult,
-} from "../providers/registry.ts";
+} from "../providers/provider.ts";
 import {
   createPlaybackWorkerFatalInitializationFailure,
   createPlaybackWorkerSafeDiagnostic,
   noPlaybackWorkerDiagnosticMetadata,
-  parsePlaybackWorkerCommand,
   type PlaybackWorkerBeginAuthorizationCommand,
+  type PlaybackWorkerCommand,
   type PlaybackWorkerConsumeCallbackCommand,
   type PlaybackWorkerDiagnosticCode,
   type PlaybackWorkerDiagnosticMetadata,
@@ -39,9 +36,9 @@ import {
 const successfulPollDelayMilliseconds = 5_000;
 const accessTokenRefreshLeadMilliseconds = 60_000;
 const maximumScheduledDelayMilliseconds = maximumPlatformTimerDelayMilliseconds;
-const reconnectDelayMilliseconds: ReadonlyArray<number> = Object.freeze([
+const reconnectDelayMilliseconds: ReadonlyArray<number> = [
   1_000, 2_000, 4_000, 8_000, 16_000, 30_000,
-]);
+];
 
 export type PlaybackWorkerClockPort = {
   readonly now: () => number;
@@ -75,13 +72,12 @@ export type PlaybackWorkerRuntimePorts = {
   readonly cancellation: PlaybackWorkerCancellationPort;
   readonly clock: PlaybackWorkerClockPort;
   readonly events: PlaybackWorkerEventSink;
-  readonly playbackProviderId: ProviderId;
-  readonly playbackProviders: PlaybackProviderRegistry;
+  readonly playbackProvider: PlaybackProviderPort;
   readonly scheduler: PlaybackWorkerSchedulerPort;
 };
 
 export type PlaybackWorkerRuntime = {
-  readonly receive: (message: unknown) => Promise<void>;
+  readonly receive: (message: PlaybackWorkerCommand) => Promise<void>;
 };
 
 type RuntimeStatus =
@@ -112,15 +108,14 @@ type AccessTokenState =
       readonly refreshAtEpochMilliseconds: number;
     };
 
-type ScheduledWork =
-  | {
-      readonly kind: "none";
-    }
-  | {
-      readonly kind: "scheduled";
-      readonly task: PlaybackWorkerScheduledTask;
-      readonly ticket: number;
-    };
+type ScheduledTaskSlot = {
+  readonly cancel: () => void;
+  readonly isScheduled: () => boolean;
+  readonly schedule: (
+    delayMilliseconds: number,
+    run: () => Promise<void>,
+  ) => boolean;
+};
 
 type ActiveOperation =
   | {
@@ -165,56 +160,51 @@ type CurrentTime =
 export function createPlaybackWorkerRuntime(
   ports: PlaybackWorkerRuntimePorts,
 ): PlaybackWorkerRuntime {
-  let runtimeStatus: RuntimeStatus = frozenAwaitingInitialization();
+  let runtimeStatus: RuntimeStatus = awaitingInitialization();
   let visibility: WorkerVisibility = "visible";
   let playbackState: PlaybackState = initialPlaybackState();
-  let accessTokenState: AccessTokenState = frozenMissingAccessToken();
-  let activeOperation: ActiveOperation = frozenNoActiveOperation();
-  let refreshFlight: RefreshFlight = frozenIdleRefreshFlight();
+  let accessTokenState: AccessTokenState = missingAccessToken();
+  let activeOperation: ActiveOperation = noActiveOperation();
+  let refreshFlight: RefreshFlight = idleRefreshFlight();
   let queuedWork: Promise<void> = Promise.resolve();
   let retryPosition = 0;
-  let pollSchedule: ScheduledWork = frozenNoScheduledWork();
-  let refreshSchedule: ScheduledWork = frozenNoScheduledWork();
-  let retrySchedule: ScheduledWork = frozenNoScheduledWork();
-  let pollTicket = 0;
-  let refreshTicket = 0;
-  let retryTicket = 0;
   let operationEpoch = 0;
 
-  const runtime: PlaybackWorkerRuntime = {
-    receive(message: unknown): Promise<void> {
-      const command = parsePlaybackWorkerCommand(message);
-      if (command.kind === "failure") {
-        emitDiagnostic("command", "invalid-command");
-        return Promise.resolve();
-      }
+  const schedulerFailure = (): void => {
+    emitDiagnostic("scheduler", "scheduler-failure");
+  };
+  const pollSlot = createScheduledTaskSlot(ports.scheduler, schedulerFailure);
+  const refreshSlot = createScheduledTaskSlot(
+    ports.scheduler,
+    schedulerFailure,
+  );
+  const retrySlot = createScheduledTaskSlot(ports.scheduler, schedulerFailure);
 
-      const receivedCommand = command.value;
-      switch (receivedCommand.kind) {
+  const runtime: PlaybackWorkerRuntime = {
+    receive(message: PlaybackWorkerCommand): Promise<void> {
+      switch (message.kind) {
         case "initialize":
-          return enqueue(() => initialize(receivedCommand));
+          return enqueue(() => initialize(message));
         case "begin-authorization":
-          return enqueue(() => beginAuthorization(receivedCommand));
+          return enqueue(() => beginAuthorization(message));
         case "consume-callback":
           cancelRuntimeWork();
-          return enqueue(() => consumeCallback(receivedCommand));
+          return enqueue(() => consumeCallback(message));
         case "retry":
           cancelRuntimeWork();
           return enqueue(retryConnection);
         case "visibility-change":
-          return receiveVisibilityChange(receivedCommand.visibility);
+          return receiveVisibilityChange(message.visibility);
         case "logout":
           return receiveLogout();
         case "dispose":
           receiveDispose();
           return Promise.resolve();
       }
-
-      return Promise.resolve();
     },
   };
 
-  return Object.freeze(runtime);
+  return runtime;
 
   function enqueue(work: () => Promise<void>): Promise<void> {
     const next = queuedWork.then(work, work);
@@ -258,7 +248,7 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    runtimeStatus = frozenActiveRuntime(authorization.value);
+    runtimeStatus = activeRuntime(authorization.value);
     playbackState = initialPlaybackState();
     emitPlaybackState();
     await recoverConnection();
@@ -269,12 +259,6 @@ export function createPlaybackWorkerRuntime(
   ): Promise<void> {
     if (!isRuntimeActive() || playbackState.kind !== "authorization-required") {
       emitDiagnostic("command", "command-not-allowed");
-      return;
-    }
-
-    const returnTo = parseAuthorizationReturnTarget(command.returnTo);
-    if (returnTo.kind === "failure") {
-      emitDiagnostic("authorization", "invalid-display-return-configuration");
       return;
     }
 
@@ -298,7 +282,7 @@ export function createPlaybackWorkerRuntime(
 
       const result = await authorization.value.beginAuthorization({
         nowEpochMilliseconds: now.epochMilliseconds,
-        returnTo: returnTo.value,
+        returnTo: command.returnTo,
         signal: operation.controller.signal,
       });
       if (!isCurrentOperation(operation)) {
@@ -326,7 +310,7 @@ export function createPlaybackWorkerRuntime(
           kind: "authorization-redirect",
           url: result.url,
         };
-        ports.events.emit(Object.freeze(event));
+        ports.events.emit(event);
         return;
       }
       case "connected":
@@ -493,7 +477,7 @@ export function createPlaybackWorkerRuntime(
       kind: "callback-url-restored",
       url,
     };
-    ports.events.emit(Object.freeze(event));
+    ports.events.emit(event);
   }
 
   async function retryConnection(): Promise<void> {
@@ -544,7 +528,7 @@ export function createPlaybackWorkerRuntime(
     }
 
     cancelRuntimeWork();
-    accessTokenState = frozenMissingAccessToken();
+    accessTokenState = missingAccessToken();
     retryPosition = 0;
     transition({ kind: "authorization-required", reason: "not-authorized" });
 
@@ -568,9 +552,9 @@ export function createPlaybackWorkerRuntime(
     }
 
     cancelRuntimeWork();
-    accessTokenState = frozenMissingAccessToken();
+    accessTokenState = missingAccessToken();
     retryPosition = 0;
-    runtimeStatus = frozenDisposedRuntime();
+    runtimeStatus = disposedRuntime();
   }
 
   async function recoverConnection(): Promise<void> {
@@ -600,7 +584,7 @@ export function createPlaybackWorkerRuntime(
         return;
       }
 
-      if (refreshSchedule.kind === "none") {
+      if (!refreshSlot.isScheduled()) {
         scheduleRefreshForAccessToken();
       }
 
@@ -653,12 +637,12 @@ export function createPlaybackWorkerRuntime(
           return;
         }
 
-        if (pollSchedule.kind === "none") {
+        if (!pollSlot.isScheduled()) {
           schedulePoll(0);
         }
         return;
       case "authorization-required":
-        accessTokenState = frozenMissingAccessToken();
+        accessTokenState = missingAccessToken();
         cancelAllSchedules();
         emitDiagnostic("token-refresh", "authorization-required");
         transition({
@@ -695,21 +679,14 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    const provider = ports.playbackProviders.resolve(ports.playbackProviderId);
-    if (provider.kind === "failure") {
-      emitDiagnostic("playback-poll", "runtime-operation-failed");
-      transitionToFailure(providerFailure("server-error"));
-      return;
-    }
-
     let result: PlaybackProviderResult;
     try {
-      result = await provider.value.fetchCurrentlyPlaying({
+      result = await ports.playbackProvider.fetchCurrentlyPlaying({
         accessToken: accessTokenState.accessToken,
         signal: operation.controller.signal,
       });
     } catch {
-      result = frozenNetworkFailure();
+      result = networkFailure();
     }
 
     if (!isCurrentOperation(operation)) {
@@ -750,7 +727,7 @@ export function createPlaybackWorkerRuntime(
         handleRateLimitedPlayback(result);
         return;
       case "permission-denied":
-        accessTokenState = frozenMissingAccessToken();
+        accessTokenState = missingAccessToken();
         cancelAllSchedules();
         emitDiagnostic(
           "playback-poll",
@@ -764,7 +741,7 @@ export function createPlaybackWorkerRuntime(
         return;
       case "unauthorized":
         if (!mayRefreshAfterUnauthorized) {
-          accessTokenState = frozenMissingAccessToken();
+          accessTokenState = missingAccessToken();
           cancelAllSchedules();
           emitDiagnostic(
             "playback-poll",
@@ -844,7 +821,7 @@ export function createPlaybackWorkerRuntime(
         await pollWithCurrentToken(operation, false);
         return;
       case "authorization-required":
-        accessTokenState = frozenMissingAccessToken();
+        accessTokenState = missingAccessToken();
         cancelAllSchedules();
         emitDiagnostic("token-refresh", "authorization-required");
         transition({
@@ -878,11 +855,11 @@ export function createPlaybackWorkerRuntime(
 
     const authorization = activeAuthorization();
     if (authorization.kind === "unavailable") {
-      return frozenUnexpectedRefreshResult();
+      return unexpectedRefreshResult();
     }
 
     const result = requestRefreshConnection(authorization.value, operation);
-    refreshFlight = frozenRunningRefreshFlight(operation.epoch, result);
+    refreshFlight = runningRefreshFlight(operation.epoch, result);
     try {
       return await result;
     } finally {
@@ -890,7 +867,7 @@ export function createPlaybackWorkerRuntime(
         refreshFlight.kind === "running" &&
         refreshFlight.operationEpoch === operation.epoch
       ) {
-        refreshFlight = frozenIdleRefreshFlight();
+        refreshFlight = idleRefreshFlight();
       }
     }
   }
@@ -907,12 +884,12 @@ export function createPlaybackWorkerRuntime(
         ? await authorization.recoverConnection(request)
         : await authorization.refreshCredential(request);
     } catch {
-      return frozenUnexpectedRefreshResult();
+      return unexpectedRefreshResult();
     }
   }
 
-  async function runScheduledRefresh(ticket: number): Promise<void> {
-    if (!canPerformNetworkWork() || refreshTicket !== ticket) {
+  async function runScheduledRefresh(): Promise<void> {
+    if (!canPerformNetworkWork()) {
       return;
     }
 
@@ -945,8 +922,8 @@ export function createPlaybackWorkerRuntime(
     }
   }
 
-  async function runScheduledRetry(ticket: number): Promise<void> {
-    if (!canPerformNetworkWork() || retryTicket !== ticket) {
+  async function runScheduledRetry(): Promise<void> {
+    if (!canPerformNetworkWork()) {
       return;
     }
 
@@ -978,7 +955,7 @@ export function createPlaybackWorkerRuntime(
       now.epochMilliseconds,
       expiresAtEpochMilliseconds - accessTokenRefreshLeadMilliseconds,
     );
-    accessTokenState = frozenAvailableAccessToken({
+    accessTokenState = availableAccessToken({
       accessToken,
       expiresAtEpochMilliseconds,
       refreshAtEpochMilliseconds,
@@ -1093,9 +1070,9 @@ export function createPlaybackWorkerRuntime(
   function emitPlaybackState(): void {
     const event: PlaybackWorkerEvent = {
       kind: "playback-state",
-      state: serializePlaybackState(playbackState),
+      state: playbackState,
     };
-    ports.events.emit(Object.freeze(event));
+    ports.events.emit(event);
   }
 
   function schedulePoll(delayMilliseconds: number): void {
@@ -1103,22 +1080,13 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    clearPollSchedule();
-    pollTicket += 1;
-    const ticket = pollTicket;
-    const scheduled = scheduleWork(delayMilliseconds, (): Promise<void> => {
-      if (!canPerformNetworkWork() || pollTicket !== ticket) {
+    pollSlot.schedule(delayMilliseconds, (): Promise<void> => {
+      if (!canPerformNetworkWork()) {
         return Promise.resolve();
       }
 
-      pollSchedule = frozenNoScheduledWork();
       return enqueue(recoverConnection);
     });
-    if (scheduled.kind === "failure") {
-      return;
-    }
-
-    pollSchedule = frozenScheduledWork(ticket, scheduled.value);
   }
 
   function scheduleRefreshForAccessToken(): void {
@@ -1140,22 +1108,13 @@ export function createPlaybackWorkerRuntime(
       remainingDelay,
       maximumScheduledDelayMilliseconds,
     );
-    clearRefreshSchedule();
-    refreshTicket += 1;
-    const ticket = refreshTicket;
-    const scheduled = scheduleWork(delayMilliseconds, (): Promise<void> => {
-      if (!canPerformNetworkWork() || refreshTicket !== ticket) {
+    refreshSlot.schedule(delayMilliseconds, (): Promise<void> => {
+      if (!canPerformNetworkWork()) {
         return Promise.resolve();
       }
 
-      refreshSchedule = frozenNoScheduledWork();
-      return enqueue(() => runScheduledRefresh(ticket));
+      return enqueue(runScheduledRefresh);
     });
-    if (scheduled.kind === "failure") {
-      return;
-    }
-
-    refreshSchedule = frozenScheduledWork(ticket, scheduled.value);
   }
 
   function scheduleRetry(delayMilliseconds: number): void {
@@ -1163,44 +1122,15 @@ export function createPlaybackWorkerRuntime(
       return;
     }
 
-    clearPollSchedule();
-    clearRefreshSchedule();
-    clearRetrySchedule();
-    retryTicket += 1;
-    const ticket = retryTicket;
-    const scheduled = scheduleWork(delayMilliseconds, (): Promise<void> => {
-      if (!canPerformNetworkWork() || retryTicket !== ticket) {
+    pollSlot.cancel();
+    refreshSlot.cancel();
+    retrySlot.schedule(delayMilliseconds, (): Promise<void> => {
+      if (!canPerformNetworkWork()) {
         return Promise.resolve();
       }
 
-      retrySchedule = frozenNoScheduledWork();
-      return enqueue(() => runScheduledRetry(ticket));
+      return enqueue(runScheduledRetry);
     });
-    if (scheduled.kind === "failure") {
-      return;
-    }
-
-    retrySchedule = frozenScheduledWork(ticket, scheduled.value);
-  }
-
-  function scheduleWork(
-    delayMilliseconds: number,
-    run: () => Promise<void>,
-  ):
-    | {
-        readonly kind: "success";
-        readonly value: PlaybackWorkerScheduledTask;
-      }
-    | {
-        readonly kind: "failure";
-      } {
-    try {
-      const task = ports.scheduler.schedule({ delayMilliseconds, run });
-      return Object.freeze({ kind: "success", value: task });
-    } catch {
-      emitDiagnostic("scheduler", "scheduler-failure");
-      return Object.freeze({ kind: "failure" });
-    }
   }
 
   function cancelRuntimeWork(): void {
@@ -1213,39 +1143,9 @@ export function createPlaybackWorkerRuntime(
   }
 
   function cancelAllSchedules(): void {
-    clearPollSchedule();
-    clearRefreshSchedule();
-    clearRetrySchedule();
-  }
-
-  function clearPollSchedule(): void {
-    pollTicket += 1;
-    cancelScheduledWork(pollSchedule);
-    pollSchedule = frozenNoScheduledWork();
-  }
-
-  function clearRefreshSchedule(): void {
-    refreshTicket += 1;
-    cancelScheduledWork(refreshSchedule);
-    refreshSchedule = frozenNoScheduledWork();
-  }
-
-  function clearRetrySchedule(): void {
-    retryTicket += 1;
-    cancelScheduledWork(retrySchedule);
-    retrySchedule = frozenNoScheduledWork();
-  }
-
-  function cancelScheduledWork(work: ScheduledWork): void {
-    if (work.kind === "none") {
-      return;
-    }
-
-    try {
-      work.task.cancel();
-    } catch {
-      emitDiagnostic("scheduler", "scheduler-failure");
-    }
+    pollSlot.cancel();
+    refreshSlot.cancel();
+    retrySlot.cancel();
   }
 
   function startOperation(): RuntimeOperation {
@@ -1254,8 +1154,12 @@ export function createPlaybackWorkerRuntime(
       epoch: currentOperationEpoch(),
       controller: ports.cancellation.create(),
     };
-    activeOperation = frozenActiveOperation(operation);
-    return Object.freeze(operation);
+    activeOperation = {
+      kind: "active",
+      epoch: operation.epoch,
+      controller: operation.controller,
+    };
+    return operation;
   }
 
   function operationEpochIncrement(): void {
@@ -1277,7 +1181,7 @@ export function createPlaybackWorkerRuntime(
       activeOperation.controller.abort();
     }
 
-    activeOperation = frozenNoActiveOperation();
+    activeOperation = noActiveOperation();
   }
 
   function finishOperation(operation: RuntimeOperation): void {
@@ -1285,7 +1189,7 @@ export function createPlaybackWorkerRuntime(
       activeOperation.kind === "active" &&
       activeOperation.epoch === operation.epoch
     ) {
-      activeOperation = frozenNoActiveOperation();
+      activeOperation = noActiveOperation();
     }
   }
 
@@ -1301,7 +1205,7 @@ export function createPlaybackWorkerRuntime(
     code: "invalid-public-configuration" | "worker-initialization-failed",
   ): void {
     cancelRuntimeWork();
-    runtimeStatus = frozenFatalRuntime();
+    runtimeStatus = fatalRuntime();
     ports.events.emit(createPlaybackWorkerFatalInitializationFailure(code));
   }
 
@@ -1314,13 +1218,13 @@ export function createPlaybackWorkerRuntime(
         readonly kind: "unavailable";
       } {
     if (runtimeStatus.kind !== "active") {
-      return Object.freeze({ kind: "unavailable" });
+      return { kind: "unavailable" };
     }
 
-    return Object.freeze({
+    return {
       kind: "available",
       value: runtimeStatus.authorization,
-    });
+    };
   }
 
   function readCurrentTime(): CurrentTime {
@@ -1328,14 +1232,14 @@ export function createPlaybackWorkerRuntime(
     try {
       epochMilliseconds = ports.clock.now();
     } catch {
-      return frozenUnavailableCurrentTime();
+      return unavailableCurrentTime();
     }
 
     if (!Number.isSafeInteger(epochMilliseconds) || epochMilliseconds < 0) {
-      return frozenUnavailableCurrentTime();
+      return unavailableCurrentTime();
     }
 
-    return frozenAvailableCurrentTime(epochMilliseconds);
+    return availableCurrentTime(epochMilliseconds);
   }
 
   function isRuntimeActive(): boolean {
@@ -1381,28 +1285,28 @@ function parseApplicationUrl(input: string):
       url.username !== "" ||
       url.password !== ""
     ) {
-      return Object.freeze({ kind: "failure" });
+      return { kind: "failure" };
     }
 
-    return Object.freeze({ kind: "success", value: url });
+    return { kind: "success", value: url };
   } catch {
-    return Object.freeze({ kind: "failure" });
+    return { kind: "failure" };
   }
 }
 
 function httpStatusMetadata(status: number): PlaybackWorkerDiagnosticMetadata {
-  return Object.freeze({ kind: "http-status", status });
+  return { kind: "http-status", status };
 }
 
 function httpStatusAndRetryMetadata(
   status: number,
   retryAfterMilliseconds: number,
 ): PlaybackWorkerDiagnosticMetadata {
-  return Object.freeze({
+  return {
     kind: "http-status-and-retry-after",
     status,
     retryAfterMilliseconds,
-  });
+  };
 }
 
 function isSafeScheduleDelay(delayMilliseconds: number): boolean {
@@ -1431,84 +1335,124 @@ function authorizationRequiredReason(
   return unreachable(reason);
 }
 
-function frozenAwaitingInitialization(): RuntimeStatus {
-  return Object.freeze({ kind: "awaiting-initialization" });
+function awaitingInitialization(): RuntimeStatus {
+  return { kind: "awaiting-initialization" };
 }
 
-function frozenActiveRuntime(
-  authorization: AuthorizationSessionPort,
-): RuntimeStatus {
-  return Object.freeze({ kind: "active", authorization });
+function activeRuntime(authorization: AuthorizationSessionPort): RuntimeStatus {
+  return { kind: "active", authorization };
 }
 
-function frozenDisposedRuntime(): RuntimeStatus {
-  return Object.freeze({ kind: "disposed" });
+function disposedRuntime(): RuntimeStatus {
+  return { kind: "disposed" };
 }
 
-function frozenFatalRuntime(): RuntimeStatus {
-  return Object.freeze({ kind: "fatal" });
+function fatalRuntime(): RuntimeStatus {
+  return { kind: "fatal" };
 }
 
-function frozenMissingAccessToken(): AccessTokenState {
-  return Object.freeze({ kind: "missing" });
+function missingAccessToken(): AccessTokenState {
+  return { kind: "missing" };
 }
 
-function frozenAvailableAccessToken(input: {
+function availableAccessToken(input: {
   readonly accessToken: PlaybackCredential;
   readonly expiresAtEpochMilliseconds: number;
   readonly refreshAtEpochMilliseconds: number;
 }): AccessTokenState {
-  return Object.freeze({ kind: "available", ...input });
+  return { kind: "available", ...input };
 }
 
-function frozenNoScheduledWork(): ScheduledWork {
-  return Object.freeze({ kind: "none" });
+function createScheduledTaskSlot(
+  scheduler: PlaybackWorkerSchedulerPort,
+  onFailure: () => void,
+): ScheduledTaskSlot {
+  let task: PlaybackWorkerScheduledTask | undefined;
+  let generation = 0;
+
+  const cancel = (): void => {
+    generation += 1;
+    const scheduledTask = task;
+    task = undefined;
+    if (scheduledTask === undefined) {
+      return;
+    }
+
+    try {
+      scheduledTask.cancel();
+    } catch {
+      onFailure();
+    }
+  };
+
+  const isScheduled = (): boolean => task !== undefined;
+
+  const schedule = (
+    delayMilliseconds: number,
+    run: () => Promise<void>,
+  ): boolean => {
+    cancel();
+    const scheduledGeneration = generation;
+    let invokedBeforeScheduleReturned = false;
+
+    try {
+      const scheduledTask = scheduler.schedule({
+        delayMilliseconds,
+        run(): Promise<void> {
+          if (generation !== scheduledGeneration) {
+            return Promise.resolve();
+          }
+
+          invokedBeforeScheduleReturned = true;
+          task = undefined;
+          return run();
+        },
+      });
+      if (
+        generation === scheduledGeneration &&
+        !invokedBeforeScheduleReturned
+      ) {
+        task = scheduledTask;
+      }
+      return true;
+    } catch {
+      onFailure();
+      return false;
+    }
+  };
+
+  return { cancel, isScheduled, schedule };
 }
 
-function frozenScheduledWork(
-  ticket: number,
-  task: PlaybackWorkerScheduledTask,
-): ScheduledWork {
-  return Object.freeze({ kind: "scheduled", ticket, task });
+function noActiveOperation(): ActiveOperation {
+  return { kind: "none" };
 }
 
-function frozenNoActiveOperation(): ActiveOperation {
-  return Object.freeze({ kind: "none" });
+function idleRefreshFlight(): RefreshFlight {
+  return { kind: "idle" };
 }
 
-function frozenActiveOperation(operation: RuntimeOperation): ActiveOperation {
-  return Object.freeze({
-    kind: "active",
-    epoch: operation.epoch,
-    controller: operation.controller,
-  });
-}
-
-function frozenIdleRefreshFlight(): RefreshFlight {
-  return Object.freeze({ kind: "idle" });
-}
-
-function frozenRunningRefreshFlight(
+function runningRefreshFlight(
   operationEpoch: number,
   result: Promise<RuntimeRefreshResult>,
 ): RefreshFlight {
-  return Object.freeze({ kind: "running", operationEpoch, result });
+  return { kind: "running", operationEpoch, result };
 }
 
-function frozenAvailableCurrentTime(epochMilliseconds: number): CurrentTime {
-  return Object.freeze({ kind: "available", epochMilliseconds });
+function availableCurrentTime(epochMilliseconds: number): CurrentTime {
+  return { kind: "available", epochMilliseconds };
 }
 
-function frozenUnavailableCurrentTime(): CurrentTime {
-  return Object.freeze({ kind: "unavailable" });
+function unavailableCurrentTime(): CurrentTime {
+  return { kind: "unavailable" };
 }
 
-function frozenUnexpectedRefreshResult(): RuntimeRefreshResult {
-  return Object.freeze({ kind: "unexpected" });
+function unexpectedRefreshResult(): RuntimeRefreshResult {
+  return { kind: "unexpected" };
 }
 
-function frozenNetworkFailure(): PlaybackProviderResult {
-  return Object.freeze({ kind: "network-failure" });
+function networkFailure(): PlaybackProviderResult {
+  return { kind: "network-failure" };
 }
 
 function unreachable(value: never): never {

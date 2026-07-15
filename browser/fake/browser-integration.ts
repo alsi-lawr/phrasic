@@ -1,29 +1,25 @@
 import type { BrowserPlaybackIntegration } from "../integrations/browser-integration.ts";
 
-export const fakeBrowserIntegration: BrowserPlaybackIntegration = Object.freeze(
-  {
-    applicationPath: "/fake/",
+export const fakeBrowserIntegration: BrowserPlaybackIntegration = {
+  applicationPath: "/fake/",
 
-    prepare(): Promise<{
-      readonly kind: "success";
-      readonly callbackUrl: { readonly kind: "unavailable" };
-      readonly configuration: { readonly fake: object };
-    }> {
-      return Promise.resolve(
-        Object.freeze({
-          kind: "success",
-          callbackUrl: Object.freeze({ kind: "unavailable" }),
-          configuration: Object.freeze({ fake: Object.freeze({}) }),
-        }),
-      );
-    },
-
-    validateAuthorizationUrl() {
-      return Object.freeze({ kind: "invalid" });
-    },
-
-    validateRestoredUrl() {
-      return Object.freeze({ kind: "invalid" });
-    },
+  prepare(): Promise<{
+    readonly kind: "success";
+    readonly callbackUrl: { readonly kind: "unavailable" };
+    readonly configuration: { readonly fake: object };
+  }> {
+    return Promise.resolve({
+      kind: "success",
+      callbackUrl: { kind: "unavailable" },
+      configuration: { fake: {} },
+    });
   },
-);
+
+  validateAuthorizationUrl() {
+    return { kind: "invalid" };
+  },
+
+  validateRestoredUrl() {
+    return { kind: "invalid" };
+  },
+};

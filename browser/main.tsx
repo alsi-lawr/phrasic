@@ -4,6 +4,7 @@ import {
   type BrowserPlaybackApplicationPorts,
   type BrowserPlaybackWorker,
 } from "./application.ts";
+import type { PlaybackWorkerEvent } from "./worker/protocol.ts";
 import { fetchBrowserConfiguration } from "./configuration-fetch.ts";
 import NowPlayingOverlay from "../components/overlay/NowPlayingOverlay.tsx";
 import { spotifyOverlayPresentation } from "./providers/spotify-presentation.ts";
@@ -26,7 +27,7 @@ createRoot(rootElement).render(
 );
 
 function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
-  return Object.freeze({
+  return {
     createWorker: createPlaybackWorker,
     fetchConfiguration(options) {
       return fetchBrowserConfiguration({
@@ -38,7 +39,7 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
       });
     },
     integration: spotifyBrowserIntegration,
-    location: Object.freeze({
+    location: {
       current(): URL {
         return new URL(window.location.href);
       },
@@ -48,7 +49,7 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
       replace(url: URL): void {
         window.history.replaceState(null, "", `${url.pathname}${url.search}`);
       },
-    }),
+    },
     onPageHide(listener: () => void): () => void {
       window.addEventListener("pagehide", listener, { once: true });
 
@@ -66,7 +67,7 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
     visibility(): "hidden" | "visible" {
       return document.visibilityState === "visible" ? "visible" : "hidden";
     },
-  });
+  };
 }
 
 function createPlaybackWorker(): BrowserPlaybackWorker {
@@ -86,8 +87,8 @@ function createPlaybackWorker(): BrowserPlaybackWorker {
         worker.removeEventListener("error", onError);
       };
     },
-    onMessage(listener: (message: unknown) => void): () => void {
-      const onMessage = (event: MessageEvent<unknown>): void => {
+    onMessage(listener: (message: PlaybackWorkerEvent) => void): () => void {
+      const onMessage = (event: MessageEvent<PlaybackWorkerEvent>): void => {
         listener(event.data);
       };
       worker.addEventListener("message", onMessage);
@@ -104,5 +105,5 @@ function createPlaybackWorker(): BrowserPlaybackWorker {
     },
   };
 
-  return Object.freeze(playbackWorker);
+  return playbackWorker;
 }

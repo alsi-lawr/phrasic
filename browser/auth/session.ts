@@ -132,7 +132,7 @@ export function createBrowserAuthClockPort(
     },
   };
 
-  return Object.freeze(clock);
+  return clock;
 }
 
 export async function beginSpotifyAuthorization(
@@ -152,7 +152,7 @@ export async function beginSpotifyAuthorization(
     }),
   };
 
-  return Object.freeze(redirect);
+  return redirect;
 }
 
 export async function consumeSpotifyAuthorizationCallback(
@@ -165,7 +165,7 @@ export async function consumeSpotifyAuthorizationCallback(
 
   switch (callback.kind) {
     case "malformed":
-      return frozenMalformedCallback(callback.code);
+      return malformedCallback(callback.code);
     case "denied":
       return consumeDeniedSpotifyAuthorizationCallback(callback, options);
     case "success":
@@ -183,7 +183,7 @@ export async function refreshSpotifyConnection(
 ): Promise<RefreshSpotifyConnectionResult> {
   const storedRefreshToken = await options.storage.readSpotifyRefreshToken();
   if (storedRefreshToken.kind === "missing") {
-    return frozenMissingConnectionAuthorizationRequired();
+    return missingConnectionAuthorizationRequired();
   }
 
   const refreshed = await refreshSpotifyAccessToken({
@@ -200,15 +200,15 @@ export async function refreshSpotifyConnection(
         );
       }
 
-      return frozenRefreshSuccess(refreshed.accessToken, refreshed.expiresIn);
+      return refreshSuccess(refreshed.accessToken, refreshed.expiresIn);
     }
     case "authorization-required":
       await options.storage.deleteSpotifyRefreshToken();
-      return frozenInvalidCredentialsAuthorizationRequired();
+      return invalidCredentialsAuthorizationRequired();
     case "transient-failure":
-      return frozenRefreshTransientFailure();
+      return refreshTransientFailure();
     case "provider-failure":
-      return frozenRefreshProviderFailure(refreshed.code);
+      return refreshProviderFailure(refreshed.code);
   }
 
   const unhandledRefresh: never = refreshed;
@@ -223,7 +223,7 @@ export async function logoutSpotifyAuthorization(
     kind: "logged-out",
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
 async function consumeDeniedSpotifyAuthorizationCallback(
@@ -231,9 +231,7 @@ async function consumeDeniedSpotifyAuthorizationCallback(
   options: ConsumeSpotifyAuthorizationCallbackOptions,
 ): Promise<ConsumeSpotifyAuthorizationCallbackResult> {
   if (callback.state.kind !== "state-candidate") {
-    return frozenInvalidPendingAuthorizationRequired(
-      "invalid-pending-authorization",
-    );
+    return invalidPendingAuthorizationRequired("invalid-pending-authorization");
   }
 
   const consumed = await options.storage.consumePendingAuthorizationAttempt({
@@ -244,7 +242,7 @@ async function consumeDeniedSpotifyAuthorizationCallback(
     return authorizationRequiredForPendingRejection(consumed);
   }
 
-  return frozenAuthorizationDenied(consumed.attempt.returnTo);
+  return authorizationDenied(consumed.attempt.returnTo);
 }
 
 async function consumeSuccessfulSpotifyAuthorizationCallback(
@@ -269,23 +267,20 @@ async function consumeSuccessfulSpotifyAuthorizationCallback(
   switch (exchanged.kind) {
     case "success":
       await options.storage.saveSpotifyRefreshToken(exchanged.refreshToken);
-      return frozenConnected(
+      return connected(
         exchanged.accessToken,
         exchanged.expiresIn,
         consumed.attempt.returnTo,
       );
     case "authorization-required":
       await options.storage.deleteSpotifyRefreshToken();
-      return frozenCallbackInvalidCredentialsAuthorizationRequired(
+      return callbackInvalidCredentialsAuthorizationRequired(
         consumed.attempt.returnTo,
       );
     case "transient-failure":
-      return frozenCallbackTransientFailure(consumed.attempt.returnTo);
+      return callbackTransientFailure(consumed.attempt.returnTo);
     case "provider-failure":
-      return frozenCallbackProviderFailure(
-        exchanged.code,
-        consumed.attempt.returnTo,
-      );
+      return callbackProviderFailure(exchanged.code, consumed.attempt.returnTo);
   }
 
   const unhandledExchange: never = exchanged;
@@ -301,17 +296,13 @@ function authorizationRequiredForPendingRejection(
   >,
 ): ConsumeSpotifyAuthorizationCallbackResult {
   if (consumed.reason === "expired") {
-    return frozenInvalidPendingAuthorizationRequired(
-      "expired-pending-authorization",
-    );
+    return invalidPendingAuthorizationRequired("expired-pending-authorization");
   }
 
-  return frozenInvalidPendingAuthorizationRequired(
-    "invalid-pending-authorization",
-  );
+  return invalidPendingAuthorizationRequired("invalid-pending-authorization");
 }
 
-function frozenMalformedCallback(
+function malformedCallback(
   code: Extract<
     SpotifyAuthorizationCallback,
     { readonly kind: "malformed" }
@@ -322,10 +313,10 @@ function frozenMalformedCallback(
     code,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenAuthorizationDenied(
+function authorizationDenied(
   returnTo: DisplayReturnConfiguration,
 ): ConsumeSpotifyAuthorizationCallbackResult {
   const result: ConsumeSpotifyAuthorizationCallbackResult = {
@@ -333,10 +324,10 @@ function frozenAuthorizationDenied(
     returnTo,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenInvalidPendingAuthorizationRequired(
+function invalidPendingAuthorizationRequired(
   reason: Extract<
     ConsumeSpotifyAuthorizationCallbackResult,
     {
@@ -351,10 +342,10 @@ function frozenInvalidPendingAuthorizationRequired(
     reason,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenCallbackInvalidCredentialsAuthorizationRequired(
+function callbackInvalidCredentialsAuthorizationRequired(
   returnTo: DisplayReturnConfiguration,
 ): ConsumeSpotifyAuthorizationCallbackResult {
   const result: ConsumeSpotifyAuthorizationCallbackResult = {
@@ -363,10 +354,10 @@ function frozenCallbackInvalidCredentialsAuthorizationRequired(
     returnTo,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenConnected(
+function connected(
   accessToken: SpotifyAccessToken,
   expiresIn: SpotifyAccessTokenLifetimeSeconds,
   returnTo: DisplayReturnConfiguration,
@@ -378,10 +369,10 @@ function frozenConnected(
     returnTo,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenCallbackTransientFailure(
+function callbackTransientFailure(
   returnTo: DisplayReturnConfiguration,
 ): ConsumeSpotifyAuthorizationCallbackResult {
   const result: ConsumeSpotifyAuthorizationCallbackResult = {
@@ -389,10 +380,10 @@ function frozenCallbackTransientFailure(
     returnTo,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenCallbackProviderFailure(
+function callbackProviderFailure(
   code: Extract<
     SpotifyTokenRequestFailure,
     { readonly kind: "provider-failure" }
@@ -405,10 +396,10 @@ function frozenCallbackProviderFailure(
     returnTo,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenRefreshSuccess(
+function refreshSuccess(
   accessToken: SpotifyAccessToken,
   expiresIn: SpotifyAccessTokenLifetimeSeconds,
 ): RefreshSpotifyConnectionResult {
@@ -418,36 +409,36 @@ function frozenRefreshSuccess(
     expiresIn,
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenMissingConnectionAuthorizationRequired(): RefreshSpotifyConnectionResult {
+function missingConnectionAuthorizationRequired(): RefreshSpotifyConnectionResult {
   const result: RefreshSpotifyConnectionResult = {
     kind: "authorization-required",
     reason: "missing-connection",
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenInvalidCredentialsAuthorizationRequired(): RefreshSpotifyConnectionResult {
+function invalidCredentialsAuthorizationRequired(): RefreshSpotifyConnectionResult {
   const result: RefreshSpotifyConnectionResult = {
     kind: "authorization-required",
     reason: "invalid-credentials",
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenRefreshTransientFailure(): RefreshSpotifyConnectionResult {
+function refreshTransientFailure(): RefreshSpotifyConnectionResult {
   const result: RefreshSpotifyConnectionResult = {
     kind: "transient-failure",
   };
 
-  return Object.freeze(result);
+  return result;
 }
 
-function frozenRefreshProviderFailure(
+function refreshProviderFailure(
   code: Extract<
     SpotifyTokenRequestFailure,
     { readonly kind: "provider-failure" }
@@ -458,5 +449,5 @@ function frozenRefreshProviderFailure(
     code,
   };
 
-  return Object.freeze(result);
+  return result;
 }

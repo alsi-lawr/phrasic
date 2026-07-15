@@ -31,5 +31,5 @@ export async function fetchBrowserConfiguration(
     },
   };
 
-  return Object.freeze(configurationResponse);
+  return configurationResponse;
 }

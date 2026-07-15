@@ -24,12 +24,10 @@ import {
 import { createSpotifyAuthorizationProvider } from "../../../browser/auth/spotify-provider.ts";
 import { parseSpotifyPlaybackPayload } from "../../../browser/providers/spotify-payload.ts";
 import {
-  createPlaybackProviderRegistry,
   type PlaybackProviderPort,
-  type PlaybackProviderRegistry,
   type PlaybackProviderRequest,
   type PlaybackProviderResult,
-} from "../../../browser/providers/registry.ts";
+} from "../../../browser/providers/provider.ts";
 import {
   createPlaybackWorkerRuntime,
   type PlaybackWorkerEventSink,
@@ -38,8 +36,11 @@ import {
 } from "../../../browser/worker/runtime.ts";
 import { createSpotifyPlaybackProvider } from "../../../browser/providers/spotify.ts";
 import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";
-import type { PlaybackWorkerEvent } from "../../../browser/worker/protocol.ts";
-import { ProviderId } from "../../../domain/playback.ts";
+import type {
+  PlaybackWorkerCommand,
+  PlaybackWorkerEvent,
+} from "../../../browser/worker/protocol.ts";
+import { parseProviderId, type ProviderId } from "../../../domain/playback.ts";
 import {
   emptyTrackPayload,
   playingTrackPayload,
@@ -754,14 +755,7 @@ test("safe diagnostics omit credential, callback, request, raw-error, and payloa
   });
 
   await runtime.receive(initializeCommand());
-  await runtime.receive({
-    kind: "retry",
-    callbackValue: sentinels.callbackValue,
-    headers: { Authorization: `Bearer ${sentinels.accessToken}` },
-    body: sentinels.body,
-    error: new Error(sentinels.rawError),
-    payload: { refresh_token: sentinels.refreshToken },
-  });
+  await runtime.receive({ kind: "retry" });
   await runtime.receive({ kind: "logout" });
   await runtime.receive({
     kind: "consume-callback",
@@ -777,13 +771,6 @@ test("safe diagnostics omit credential, callback, request, raw-error, and payloa
       (event) =>
         event.kind === "safe-diagnostic" &&
         event.code === "playback-network-failure",
-    ),
-    true,
-  );
-  assert.equal(
-    events.some(
-      (event) =>
-        event.kind === "safe-diagnostic" && event.code === "invalid-command",
     ),
     true,
   );
@@ -829,6 +816,34 @@ test("visibility suspension cancels scheduled work and resumes with one delibera
   assert.deepEqual(fixture.scheduler.activeDelays(), [5_000, 3_540_000]);
 });
 
+test("a synchronous scheduler callback does not leave a phantom scheduled task", async () => {
+  const storage = new MemorySpotifyAuthStorage();
+  await storage.seedRefreshToken("stored-refresh");
+  const clock = new FakeClock(1_000_000);
+  const scheduler = new SynchronousFirstScheduler();
+  const events: PlaybackWorkerEvent[] = [];
+  const runtime = createRuntime({
+    storage,
+    scheduler,
+    clock,
+    events,
+    authFetch: new QueuedSpotifyAuthFetch([tokenResponse("initial-access")]),
+    spotify: new QueuedSpotifyTransport([playbackResult(playingTrackPayload)]),
+  });
+
+  await runtime.receive(initializeCommand());
+  await scheduler.waitForSynchronousCallback();
+  await runtime.receive({ kind: "visibility-change", visibility: "hidden" });
+
+  assert.equal(
+    events.some(
+      (event) =>
+        event.kind === "safe-diagnostic" && event.code === "scheduler-failure",
+    ),
+    false,
+  );
+});
+
 type RuntimeFixture = {
   readonly authFetch: QueuedSpotifyAuthFetch;
   readonly clock: FakeClock;
@@ -856,7 +871,7 @@ type RuntimeDependencies = {
   readonly authFetch: SpotifyAuthFetchPort;
   readonly clock: FakeClock;
   readonly events: PlaybackWorkerEvent[];
-  readonly scheduler: FakeScheduler;
+  readonly scheduler: PlaybackWorkerSchedulerPort;
   readonly spotify: PlaybackProviderPort;
   readonly storage: MemorySpotifyAuthStorage;
 };
@@ -951,25 +966,13 @@ function createRuntime(
       },
     }),
     events,
-    playbackProviderId: dependencies.spotify.providerId,
-    playbackProviders: playbackProviderRegistry(dependencies.spotify),
+    playbackProvider: dependencies.spotify,
     scheduler: dependencies.scheduler,
   });
 }
 
-function playbackProviderRegistry(
-  provider: PlaybackProviderPort,
-): PlaybackProviderRegistry {
-  const registry = createPlaybackProviderRegistry([provider]);
-  if (registry.kind === "success") {
-    return registry.value;
-  }
-
-  throw new Error("Expected a unique playback provider test registration.");
-}
-
 function spotifyProviderId(): ProviderId {
-  const providerId = ProviderId.create("spotify");
+  const providerId = parseProviderId("spotify");
   if (providerId.kind === "success") {
     return providerId.value;
   }
@@ -1075,7 +1078,7 @@ function rejectedWhenAborted(signal: AbortSignal): Promise<Response> {
   });
 }
 
-function initializeCommand(): unknown {
+function initializeCommand(): PlaybackWorkerCommand {
   return {
     kind: "initialize",
     applicationUrl: "https://nowplaying.example/nowplaying",
@@ -1484,6 +1487,40 @@ class FakeScheduler implements PlaybackWorkerSchedulerPort {
       cancel(): void {
         entry.cancelled = true;
       },
+    });
+  }
+}
+
+class SynchronousFirstScheduler implements PlaybackWorkerSchedulerPort {
+  private hasScheduled = false;
+  private synchronousCallback: Promise<void> | undefined;
+
+  async waitForSynchronousCallback(): Promise<void> {
+    if (this.synchronousCallback === undefined) {
+      throw new Error("Expected a synchronous callback.");
+    }
+
+    await this.synchronousCallback;
+  }
+
+  schedule(options: {
+    readonly delayMilliseconds: number;
+    readonly run: () => Promise<void>;
+  }): { readonly cancel: () => void } {
+    if (!this.hasScheduled) {
+      this.hasScheduled = true;
+      this.synchronousCallback = options.run();
+      return Object.freeze({
+        cancel(): void {
+          throw new Error(
+            "A synchronously completed task must not be cancelled.",
+          );
+        },
+      });
+    }
+
+    return Object.freeze({
+      cancel(): void {},
     });
   }
 }

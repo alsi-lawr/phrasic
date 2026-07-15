@@ -171,180 +171,119 @@ export type PlaybackTransitionError = {
   readonly event: PlaybackEvent["kind"];
 };
 
-export class ProviderId {
-  private readonly rawValue: string;
+declare const providerIdBrand: unique symbol;
+declare const providerItemIdBrand: unique symbol;
+declare const providerCollectionIdBrand: unique symbol;
+declare const displayTextBrand: unique symbol;
+declare const originalArtworkUrlBrand: unique symbol;
+declare const playbackPositionMillisecondsBrand: unique symbol;
+declare const playbackDurationMillisecondsBrand: unique symbol;
 
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
+export type ProviderId = string & {
+  readonly [providerIdBrand]: "ProviderId";
+};
+export type ProviderItemId = string & {
+  readonly [providerItemIdBrand]: "ProviderItemId";
+};
+export type ProviderCollectionId = string & {
+  readonly [providerCollectionIdBrand]: "ProviderCollectionId";
+};
+export type DisplayText = string & {
+  readonly [displayTextBrand]: "DisplayText";
+};
+export type OriginalArtworkUrl = string & {
+  readonly [originalArtworkUrlBrand]: "OriginalArtworkUrl";
+};
+export type PlaybackPositionMilliseconds = number & {
+  readonly [playbackPositionMillisecondsBrand]: "PlaybackPositionMilliseconds";
+};
+export type PlaybackDurationMilliseconds = number & {
+  readonly [playbackDurationMillisecondsBrand]: "PlaybackDurationMilliseconds";
+};
+
+export function parseProviderId(
+  input: unknown,
+): Result<ProviderId, ValueValidationError> {
+  const result = validateNonEmptyString("provider-id", input);
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<ProviderId, ValueValidationError> {
-    const result = validateNonEmptyString("provider-id", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new ProviderId(result.value));
-  }
+  return succeeded(result.value as ProviderId);
 }
 
-export class ProviderItemId {
-  private readonly rawValue: string;
-
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
+export function parseProviderItemId(
+  input: unknown,
+): Result<ProviderItemId, ValueValidationError> {
+  const result = validateNonEmptyString("provider-item-id", input);
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<ProviderItemId, ValueValidationError> {
-    const result = validateNonEmptyString("provider-item-id", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new ProviderItemId(result.value));
-  }
+  return succeeded(result.value as ProviderItemId);
 }
 
-export class ProviderCollectionId {
-  private readonly rawValue: string;
-
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
+export function parseProviderCollectionId(
+  input: unknown,
+): Result<ProviderCollectionId, ValueValidationError> {
+  const result = validateNonEmptyString("provider-collection-id", input);
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<ProviderCollectionId, ValueValidationError> {
-    const result = validateNonEmptyString("provider-collection-id", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new ProviderCollectionId(result.value));
-  }
+  return succeeded(result.value as ProviderCollectionId);
 }
 
 export const maximumPlatformTimerDelayMilliseconds = 2_147_483_647;
 
-export class PlaybackPositionMilliseconds {
-  private readonly rawValue: number;
-
-  private constructor(value: number) {
-    this.rawValue = value;
-    Object.freeze(this);
+export function parsePlaybackPositionMilliseconds(
+  input: unknown,
+): Result<PlaybackPositionMilliseconds, ValueValidationError> {
+  const result = validateNonNegativeInteger(
+    "playback-position-milliseconds",
+    input,
+  );
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): number {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<PlaybackPositionMilliseconds, ValueValidationError> {
-    const result = validateNonNegativeInteger(
-      "playback-position-milliseconds",
-      input,
-    );
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new PlaybackPositionMilliseconds(result.value));
-  }
+  return succeeded(result.value as PlaybackPositionMilliseconds);
 }
 
-export class PlaybackDurationMilliseconds {
-  private readonly rawValue: number;
-
-  private constructor(value: number) {
-    this.rawValue = value;
-    Object.freeze(this);
+export function parsePlaybackDurationMilliseconds(
+  input: unknown,
+): Result<PlaybackDurationMilliseconds, ValueValidationError> {
+  const result = validateNonNegativeInteger(
+    "playback-duration-milliseconds",
+    input,
+  );
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): number {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<PlaybackDurationMilliseconds, ValueValidationError> {
-    const result = validateNonNegativeInteger(
-      "playback-duration-milliseconds",
-      input,
-    );
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new PlaybackDurationMilliseconds(result.value));
-  }
+  return succeeded(result.value as PlaybackDurationMilliseconds);
 }
 
-export class DisplayText {
-  private readonly rawValue: string;
-
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
+export function parseDisplayText(
+  input: unknown,
+): Result<DisplayText, ValueValidationError> {
+  const result = validateNonEmptyString("display-text", input);
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<DisplayText, ValueValidationError> {
-    const result = validateNonEmptyString("display-text", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new DisplayText(result.value));
-  }
+  return succeeded(result.value as DisplayText);
 }
 
-export class OriginalArtworkUrl {
-  private readonly rawValue: string;
-
-  private constructor(value: string) {
-    this.rawValue = value;
-    Object.freeze(this);
+export function parseOriginalArtworkUrl(
+  input: unknown,
+): Result<OriginalArtworkUrl, ValueValidationError> {
+  const result = validateHttpUrl("original-artwork-url", input);
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get value(): string {
-    return this.rawValue;
-  }
-
-  public static create(
-    input: unknown,
-  ): Result<OriginalArtworkUrl, ValueValidationError> {
-    const result = validateHttpUrl("original-artwork-url", input);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new OriginalArtworkUrl(result.value));
-  }
+  return succeeded(result.value as OriginalArtworkUrl);
 }
 
 export type ProviderLinkInput = {
@@ -352,34 +291,20 @@ export type ProviderLinkInput = {
   readonly href: unknown;
 };
 
-export class ProviderLink {
-  private readonly linkedProviderId: ProviderId;
-  private readonly linkedHref: string;
+export type ProviderLink = {
+  readonly providerId: ProviderId;
+  readonly href: string;
+};
 
-  private constructor(providerId: ProviderId, href: string) {
-    this.linkedProviderId = providerId;
-    this.linkedHref = href;
-    Object.freeze(this);
+export function createProviderLink(
+  input: ProviderLinkInput,
+): Result<ProviderLink, ValueValidationError> {
+  const result = validateHttpUrl("provider-link", input.href);
+  if (result.kind === "failure") {
+    return result;
   }
 
-  public get providerId(): ProviderId {
-    return this.linkedProviderId;
-  }
-
-  public get href(): string {
-    return this.linkedHref;
-  }
-
-  public static create(
-    input: ProviderLinkInput,
-  ): Result<ProviderLink, ValueValidationError> {
-    const result = validateHttpUrl("provider-link", input.href);
-    if (result.kind === "failure") {
-      return result;
-    }
-
-    return succeeded(new ProviderLink(input.providerId, result.value));
-  }
+  return succeeded({ providerId: input.providerId, href: result.value });
 }
 
 export type OriginalArtwork =
@@ -399,7 +324,7 @@ export function availableOriginalArtwork(
     kind: "available",
     url,
   };
-  return Object.freeze(artwork);
+  return artwork;
 }
 
 export function unavailableOriginalArtwork(
@@ -409,77 +334,26 @@ export function unavailableOriginalArtwork(
     kind: "unavailable",
     reason,
   };
-  return Object.freeze(artwork);
+  return artwork;
 }
 
-export type CreatorInput = {
+export type Creator = {
   readonly name: DisplayText;
   readonly links: ReadonlyArray<ProviderLink>;
 };
 
-export class Creator {
-  public readonly name: DisplayText;
-  public readonly links: ReadonlyArray<ProviderLink>;
-
-  private constructor(input: CreatorInput) {
-    this.name = input.name;
-    this.links = freezeArray(input.links);
-    Object.freeze(this);
-  }
-
-  public static create(input: CreatorInput): Creator {
-    return new Creator(input);
-  }
-}
-
-export type CollectionInput = {
+export type Collection = {
   readonly id: ProviderCollectionId;
   readonly title: DisplayText;
   readonly links: ReadonlyArray<ProviderLink>;
 };
 
-export class Collection {
-  public readonly id: ProviderCollectionId;
-  public readonly title: DisplayText;
-  public readonly links: ReadonlyArray<ProviderLink>;
-
-  private constructor(input: CollectionInput) {
-    this.id = input.id;
-    this.title = input.title;
-    this.links = freezeArray(input.links);
-    Object.freeze(this);
-  }
-
-  public static create(input: CollectionInput): Collection {
-    return new Collection(input);
-  }
-}
-
-export type ShowInput = {
+export type Show = {
   readonly id: ProviderCollectionId;
   readonly title: DisplayText;
   readonly publisher: DisplayText;
   readonly links: ReadonlyArray<ProviderLink>;
 };
-
-export class Show {
-  public readonly id: ProviderCollectionId;
-  public readonly title: DisplayText;
-  public readonly publisher: DisplayText;
-  public readonly links: ReadonlyArray<ProviderLink>;
-
-  private constructor(input: ShowInput) {
-    this.id = input.id;
-    this.title = input.title;
-    this.publisher = input.publisher;
-    this.links = freezeArray(input.links);
-    Object.freeze(this);
-  }
-
-  public static create(input: ShowInput): Show {
-    return new Show(input);
-  }
-}
 
 export type TrackItemInput = {
   readonly providerId: ProviderId;
@@ -491,49 +365,30 @@ export type TrackItemInput = {
   readonly links: ReadonlyArray<ProviderLink>;
 };
 
-export class TrackItem {
-  private readonly itemKind = "track" as const;
-  public readonly providerId: ProviderId;
-  public readonly itemId: ProviderItemId;
-  public readonly title: DisplayText;
-  public readonly artists: ReadonlyArray<Creator>;
-  public readonly collection: Collection;
-  public readonly artwork: OriginalArtwork;
-  public readonly links: ReadonlyArray<ProviderLink>;
+export type TrackItem = {
+  readonly kind: "track";
+  readonly providerId: ProviderId;
+  readonly itemId: ProviderItemId;
+  readonly title: DisplayText;
+  readonly artists: ReadonlyArray<Creator>;
+  readonly collection: Collection;
+  readonly artwork: OriginalArtwork;
+  readonly links: ReadonlyArray<ProviderLink>;
+};
 
-  private constructor(input: TrackItemInput) {
-    this.providerId = input.providerId;
-    this.itemId = input.itemId;
-    this.title = input.title;
-    this.artists = freezeArray(input.artists);
-    this.collection = input.collection;
-    this.artwork = input.artwork;
-    this.links = freezeArray(input.links);
-    Object.freeze(this);
+export function createTrackItem(
+  input: TrackItemInput,
+): Result<TrackItem, ItemConstructionError> {
+  if (input.artists.length === 0) {
+    return failed(invalidItem("track", "missing-creators"));
   }
 
-  public get kind(): "track" {
-    return this.itemKind;
+  const linksError = providerLinksError(input.providerId, input.links, "track");
+  if (linksError.kind === "failure") {
+    return linksError;
   }
 
-  public static create(
-    input: TrackItemInput,
-  ): Result<TrackItem, ItemConstructionError> {
-    if (input.artists.length === 0) {
-      return failed(invalidItem("track", "missing-creators"));
-    }
-
-    const linksError = providerLinksError(
-      input.providerId,
-      input.links,
-      "track",
-    );
-    if (linksError.kind === "failure") {
-      return linksError;
-    }
-
-    return succeeded(new TrackItem(input));
-  }
+  return succeeded({ kind: "track", ...input });
 }
 
 export type EpisodeItemInput = {
@@ -545,43 +400,29 @@ export type EpisodeItemInput = {
   readonly links: ReadonlyArray<ProviderLink>;
 };
 
-export class EpisodeItem {
-  private readonly itemKind = "episode" as const;
-  public readonly providerId: ProviderId;
-  public readonly itemId: ProviderItemId;
-  public readonly title: DisplayText;
-  public readonly show: Show;
-  public readonly artwork: OriginalArtwork;
-  public readonly links: ReadonlyArray<ProviderLink>;
+export type EpisodeItem = {
+  readonly kind: "episode";
+  readonly providerId: ProviderId;
+  readonly itemId: ProviderItemId;
+  readonly title: DisplayText;
+  readonly show: Show;
+  readonly artwork: OriginalArtwork;
+  readonly links: ReadonlyArray<ProviderLink>;
+};
 
-  private constructor(input: EpisodeItemInput) {
-    this.providerId = input.providerId;
-    this.itemId = input.itemId;
-    this.title = input.title;
-    this.show = input.show;
-    this.artwork = input.artwork;
-    this.links = freezeArray(input.links);
-    Object.freeze(this);
+export function createEpisodeItem(
+  input: EpisodeItemInput,
+): Result<EpisodeItem, ItemConstructionError> {
+  const linksError = providerLinksError(
+    input.providerId,
+    input.links,
+    "episode",
+  );
+  if (linksError.kind === "failure") {
+    return linksError;
   }
 
-  public get kind(): "episode" {
-    return this.itemKind;
-  }
-
-  public static create(
-    input: EpisodeItemInput,
-  ): Result<EpisodeItem, ItemConstructionError> {
-    const linksError = providerLinksError(
-      input.providerId,
-      input.links,
-      "episode",
-    );
-    if (linksError.kind === "failure") {
-      return linksError;
-    }
-
-    return succeeded(new EpisodeItem(input));
-  }
+  return succeeded({ kind: "episode", ...input });
 }
 
 export type NowPlayingItem = EpisodeItem | TrackItem;
@@ -592,42 +433,23 @@ export type PlaybackSnapshotInput = {
   readonly duration: PlaybackDurationMilliseconds;
 };
 
-export class PlaybackSnapshot {
-  private readonly snapshotItem: NowPlayingItem;
-  private readonly snapshotPosition: PlaybackPositionMilliseconds;
-  private readonly snapshotDuration: PlaybackDurationMilliseconds;
+export type PlaybackSnapshot = {
+  readonly item: NowPlayingItem;
+  readonly position: PlaybackPositionMilliseconds;
+  readonly duration: PlaybackDurationMilliseconds;
+};
 
-  private constructor(input: PlaybackSnapshotInput) {
-    this.snapshotItem = input.item;
-    this.snapshotPosition = input.position;
-    this.snapshotDuration = input.duration;
-    Object.freeze(this);
+export function createPlaybackSnapshot(
+  input: PlaybackSnapshotInput,
+): Result<PlaybackSnapshot, PlaybackSnapshotError> {
+  if (input.position > input.duration) {
+    return failed({
+      kind: "invalid-playback-snapshot",
+      reason: "position-exceeds-duration",
+    });
   }
 
-  public get item(): NowPlayingItem {
-    return this.snapshotItem;
-  }
-
-  public get position(): PlaybackPositionMilliseconds {
-    return this.snapshotPosition;
-  }
-
-  public get duration(): PlaybackDurationMilliseconds {
-    return this.snapshotDuration;
-  }
-
-  public static create(
-    input: PlaybackSnapshotInput,
-  ): Result<PlaybackSnapshot, PlaybackSnapshotError> {
-    if (input.position.value > input.duration.value) {
-      return failed({
-        kind: "invalid-playback-snapshot",
-        reason: "position-exceeds-duration",
-      });
-    }
-
-    return succeeded(new PlaybackSnapshot(input));
-  }
+  return succeeded({ ...input });
 }
 
 export function authorizationFailure(
@@ -637,7 +459,7 @@ export function authorizationFailure(
     kind: "authorization-failed",
     reason,
   };
-  return Object.freeze(failure);
+  return failure;
 }
 
 export function providerFailure(
@@ -647,11 +469,11 @@ export function providerFailure(
     kind: "provider-failed",
     reason,
   };
-  return Object.freeze(failure);
+  return failure;
 }
 
 export function initialPlaybackState(): PlaybackState {
-  return freezeState({ kind: "initializing" });
+  return { kind: "initializing" };
 }
 
 export function currentPlaybackItem(state: PlaybackState): LastPlaybackItem {
@@ -683,56 +505,36 @@ export function transitionPlaybackState(
     case "authorization-complete":
       return transitionAuthorizationComplete(state, event);
     case "authorization-required":
-      return succeeded(
-        freezeState({
-          kind: "authorization-required",
-          reason: event.reason,
-        }),
-      );
+      return succeeded<PlaybackState>({
+        kind: "authorization-required",
+        reason: event.reason,
+      });
     case "begin-authorization":
       return transitionBeginAuthorization(state, event);
     case "connection-lost":
       return transitionConnectionLost(state, event);
     case "failure":
-      return succeeded(
-        freezeState({
-          kind: "failure",
-          error: event.failure,
-        }),
-      );
+      return succeeded<PlaybackState>({
+        kind: "failure",
+        error: event.failure,
+      });
     case "playback-empty":
-      return transitionFromConnectedState(
-        state,
-        event,
-        freezeState({ kind: "empty" }),
-      );
+      return transitionFromConnectedState(state, event, { kind: "empty" });
     case "playback-paused":
-      return transitionFromConnectedState(
-        state,
-        event,
-        freezeState({
-          kind: "paused",
-          snapshot: event.snapshot,
-        }),
-      );
+      return transitionFromConnectedState(state, event, {
+        kind: "paused",
+        snapshot: event.snapshot,
+      });
     case "playback-playing":
-      return transitionFromConnectedState(
-        state,
-        event,
-        freezeState({
-          kind: "playing",
-          snapshot: event.snapshot,
-        }),
-      );
+      return transitionFromConnectedState(state, event, {
+        kind: "playing",
+        snapshot: event.snapshot,
+      });
     case "playback-unsupported":
-      return transitionFromConnectedState(
-        state,
-        event,
-        freezeState({
-          kind: "unsupported",
-          reason: event.reason,
-        }),
-      );
+      return transitionFromConnectedState(state, event, {
+        kind: "unsupported",
+        reason: event.reason,
+      });
     case "retry":
       return transitionRetry(state, event);
   }
@@ -796,7 +598,7 @@ function invalidValue(
     value,
     reason,
   };
-  return Object.freeze(error);
+  return error;
 }
 
 function providerLinksError(
@@ -809,7 +611,7 @@ function providerLinksError(
   }
 
   const allLinksMatchProvider = links.every(
-    (link: ProviderLink): boolean => link.providerId.value === providerId.value,
+    (link: ProviderLink): boolean => link.providerId === providerId,
   );
   if (!allLinksMatchProvider) {
     return failed(invalidItem(item, "provider-link-provider-mismatch"));
@@ -827,7 +629,7 @@ function invalidItem(
     item,
     reason,
   };
-  return Object.freeze(error);
+  return error;
 }
 
 function transitionAuthorizationAvailable(
@@ -878,7 +680,7 @@ function transitionBeginAuthorization(
 ): Result<PlaybackState, PlaybackTransitionError> {
   switch (state.kind) {
     case "authorization-required":
-      return succeeded(freezeState({ kind: "authorizing" }));
+      return succeeded<PlaybackState>({ kind: "authorizing" });
     case "initializing":
     case "authorizing":
     case "empty":
@@ -954,7 +756,7 @@ function transitionRetry(
 ): Result<PlaybackState, PlaybackTransitionError> {
   switch (state.kind) {
     case "failure":
-      return succeeded(freezeState({ kind: "initializing" }));
+      return succeeded<PlaybackState>({ kind: "initializing" });
     case "initializing":
     case "authorization-required":
     case "authorizing":
@@ -972,10 +774,10 @@ function transitionRetry(
 function reconnectingState(
   lastItem: LastPlaybackItem,
 ): ReconnectingPlaybackState {
-  return freezeState({
+  return {
     kind: "reconnecting",
     lastItem,
-  });
+  };
 }
 
 function availableLastItem(item: NowPlayingItem): LastPlaybackItem {
@@ -983,14 +785,14 @@ function availableLastItem(item: NowPlayingItem): LastPlaybackItem {
     kind: "available",
     item,
   };
-  return Object.freeze(lastItem);
+  return lastItem;
 }
 
 export function unavailableLastPlaybackItem(): LastPlaybackItem {
   const lastItem: LastPlaybackItem = {
     kind: "unavailable",
   };
-  return Object.freeze(lastItem);
+  return lastItem;
 }
 
 function invalidTransition(
@@ -1002,17 +804,7 @@ function invalidTransition(
     state: state.kind,
     event: event.kind,
   };
-  return failed(Object.freeze(error));
-}
-
-function freezeArray<Value>(
-  values: ReadonlyArray<Value>,
-): ReadonlyArray<Value> {
-  return Object.freeze([...values]);
-}
-
-function freezeState<State extends PlaybackState>(state: State): State {
-  return Object.freeze(state);
+  return failed(error);
 }
 
 function succeeded<Value>(value: Value): {
@@ -1026,7 +818,7 @@ function succeeded<Value>(value: Value): {
     kind: "success",
     value,
   };
-  return Object.freeze(result);
+  return result;
 }
 
 function failed<Failure>(error: Failure): {
@@ -1040,7 +832,7 @@ function failed<Failure>(error: Failure): {
     kind: "failure",
     error,
   };
-  return Object.freeze(result);
+  return result;
 }
 
 function assertNever(value: never): never {

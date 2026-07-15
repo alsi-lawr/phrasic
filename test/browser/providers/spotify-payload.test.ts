@@ -39,13 +39,13 @@ test("Spotify playback payloads normalize playing tracks with original links and
   const state = expectSuccess(parseSpotifyPlaybackPayload(playingTrackPayload));
   const track = expectPlayingTrack(state);
 
-  assert.equal(track.providerId.value, "spotify");
-  assert.equal(track.itemId.value, "track-1");
-  assert.equal(track.title.value, "Track title");
-  assert.equal(track.collection.id.value, "album-1");
-  assert.equal(track.collection.title.value, "Album title");
+  assert.equal(track.providerId, "spotify");
+  assert.equal(track.itemId, "track-1");
+  assert.equal(track.title, "Track title");
+  assert.equal(track.collection.id, "album-1");
+  assert.equal(track.collection.title, "Album title");
   assert.deepEqual(
-    track.artists.map((artist) => artist.name.value),
+    track.artists.map((artist) => artist.name),
     ["Track artist"],
   );
   assert.deepEqual(
@@ -62,12 +62,12 @@ test("Spotify playback payloads normalize playing tracks with original links and
   );
   assert.equal(track.artwork.kind, "available");
   if (track.artwork.kind === "available") {
-    assert.equal(track.artwork.url.value, trackArtworkUrl);
+    assert.equal(track.artwork.url, trackArtworkUrl);
   }
 
   if (state.kind === "playing") {
-    assert.equal(state.snapshot.position.value, 1_250);
-    assert.equal(state.snapshot.duration.value, 3_000);
+    assert.equal(state.snapshot.position, 1_250);
+    assert.equal(state.snapshot.duration, 3_000);
   }
 });
 
@@ -87,12 +87,12 @@ test("Spotify playback payloads normalize paused episodes", () => {
     throw new Error("Expected an episode item");
   }
 
-  assert.equal(item.providerId.value, "spotify");
-  assert.equal(item.itemId.value, "episode-1");
-  assert.equal(item.title.value, "Episode title");
-  assert.equal(item.show.id.value, "show-1");
-  assert.equal(item.show.title.value, "Show title");
-  assert.equal(item.show.publisher.value, "Show publisher");
+  assert.equal(item.providerId, "spotify");
+  assert.equal(item.itemId, "episode-1");
+  assert.equal(item.title, "Episode title");
+  assert.equal(item.show.id, "show-1");
+  assert.equal(item.show.title, "Show title");
+  assert.equal(item.show.publisher, "Show publisher");
   assert.deepEqual(
     item.links.map((link) => link.href),
     ["https://open.spotify.com/episode/episode-1"],
@@ -103,10 +103,10 @@ test("Spotify playback payloads normalize paused episodes", () => {
   );
   assert.equal(item.artwork.kind, "available");
   if (item.artwork.kind === "available") {
-    assert.equal(item.artwork.url.value, episodeArtworkUrl);
+    assert.equal(item.artwork.url, episodeArtworkUrl);
   }
-  assert.equal(state.snapshot.position.value, 2_500);
-  assert.equal(state.snapshot.duration.value, 4_000);
+  assert.equal(state.snapshot.position, 2_500);
+  assert.equal(state.snapshot.duration, 4_000);
 });
 
 test("Spotify empty and unsupported playback variants remain explicit", () => {
@@ -261,7 +261,7 @@ function selectedArtworkUrl(
     expectSuccess(parseSpotifyPlaybackPayload(payload, artworkSize)),
   );
   if (track.artwork.kind === "available") {
-    return track.artwork.url.value;
+    return track.artwork.url;
   }
 
   throw new Error("Expected available Spotify artwork");

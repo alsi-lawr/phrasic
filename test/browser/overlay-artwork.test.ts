@@ -13,8 +13,8 @@ import {
 } from "../../components/overlay/overlay-layout.ts";
 import { overlayMotionDecisionForPreference } from "../../components/overlay/overlay-motion.ts";
 import {
-  PlaybackSnapshot,
-  TrackItem,
+  createPlaybackSnapshot,
+  createTrackItem,
   transitionPlaybackState,
   unavailableOriginalArtwork,
   type PlaybackState,
@@ -67,7 +67,7 @@ test("artwork renders current and stale domain artwork while preserving the viny
   );
 
   const itemWithoutArtwork = expectSuccess(
-    TrackItem.create({
+    createTrackItem({
       artwork: unavailableOriginalArtwork("provider-did-not-supply-artwork"),
       artists: playing.snapshot.item.artists,
       collection: playing.snapshot.item.collection,
@@ -80,7 +80,7 @@ test("artwork renders current and stale domain artwork while preserving the viny
   const fallbackState: PlaybackState = Object.freeze({
     kind: "playing",
     snapshot: expectSuccess(
-      PlaybackSnapshot.create({
+      createPlaybackSnapshot({
         duration: playing.snapshot.duration,
         item: itemWithoutArtwork,
         position: playing.snapshot.position,

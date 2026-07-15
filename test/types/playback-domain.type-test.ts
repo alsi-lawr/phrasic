@@ -1,47 +1,53 @@
 import {
   availableOriginalArtwork,
-  Collection,
-  Creator,
-  DisplayText,
-  OriginalArtworkUrl,
-  PlaybackDurationMilliseconds,
-  PlaybackPositionMilliseconds,
-  ProviderCollectionId,
-  ProviderId,
-  ProviderItemId,
-  ProviderLink,
-  TrackItem,
+  createEpisodeItem,
+  createPlaybackSnapshot,
+  createProviderLink,
+  createTrackItem,
+  parseDisplayText,
+  parseOriginalArtworkUrl,
+  parsePlaybackDurationMilliseconds,
+  parsePlaybackPositionMilliseconds,
+  parseProviderCollectionId,
+  parseProviderId,
+  parseProviderItemId,
+  type ProviderCollectionId,
+  type Collection,
+  type Creator,
+  type NowPlayingItem,
+  type ProviderId,
+  type ProviderItemId,
+  type PlaybackPositionMilliseconds,
   type Result,
+  type Show,
 } from "../../domain/playback.ts";
 
-const providerId = expectSuccess(ProviderId.create("spotify"));
-const itemId = expectSuccess(ProviderItemId.create("track-1"));
-const collectionId = expectSuccess(ProviderCollectionId.create("collection-1"));
-const position = expectSuccess(PlaybackPositionMilliseconds.create(1_000));
-const duration = expectSuccess(PlaybackDurationMilliseconds.create(3_000));
-const text = expectSuccess(DisplayText.create("Track title"));
+const providerId = expectSuccess(parseProviderId("spotify"));
+const itemId = expectSuccess(parseProviderItemId("track-1"));
+const collectionId = expectSuccess(parseProviderCollectionId("collection-1"));
+const position = expectSuccess(parsePlaybackPositionMilliseconds(1_000));
+const duration = expectSuccess(parsePlaybackDurationMilliseconds(3_000));
+const text = expectSuccess(parseDisplayText("Track title"));
 const artwork = availableOriginalArtwork(
-  expectSuccess(
-    OriginalArtworkUrl.create("https://spotify.example/artwork.jpg"),
-  ),
+  expectSuccess(parseOriginalArtworkUrl("https://spotify.example/artwork.jpg")),
 );
 const link = expectSuccess(
-  ProviderLink.create({
+  createProviderLink({
     providerId,
     href: "https://spotify.example/items/track-1",
   }),
 );
-const creator = Creator.create({
+const creator: Creator = {
   name: text,
   links: [link],
-});
-const collection = Collection.create({
+};
+const collection: Collection = {
   id: collectionId,
   title: text,
   links: [link],
-});
+};
 const track = expectSuccess(
-  TrackItem.create({
+  createTrackItem({
     providerId,
     itemId,
     title: text,
@@ -51,25 +57,82 @@ const track = expectSuccess(
     links: [link],
   }),
 );
+const show: Show = {
+  id: collectionId,
+  title: text,
+  publisher: text,
+  links: [link],
+};
+const episode = expectSuccess(
+  createEpisodeItem({
+    providerId,
+    itemId,
+    title: text,
+    show,
+    artwork,
+    links: [link],
+  }),
+);
+const snapshot = expectSuccess(
+  createPlaybackSnapshot({ item: track, position, duration }),
+);
 // @ts-expect-error Plain strings are not validated provider IDs.
 const plainStringProviderId: ProviderId = "spotify";
+// @ts-expect-error Plain strings are not validated provider item IDs.
+const plainStringProviderItemId: ProviderItemId = "track-1";
+// @ts-expect-error Plain strings are not validated provider collection IDs.
+const plainStringProviderCollectionId: ProviderCollectionId = "collection-1";
 // @ts-expect-error Item IDs cannot be used as provider IDs.
 const itemAsProviderId: ProviderId = itemId;
+// @ts-expect-error Provider IDs cannot be used as item IDs.
+const providerAsItemId: ProviderItemId = providerId;
+// @ts-expect-error Provider IDs cannot be used as collection IDs.
+const providerAsCollectionId: ProviderCollectionId = providerId;
 // @ts-expect-error Collection IDs cannot be used as item IDs.
 const collectionAsItemId: ProviderItemId = collectionId;
+// @ts-expect-error Item IDs cannot be used as collection IDs.
+const itemAsCollectionId: ProviderCollectionId = itemId;
+// @ts-expect-error Collection IDs cannot be used as provider IDs.
+const collectionAsProviderId: ProviderId = collectionId;
 // @ts-expect-error Playback durations cannot be used as playback positions.
 const durationAsPosition: PlaybackPositionMilliseconds = duration;
-// @ts-expect-error Validated values expose no writable raw value.
-providerId.value = "other-provider";
+// @ts-expect-error Branded identifiers are readonly string primitives.
+providerId[0] = "x";
 // @ts-expect-error Track fields are readonly after construction.
 track.title = text;
 // @ts-expect-error Track artist collections are readonly after construction.
 track.artists.push(creator);
+// @ts-expect-error Provider link fields are readonly after construction.
+link.href = "https://spotify.example/items/track-2";
+// @ts-expect-error Creator fields are readonly after construction.
+creator.name = text;
+// @ts-expect-error Collection fields are readonly after construction.
+collection.title = text;
+// @ts-expect-error Episode fields are readonly after construction.
+episode.show = show;
+// @ts-expect-error Playback snapshot fields are readonly after construction.
+snapshot.position = position;
+
+function itemTitle(item: NowPlayingItem): string {
+  switch (item.kind) {
+    case "track":
+      return item.collection.title;
+    case "episode":
+      return item.show.title;
+  }
+}
 
 void plainStringProviderId;
+void plainStringProviderItemId;
+void plainStringProviderCollectionId;
 void itemAsProviderId;
+void providerAsItemId;
+void providerAsCollectionId;
 void collectionAsItemId;
+void itemAsCollectionId;
+void collectionAsProviderId;
 void durationAsPosition;
+void itemTitle;
 void position;
 
 function expectSuccess<Value, Failure>(result: Result<Value, Failure>): Value {

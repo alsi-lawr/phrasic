@@ -58,18 +58,17 @@ type OverlayDisplayQuery =
       readonly width: number;
     };
 
-const overlayMode: OverlaySetupMode = Object.freeze({ kind: "overlay" });
-const setupMode: OverlaySetupMode = Object.freeze({ kind: "setup" });
-const noDisplayDiagnostic: OverlayDisplayDiagnostic = Object.freeze({
+const overlayMode: OverlaySetupMode = { kind: "overlay" };
+const setupMode: OverlaySetupMode = { kind: "setup" };
+const noDisplayDiagnostic: OverlayDisplayDiagnostic = {
   kind: "none",
-});
+};
 
 export class OverlayDisplayWidth {
   private readonly pixels: number;
 
   private constructor(pixels: number) {
     this.pixels = pixels;
-    Object.freeze(this);
   }
 
   public get value(): number {
@@ -88,7 +87,6 @@ export class OverlayDisplayHeight {
 
   private constructor(pixels: number) {
     this.pixels = pixels;
-    Object.freeze(this);
   }
 
   public get value(): number {
@@ -115,59 +113,57 @@ export function resolveOverlayGeometry(
     width,
   };
 
-  return Object.freeze(geometry);
+  return geometry;
 }
 
 function parseDisplayQuery(parameters: URLSearchParams): OverlayDisplayQuery {
   for (const name of parameters.keys()) {
     if (name !== "setup" && name !== "width") {
-      return frozenInvalidDisplayQuery("unsupported-display-query");
+      return invalidDisplayQuery("unsupported-display-query");
     }
   }
 
   const widthValues = parameters.getAll("width");
   const setupValues = parameters.getAll("setup");
   if (widthValues.length > 1 || setupValues.length > 1) {
-    return frozenInvalidDisplayQuery("repeated-display-query-parameter");
+    return invalidDisplayQuery("repeated-display-query-parameter");
   }
 
   const hasSetup = setupValues.length === 1;
   if (hasSetup && setupValues[0] !== "1") {
-    return frozenInvalidDisplayQuery("unsupported-display-query");
+    return invalidDisplayQuery("unsupported-display-query");
   }
 
   if (widthValues.length === 0) {
-    return hasSetup ? frozenSetupDisplayQuery() : frozenNoDisplayQuery();
+    return hasSetup ? setupDisplayQuery() : noDisplayQuery();
   }
 
   const widthValue = widthValues[0];
   if (widthValue === undefined) {
-    return frozenInvalidDisplayQuery("malformed-display-width");
+    return invalidDisplayQuery("malformed-display-width");
   }
 
   if (/^\d+\.\d+$/.test(widthValue)) {
-    return frozenInvalidDisplayQuery("fractional-display-width");
+    return invalidDisplayQuery("fractional-display-width");
   }
 
   if (!/^\d+$/.test(widthValue)) {
-    return frozenInvalidDisplayQuery("malformed-display-width");
+    return invalidDisplayQuery("malformed-display-width");
   }
 
   const width = Number(widthValue);
   if (!Number.isSafeInteger(width)) {
-    return frozenInvalidDisplayQuery("unsafe-display-width");
+    return invalidDisplayQuery("unsafe-display-width");
   }
 
   if (
     width < minimumOverlayDisplayWidth ||
     width > maximumOverlayDisplayWidth
   ) {
-    return frozenInvalidDisplayQuery("out-of-range-display-width");
+    return invalidDisplayQuery("out-of-range-display-width");
   }
 
-  return hasSetup
-    ? frozenWidthAndSetupDisplayQuery(width)
-    : frozenWidthDisplayQuery(width);
+  return hasSetup ? widthAndSetupDisplayQuery(width) : widthDisplayQuery(width);
 }
 
 function displayDiagnostic(
@@ -214,31 +210,31 @@ function displaySetupMode(display: OverlayDisplayQuery): OverlaySetupMode {
   return unreachable(display);
 }
 
-function frozenInvalidDisplayQuery(
+function invalidDisplayQuery(
   reason: InvalidOverlayDisplayQueryDiagnostic["reason"],
 ): OverlayDisplayQuery {
-  const diagnostic: InvalidOverlayDisplayQueryDiagnostic = Object.freeze({
+  const diagnostic: InvalidOverlayDisplayQueryDiagnostic = {
     kind: "invalid-display-query",
     reason,
-  });
+  };
 
-  return Object.freeze({ kind: "invalid", diagnostic });
+  return { kind: "invalid", diagnostic };
 }
 
-function frozenNoDisplayQuery(): OverlayDisplayQuery {
-  return Object.freeze({ kind: "none" });
+function noDisplayQuery(): OverlayDisplayQuery {
+  return { kind: "none" };
 }
 
-function frozenSetupDisplayQuery(): OverlayDisplayQuery {
-  return Object.freeze({ kind: "setup" });
+function setupDisplayQuery(): OverlayDisplayQuery {
+  return { kind: "setup" };
 }
 
-function frozenWidthDisplayQuery(width: number): OverlayDisplayQuery {
-  return Object.freeze({ kind: "width", width });
+function widthDisplayQuery(width: number): OverlayDisplayQuery {
+  return { kind: "width", width };
 }
 
-function frozenWidthAndSetupDisplayQuery(width: number): OverlayDisplayQuery {
-  return Object.freeze({ kind: "width-and-setup", width });
+function widthAndSetupDisplayQuery(width: number): OverlayDisplayQuery {
+  return { kind: "width-and-setup", width };
 }
 
 function unreachable(value: never): never {

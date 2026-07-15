@@ -48,22 +48,22 @@ export function createSpotifyAuthorizationProvider(
         { applicationUrl: initialization.applicationUrl },
       );
       if (configuration.kind === "failure") {
-        return Object.freeze({
+        return {
           kind: "failure",
-          error: Object.freeze({
+          error: {
             kind: "invalid-provider-configuration",
-          }),
-        });
+          },
+        };
       }
 
-      return Object.freeze({
+      return {
         kind: "success",
         value: spotifyAuthorizationSession(configuration.value, options),
-      });
+      };
     },
   };
 
-  return Object.freeze(provider);
+  return provider;
 }
 
 function spotifyAuthorizationSession(
@@ -74,7 +74,7 @@ function spotifyAuthorizationSession(
     async beginAuthorization(options): Promise<BeginAuthorizationResult> {
       const returnTo = validatedReturnTarget(options.returnTo);
       if (returnTo.kind === "failure") {
-        return Object.freeze({ kind: "provider-failure" });
+        return { kind: "provider-failure" };
       }
 
       const redirect = await beginSpotifyAuthorization({
@@ -87,10 +87,10 @@ function spotifyAuthorizationSession(
         returnTo: returnTo.value,
       });
 
-      return Object.freeze({
+      return {
         kind: "authorization-redirect",
         url: redirect.url,
-      });
+      };
     },
 
     cancelPendingWork(): void {},
@@ -111,42 +111,42 @@ function spotifyAuthorizationSession(
 
       switch (result.kind) {
         case "connected":
-          return Object.freeze({
+          return {
             kind: "connected",
             credential: result.accessToken,
             lifetime: result.expiresIn,
             returnUrl: returnUrl(configuration, result.returnTo),
-          });
+          };
         case "authorization-denied":
-          return Object.freeze({
+          return {
             kind: "authorization-denied",
             returnUrl: returnUrl(configuration, result.returnTo),
-          });
+          };
         case "malformed-callback":
-          return Object.freeze({ kind: "malformed-callback" });
+          return { kind: "malformed-callback" };
         case "authorization-required":
           return "returnTo" in result
-            ? Object.freeze({
+            ? {
                 kind: "authorization-required",
-                returnUrl: Object.freeze({
+                returnUrl: {
                   kind: "available",
                   value: returnUrl(configuration, result.returnTo),
-                }),
-              })
-            : Object.freeze({
+                },
+              }
+            : {
                 kind: "authorization-required",
-                returnUrl: Object.freeze({ kind: "unavailable" }),
-              });
+                returnUrl: { kind: "unavailable" },
+              };
         case "transient-failure":
-          return Object.freeze({
+          return {
             kind: "transient-failure",
             returnUrl: returnUrl(configuration, result.returnTo),
-          });
+          };
         case "provider-failure":
-          return Object.freeze({
+          return {
             kind: "provider-failure",
             returnUrl: returnUrl(configuration, result.returnTo),
-          });
+          };
       }
 
       return unreachable(result);
@@ -165,7 +165,7 @@ function spotifyAuthorizationSession(
     },
   };
 
-  return Object.freeze(session);
+  return session;
 }
 
 async function refreshConnection(
@@ -188,20 +188,20 @@ function mapRefreshResult(
 ): AuthorizationConnectionResult {
   switch (result.kind) {
     case "success":
-      return Object.freeze({
+      return {
         kind: "success",
         credential: result.accessToken,
         lifetime: result.expiresIn,
-      });
+      };
     case "authorization-required":
-      return Object.freeze({
+      return {
         kind: "authorization-required",
         reason: result.reason,
-      });
+      };
     case "transient-failure":
-      return Object.freeze({ kind: "transient-failure" });
+      return { kind: "transient-failure" };
     case "provider-failure":
-      return Object.freeze({ kind: "provider-failure" });
+      return { kind: "provider-failure" };
   }
 
   return unreachable(result);
@@ -272,15 +272,15 @@ function cancellationAwareStorage(
     },
   };
 
-  return Object.freeze(guarded);
+  return guarded;
 }
 
 function rejectedPendingAuthorizationAttempt(): SpotifyPendingAuthorizationAttemptConsumeResult {
-  return Object.freeze({ kind: "rejected", reason: "missing-attempt" });
+  return { kind: "rejected", reason: "missing-attempt" };
 }
 
 function missingRefreshToken(): SpotifyRefreshTokenReadResult {
-  return Object.freeze({ kind: "missing" });
+  return { kind: "missing" };
 }
 
 function unreachable(value: never): never {

@@ -4,19 +4,12 @@ import {
 } from "../../browser/providers/spotify-payload.ts";
 import type { SpotifyAccessToken } from "../../browser/auth/token.ts";
 import type {
-  PlaybackProviderRegistry,
   PlaybackProviderRequest,
   PlaybackProviderResult,
-} from "../../browser/providers/registry.ts";
-import type {
-  PlaybackState,
-  ProviderId,
-  Result,
-} from "../../domain/playback.ts";
+} from "../../browser/providers/provider.ts";
+import type { PlaybackState, Result } from "../../domain/playback.ts";
 
 const payload: unknown = {};
-declare const playbackProviderId: ProviderId;
-declare const playbackProviders: PlaybackProviderRegistry;
 declare const playbackState: PlaybackState;
 declare const spotifyAccessToken: SpotifyAccessToken;
 const result: Result<PlaybackState, SpotifyPlaybackParseFailure> =
@@ -29,10 +22,6 @@ const providerResult: PlaybackProviderResult = Object.freeze({
   kind: "playback",
   state: playbackState,
 });
-const providerResolution = playbackProviders.resolve(playbackProviderId);
-
-// @ts-expect-error Provider resolution accepts only validated provider identifiers.
-playbackProviders.resolve("spotify");
 
 if (result.kind === "success") {
   const state: PlaybackState = result.value;
@@ -55,4 +44,3 @@ if (providerResult.kind === "playback") {
 }
 
 void playbackRequest;
-void providerResolution;

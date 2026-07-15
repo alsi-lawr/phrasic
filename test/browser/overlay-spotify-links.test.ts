@@ -7,16 +7,20 @@ import { parseSpotifyPlaybackPayload } from "../../browser/providers/spotify-pay
 import { spotifyOverlayPresentation } from "../../browser/providers/spotify-presentation.ts";
 import { OverlayVisualProviderLinks } from "../../components/overlay/OverlayVisualProviderLinks.tsx";
 import {
-  Collection,
-  Creator,
-  DisplayText,
-  PlaybackSnapshot,
-  ProviderId,
-  ProviderLink,
-  TrackItem,
+  createPlaybackSnapshot,
+  createProviderLink,
+  createTrackItem,
+  parseDisplayText,
   transitionPlaybackState,
+  parseProviderId,
+  type DisplayText,
+  type Collection,
+  type Creator,
   type PlaybackState,
+  type ProviderId,
+  type ProviderLink,
   type Result,
+  type TrackItem,
 } from "../../domain/playback.ts";
 import {
   emptyTrackPayload,
@@ -26,12 +30,12 @@ import {
 
 test("Spotify destinations render a track, every creator, and its album", () => {
   const originalTrack = playingTrack();
-  const secondCreator = Creator.create({
+  const secondCreator: Creator = {
     links: [spotifyLink(originalTrack.providerId)],
     name: text("Second track artist"),
-  });
+  };
   const track = expectSuccess(
-    TrackItem.create({
+    createTrackItem({
       artwork: originalTrack.artwork,
       artists: [...originalTrack.artists, secondCreator],
       collection: originalTrack.collection,
@@ -117,13 +121,13 @@ test("rendered Spotify links retain accessible pointer and keyboard-focus target
 
 test("missing or non-Spotify child links render no partial destination set", () => {
   const originalTrack = playingTrack();
-  const missingAlbum = Collection.create({
+  const missingAlbum: Collection = {
     id: originalTrack.collection.id,
     links: [],
     title: originalTrack.collection.title,
-  });
+  };
   const trackWithoutAlbumLink = expectSuccess(
-    TrackItem.create({
+    createTrackItem({
       artwork: originalTrack.artwork,
       artists: originalTrack.artists,
       collection: missingAlbum,
@@ -133,22 +137,22 @@ test("missing or non-Spotify child links render no partial destination set", () 
       title: originalTrack.title,
     }),
   );
-  const anotherProvider = expectSuccess(ProviderId.create("another-provider"));
+  const anotherProvider = expectSuccess(parseProviderId("another-provider"));
   const trackWithNonSpotifyCreator = expectSuccess(
-    TrackItem.create({
+    createTrackItem({
       artwork: originalTrack.artwork,
       artists: [
-        Creator.create({
+        {
           links: [
             expectSuccess(
-              ProviderLink.create({
+              createProviderLink({
                 href: "https://another-provider.example/artist/artist-1",
                 providerId: anotherProvider,
               }),
             ),
           ],
           name: firstCreator(originalTrack).name,
-        }),
+        } satisfies Creator,
       ],
       collection: originalTrack.collection,
       itemId: originalTrack.itemId,
@@ -197,7 +201,7 @@ function playingState(track: TrackItem): PlaybackState {
   return Object.freeze({
     kind: "playing",
     snapshot: expectSuccess(
-      PlaybackSnapshot.create({
+      createPlaybackSnapshot({
         duration: source.snapshot.duration,
         item: track,
         position: source.snapshot.position,
@@ -244,7 +248,7 @@ function playbackSnapshot(
 
 function spotifyLink(providerId: ProviderId): ProviderLink {
   return expectSuccess(
-    ProviderLink.create({
+    createProviderLink({
       href: "https://open.spotify.com/artist/artist-2",
       providerId,
     }),
@@ -261,7 +265,7 @@ function firstCreator(track: TrackItem): Creator {
 }
 
 function text(value: string): DisplayText {
-  return expectSuccess(DisplayText.create(value));
+  return expectSuccess(parseDisplayText(value));
 }
 
 function expectSuccess<Value, Failure>(result: Result<Value, Failure>): Value {

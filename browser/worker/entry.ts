@@ -5,14 +5,16 @@ import {
 } from "../auth/storage.ts";
 import { createSpotifyAuthFetchPort } from "../auth/token.ts";
 import { createSpotifyAuthorizationProvider } from "../auth/spotify-provider.ts";
-import { createPlaybackProviderRegistry } from "../providers/registry.ts";
 import { createSpotifyPlaybackProvider } from "../providers/spotify.ts";
 import {
   createBrowserRequestDeadlinePort,
   spotifyHttpRequestDeadlineMilliseconds,
   type BrowserRequestDeadlineSchedulerPort,
 } from "../request-deadline.ts";
-import { createPlaybackWorkerFatalInitializationFailure } from "./protocol.ts";
+import {
+  createPlaybackWorkerFatalInitializationFailure,
+  type PlaybackWorkerCommand,
+} from "./protocol.ts";
 import {
   createPlaybackWorkerRuntime,
   type PlaybackWorkerEventSink,
@@ -33,9 +35,12 @@ const bootstrap = createWorkerBootstrap();
 
 switch (bootstrap.kind) {
   case "ready":
-    self.addEventListener("message", (event: MessageEvent<unknown>): void => {
-      void bootstrap.runtime.receive(event.data);
-    });
+    self.addEventListener(
+      "message",
+      (event: MessageEvent<PlaybackWorkerCommand>): void => {
+        void bootstrap.runtime.receive(event.data);
+      },
+    );
     break;
   case "unavailable":
     self.postMessage(
@@ -53,17 +58,17 @@ function createWorkerBootstrap(): WorkerBootstrap {
     typeof self.crypto === "undefined" ||
     typeof AbortController === "undefined"
   ) {
-    return Object.freeze({ kind: "unavailable" });
+    return { kind: "unavailable" };
   }
 
   try {
     const fetchImplementation: typeof globalThis.fetch = (input, init) =>
       self.fetch(input, init);
-    const events: PlaybackWorkerEventSink = Object.freeze({
+    const events: PlaybackWorkerEventSink = {
       emit(event): void {
         self.postMessage(event);
       },
-    });
+    };
     const scheduler = nativeWorkerScheduler();
     const requestDeadline = createBrowserRequestDeadlinePort(
       nativeRequestDeadlineScheduler(),
@@ -73,12 +78,6 @@ function createWorkerBootstrap(): WorkerBootstrap {
       requestDeadline,
       timeoutMilliseconds: spotifyHttpRequestDeadlineMilliseconds,
     });
-    const playbackProviders = createPlaybackProviderRegistry([
-      spotifyPlaybackProvider,
-    ]);
-    if (playbackProviders.kind === "failure") {
-      return Object.freeze({ kind: "unavailable" });
-    }
     const runtime = createPlaybackWorkerRuntime({
       authorization: createSpotifyAuthorizationProvider({
         crypto: createBrowserPkceCryptoPort(self.crypto),
@@ -91,25 +90,24 @@ function createWorkerBootstrap(): WorkerBootstrap {
           createNativeIndexedDbAuthorizationPort(self.indexedDB),
         ),
       }),
-      cancellation: Object.freeze({
+      cancellation: {
         create(): AbortController {
           return new AbortController();
         },
-      }),
-      clock: Object.freeze({
+      },
+      clock: {
         now(): number {
           return Date.now();
         },
-      }),
+      },
       events,
-      playbackProviderId: spotifyPlaybackProvider.providerId,
-      playbackProviders: playbackProviders.value,
+      playbackProvider: spotifyPlaybackProvider,
       scheduler,
     });
 
-    return Object.freeze({ kind: "ready", runtime });
+    return { kind: "ready", runtime };
   } catch {
-    return Object.freeze({ kind: "unavailable" });
+    return { kind: "unavailable" };
   }
 }
 
@@ -117,15 +115,15 @@ function nativeRequestDeadlineScheduler(): BrowserRequestDeadlineSchedulerPort {
   const scheduler: BrowserRequestDeadlineSchedulerPort = {
     schedule(options) {
       const timer = self.setTimeout(options.run, options.delayMilliseconds);
-      return Object.freeze({
+      return {
         cancel(): void {
           self.clearTimeout(timer);
         },
-      });
+      };
     },
   };
 
-  return Object.freeze(scheduler);
+  return scheduler;
 }
 
 function nativeWorkerScheduler(): PlaybackWorkerSchedulerPort {
@@ -134,13 +132,13 @@ function nativeWorkerScheduler(): PlaybackWorkerSchedulerPort {
       const timer = self.setTimeout((): void => {
         void options.run();
       }, options.delayMilliseconds);
-      return Object.freeze({
+      return {
         cancel(): void {
           self.clearTimeout(timer);
         },
-      });
+      };
     },
   };
 
-  return Object.freeze(scheduler);
+  return scheduler;
 }

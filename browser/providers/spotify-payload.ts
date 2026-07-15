@@ -1,29 +1,37 @@
 import {
   availableOriginalArtwork,
-  Collection,
-  Creator,
-  DisplayText,
-  EpisodeItem,
-  OriginalArtworkUrl,
-  PlaybackDurationMilliseconds,
-  PlaybackPositionMilliseconds,
-  PlaybackSnapshot,
-  ProviderCollectionId,
-  ProviderId,
-  ProviderItemId,
-  ProviderLink,
-  Show,
-  TrackItem,
+  createEpisodeItem,
+  createPlaybackSnapshot,
+  createProviderLink,
+  createTrackItem,
   unavailableOriginalArtwork,
+  parseDisplayText,
+  parseOriginalArtworkUrl,
+  parsePlaybackDurationMilliseconds,
+  parsePlaybackPositionMilliseconds,
+  parseProviderCollectionId,
+  parseProviderItemId,
   type ArtworkUnavailableReason,
+  type Collection,
+  type Creator,
+  type EpisodeItem,
   type ItemConstructionError,
   type NowPlayingItem,
   type OriginalArtwork,
+  type OriginalArtworkUrl,
+  type PlaybackDurationMilliseconds,
+  type PlaybackPositionMilliseconds,
   type PlaybackSnapshotError,
+  type PlaybackSnapshot,
   type PlaybackState,
+  type ProviderId,
+  type ProviderLink,
   type Result,
   type ValueValidationError,
+  type Show,
+  type TrackItem,
 } from "../../domain/playback.ts";
+import { spotifyProviderId } from "./provider-identifiers.ts";
 
 export type SpotifyArtworkSize = "large" | "medium" | "small";
 
@@ -180,12 +188,7 @@ function parseTrackPlayback(
     return succeeded(unsupportedPlaybackState("local-item"));
   }
 
-  const providerId = parseSpotifyProviderId();
-  if (providerId.kind === "failure") {
-    return providerId;
-  }
-
-  const itemResult = parseTrackItem(item.value, providerId.value, artworkSize);
+  const itemResult = parseTrackItem(item.value, spotifyProviderId, artworkSize);
   if (itemResult.kind === "failure") {
     return itemResult;
   }
@@ -223,14 +226,9 @@ function parseEpisodePlayback(
     return item;
   }
 
-  const providerId = parseSpotifyProviderId();
-  if (providerId.kind === "failure") {
-    return providerId;
-  }
-
   const itemResult = parseEpisodeItem(
     item.value,
-    providerId.value,
+    spotifyProviderId,
     artworkSize,
   );
   if (itemResult.kind === "failure") {
@@ -266,7 +264,7 @@ function parseTrackItem(
   }
 
   const itemId = mapValueValidation(
-    ProviderItemId.create(itemIdValue.value),
+    parseProviderItemId(itemIdValue.value),
     "$.item.id",
   );
   if (itemId.kind === "failure") {
@@ -279,7 +277,7 @@ function parseTrackItem(
   }
 
   const title = mapValueValidation(
-    DisplayText.create(titleValue.value),
+    parseDisplayText(titleValue.value),
     "$.item.name",
   );
   if (title.kind === "failure") {
@@ -327,7 +325,7 @@ function parseTrackItem(
   }
 
   return mapItemConstruction(
-    TrackItem.create({
+    createTrackItem({
       providerId,
       itemId: itemId.value,
       title: title.value,
@@ -351,7 +349,7 @@ function parseEpisodeItem(
   }
 
   const itemId = mapValueValidation(
-    ProviderItemId.create(itemIdValue.value),
+    parseProviderItemId(itemIdValue.value),
     "$.item.id",
   );
   if (itemId.kind === "failure") {
@@ -364,7 +362,7 @@ function parseEpisodeItem(
   }
 
   const title = mapValueValidation(
-    DisplayText.create(titleValue.value),
+    parseDisplayText(titleValue.value),
     "$.item.name",
   );
   if (title.kind === "failure") {
@@ -397,7 +395,7 @@ function parseEpisodeItem(
   }
 
   return mapItemConstruction(
-    EpisodeItem.create({
+    createEpisodeItem({
       providerId,
       itemId: itemId.value,
       title: title.value,
@@ -439,7 +437,7 @@ function parseCreators(
     }
 
     const name = mapValueValidation(
-      DisplayText.create(nameValue.value),
+      parseDisplayText(nameValue.value),
       "$.item.artists[].name",
     );
     if (name.kind === "failure") {
@@ -456,15 +454,13 @@ function parseCreators(
       return link;
     }
 
-    creators.push(
-      Creator.create({
-        name: name.value,
-        links: [link.value],
-      }),
-    );
+    creators.push({
+      name: name.value,
+      links: [link.value],
+    } satisfies Creator);
   }
 
-  return succeeded(Object.freeze(creators));
+  return succeeded(creators);
 }
 
 function parseCollection(
@@ -477,7 +473,7 @@ function parseCollection(
   }
 
   const collectionId = mapValueValidation(
-    ProviderCollectionId.create(collectionIdValue.value),
+    parseProviderCollectionId(collectionIdValue.value),
     "$.item.album.id",
   );
   if (collectionId.kind === "failure") {
@@ -490,7 +486,7 @@ function parseCollection(
   }
 
   const title = mapValueValidation(
-    DisplayText.create(titleValue.value),
+    parseDisplayText(titleValue.value),
     "$.item.album.name",
   );
   if (title.kind === "failure") {
@@ -507,13 +503,11 @@ function parseCollection(
     return link;
   }
 
-  return succeeded(
-    Collection.create({
-      id: collectionId.value,
-      title: title.value,
-      links: [link.value],
-    }),
-  );
+  return succeeded({
+    id: collectionId.value,
+    title: title.value,
+    links: [link.value],
+  } satisfies Collection);
 }
 
 function parseShow(
@@ -531,7 +525,7 @@ function parseShow(
   }
 
   const showId = mapValueValidation(
-    ProviderCollectionId.create(showIdValue.value),
+    parseProviderCollectionId(showIdValue.value),
     "$.item.show.id",
   );
   if (showId.kind === "failure") {
@@ -544,7 +538,7 @@ function parseShow(
   }
 
   const title = mapValueValidation(
-    DisplayText.create(titleValue.value),
+    parseDisplayText(titleValue.value),
     "$.item.show.name",
   );
   if (title.kind === "failure") {
@@ -561,7 +555,7 @@ function parseShow(
   }
 
   const publisher = mapValueValidation(
-    DisplayText.create(publisherValue.value),
+    parseDisplayText(publisherValue.value),
     "$.item.show.publisher",
   );
   if (publisher.kind === "failure") {
@@ -578,14 +572,12 @@ function parseShow(
     return link;
   }
 
-  return succeeded(
-    Show.create({
-      id: showId.value,
-      title: title.value,
-      publisher: publisher.value,
-      links: [link.value],
-    }),
-  );
+  return succeeded({
+    id: showId.value,
+    title: title.value,
+    publisher: publisher.value,
+    links: [link.value],
+  } satisfies Show);
 }
 
 function parseArtwork(
@@ -660,7 +652,7 @@ function parseArtworkUrl(
     return failed("provider-artwork-is-invalid");
   }
 
-  const artworkUrl = OriginalArtworkUrl.create(input["url"]);
+  const artworkUrl = parseOriginalArtworkUrl(input["url"]);
   if (artworkUrl.kind === "failure") {
     return failed("provider-artwork-is-invalid");
   }
@@ -698,7 +690,7 @@ function parseSpotifyLink(
   }
 
   return mapValueValidation(
-    ProviderLink.create({
+    createProviderLink({
       providerId,
       href: spotifyUrlValue.value,
     }),
@@ -715,7 +707,7 @@ function parsePlaybackPosition(
   }
 
   return mapValueValidation(
-    PlaybackPositionMilliseconds.create(positionValue.value),
+    parsePlaybackPositionMilliseconds(positionValue.value),
     "$.progress_ms",
   );
 }
@@ -729,7 +721,7 @@ function parsePlaybackDuration(
   }
 
   return mapValueValidation(
-    PlaybackDurationMilliseconds.create(durationValue.value),
+    parsePlaybackDurationMilliseconds(durationValue.value),
     "$.item.duration_ms",
   );
 }
@@ -740,7 +732,7 @@ function parseActivePlaybackState(
   duration: PlaybackDurationMilliseconds,
   isPlaying: boolean,
 ): Result<PlaybackState, SpotifyPlaybackParseFailure> {
-  const snapshot = PlaybackSnapshot.create({
+  const snapshot = createPlaybackSnapshot({
     item,
     position,
     duration,
@@ -754,13 +746,6 @@ function parseActivePlaybackState(
   }
 
   return succeeded(pausedPlaybackState(snapshot.value));
-}
-
-function parseSpotifyProviderId(): Result<
-  ProviderId,
-  SpotifyPlaybackParseFailure
-> {
-  return mapValueValidation(ProviderId.create("spotify"), "$");
 }
 
 function parseObject(
@@ -877,7 +862,7 @@ function emptyPlaybackState(): PlaybackState {
   const state = {
     kind: "empty",
   } satisfies PlaybackState;
-  return Object.freeze(state);
+  return state;
 }
 
 function playingPlaybackState(snapshot: PlaybackSnapshot): PlaybackState {
@@ -885,7 +870,7 @@ function playingPlaybackState(snapshot: PlaybackSnapshot): PlaybackState {
     kind: "playing",
     snapshot,
   } satisfies PlaybackState;
-  return Object.freeze(state);
+  return state;
 }
 
 function pausedPlaybackState(snapshot: PlaybackSnapshot): PlaybackState {
@@ -893,7 +878,7 @@ function pausedPlaybackState(snapshot: PlaybackSnapshot): PlaybackState {
     kind: "paused",
     snapshot,
   } satisfies PlaybackState;
-  return Object.freeze(state);
+  return state;
 }
 
 function unsupportedPlaybackState(
@@ -903,7 +888,7 @@ function unsupportedPlaybackState(
     kind: "unsupported",
     reason,
   } satisfies PlaybackState;
-  return Object.freeze(state);
+  return state;
 }
 
 function parseFailure(
@@ -915,7 +900,7 @@ function parseFailure(
     path,
     code,
   };
-  return Object.freeze(failure);
+  return failure;
 }
 
 function isUnknownJsonObject(input: unknown): input is UnknownJsonObject {
@@ -930,20 +915,20 @@ function succeeded<Value>(value: Value): {
   readonly kind: "success";
   readonly value: Value;
 } {
-  return Object.freeze({
+  return {
     kind: "success",
     value,
-  });
+  };
 }
 
 function failed<Failure>(error: Failure): {
   readonly kind: "failure";
   readonly error: Failure;
 } {
-  return Object.freeze({
+  return {
     kind: "failure",
     error,
-  });
+  };
 }
 
 function assertNever(value: never): never {

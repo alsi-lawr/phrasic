@@ -1,15 +1,30 @@
 import {
+  availableOriginalArtwork,
+  createProviderLink,
   maximumPlatformTimerDelayMilliseconds,
+  parseDisplayText,
+  parseOriginalArtworkUrl,
+  parseProviderCollectionId,
+  parseProviderItemId,
+  unavailableOriginalArtwork,
+  type Collection,
+  type Creator,
+  type DisplayText,
+  type OriginalArtwork,
+  type ProviderCollectionId,
+  type ProviderItemId,
+  type ProviderLink,
   type Result,
+  type Show,
   type UnsupportedPlaybackReason,
 } from "../../domain/playback.ts";
+import { fakeProviderId } from "../providers/provider-identifiers.ts";
 
 export type FakePlaybackMode = "paused" | "playing";
 
 export type FakeTrackCreator = {
-  readonly creatorId: string;
-  readonly name: string;
-  readonly url: string;
+  readonly creatorId: ProviderItemId;
+  readonly creator: Creator;
 };
 
 export type FakeProviderFailure =
@@ -34,26 +49,21 @@ export type FakeControlCommand =
   | {
       readonly kind: "set-track";
       readonly playback: FakePlaybackMode;
-      readonly itemId: string;
-      readonly title: string;
-      readonly itemUrl: string;
-      readonly artworkUrl: string | null;
+      readonly itemId: ProviderItemId;
+      readonly title: DisplayText;
+      readonly itemLink: ProviderLink;
+      readonly artwork: OriginalArtwork;
       readonly creators: ReadonlyArray<FakeTrackCreator>;
-      readonly collectionId: string;
-      readonly collectionTitle: string;
-      readonly collectionUrl: string;
+      readonly collection: Collection;
     }
   | {
       readonly kind: "set-episode";
       readonly playback: FakePlaybackMode;
-      readonly itemId: string;
-      readonly title: string;
-      readonly itemUrl: string;
-      readonly artworkUrl: string | null;
-      readonly showId: string;
-      readonly showTitle: string;
-      readonly publisher: string;
-      readonly showUrl: string;
+      readonly itemId: ProviderItemId;
+      readonly title: DisplayText;
+      readonly itemLink: ProviderLink;
+      readonly artwork: OriginalArtwork;
+      readonly show: Show;
     }
   | {
       readonly kind: "set-unsupported";
@@ -151,9 +161,7 @@ function parseAuthorizationResolution(
     return invalidControl();
   }
 
-  return succeeded(
-    Object.freeze({ kind: "resolve-authorization", decision: decision.value }),
-  );
+  return succeeded({ kind: "resolve-authorization", decision: decision.value });
 }
 
 function parseNoArgumentCommand(
@@ -166,8 +174,8 @@ function parseNoArgumentCommand(
   }
 
   return kind === "expire-authorization"
-    ? succeeded(Object.freeze({ kind: "expire-authorization" }))
-    : succeeded(Object.freeze({ kind: "set-empty" }));
+    ? succeeded({ kind: "expire-authorization" })
+    : succeeded({ kind: "set-empty" });
 }
 
 function parseTrackCommand(
@@ -191,49 +199,45 @@ function parseTrackCommand(
   }
 
   const playback = playbackProperty(exact.value);
-  const itemId = nonEmptyStringProperty(exact.value, "itemId");
-  const title = nonEmptyStringProperty(exact.value, "title");
-  const itemUrl = httpsUrlProperty(exact.value, "itemUrl");
-  const artworkUrl = artworkUrlProperty(
-    exact.value,
-    "artworkUrl",
-    applicationUrl,
-  );
+  const itemId = providerItemIdProperty(exact.value, "itemId");
+  const title = displayTextProperty(exact.value, "title");
+  const itemLink = providerLinkProperty(exact.value, "itemUrl");
+  const artwork = artworkProperty(exact.value, "artworkUrl", applicationUrl);
   const creators = trackCreatorsProperty(exact.value);
-  const collectionId = nonEmptyStringProperty(exact.value, "collectionId");
-  const collectionTitle = nonEmptyStringProperty(
+  const collectionId = providerCollectionIdProperty(
     exact.value,
-    "collectionTitle",
+    "collectionId",
   );
-  const collectionUrl = httpsUrlProperty(exact.value, "collectionUrl");
+  const collectionTitle = displayTextProperty(exact.value, "collectionTitle");
+  const collectionLink = providerLinkProperty(exact.value, "collectionUrl");
   if (
     playback.kind === "failure" ||
     itemId.kind === "failure" ||
     title.kind === "failure" ||
-    itemUrl.kind === "failure" ||
-    artworkUrl.kind === "failure" ||
+    itemLink.kind === "failure" ||
+    artwork.kind === "failure" ||
     creators.kind === "failure" ||
     collectionId.kind === "failure" ||
     collectionTitle.kind === "failure" ||
-    collectionUrl.kind === "failure"
+    collectionLink.kind === "failure"
   ) {
     return invalidControl();
   }
 
-  return succeeded(
-    Object.freeze({
-      kind: "set-track",
-      playback: playback.value,
-      itemId: itemId.value,
-      title: title.value,
-      itemUrl: itemUrl.value,
-      artworkUrl: artworkUrl.value,
-      creators: creators.value,
-      collectionId: collectionId.value,
-      collectionTitle: collectionTitle.value,
-      collectionUrl: collectionUrl.value,
-    }),
-  );
+  return succeeded({
+    kind: "set-track",
+    playback: playback.value,
+    itemId: itemId.value,
+    title: title.value,
+    itemLink: itemLink.value,
+    artwork: artwork.value,
+    creators: creators.value,
+    collection: {
+      id: collectionId.value,
+      title: collectionTitle.value,
+      links: [collectionLink.value],
+    },
+  });
 }
 
 function parseEpisodeCommand(
@@ -257,46 +261,42 @@ function parseEpisodeCommand(
   }
 
   const playback = playbackProperty(exact.value);
-  const itemId = nonEmptyStringProperty(exact.value, "itemId");
-  const title = nonEmptyStringProperty(exact.value, "title");
-  const itemUrl = httpsUrlProperty(exact.value, "itemUrl");
-  const artworkUrl = artworkUrlProperty(
-    exact.value,
-    "artworkUrl",
-    applicationUrl,
-  );
-  const showId = nonEmptyStringProperty(exact.value, "showId");
-  const showTitle = nonEmptyStringProperty(exact.value, "showTitle");
-  const publisher = nonEmptyStringProperty(exact.value, "publisher");
-  const showUrl = httpsUrlProperty(exact.value, "showUrl");
+  const itemId = providerItemIdProperty(exact.value, "itemId");
+  const title = displayTextProperty(exact.value, "title");
+  const itemLink = providerLinkProperty(exact.value, "itemUrl");
+  const artwork = artworkProperty(exact.value, "artworkUrl", applicationUrl);
+  const showId = providerCollectionIdProperty(exact.value, "showId");
+  const showTitle = displayTextProperty(exact.value, "showTitle");
+  const publisher = displayTextProperty(exact.value, "publisher");
+  const showLink = providerLinkProperty(exact.value, "showUrl");
   if (
     playback.kind === "failure" ||
     itemId.kind === "failure" ||
     title.kind === "failure" ||
-    itemUrl.kind === "failure" ||
-    artworkUrl.kind === "failure" ||
+    itemLink.kind === "failure" ||
+    artwork.kind === "failure" ||
     showId.kind === "failure" ||
     showTitle.kind === "failure" ||
     publisher.kind === "failure" ||
-    showUrl.kind === "failure"
+    showLink.kind === "failure"
   ) {
     return invalidControl();
   }
 
-  return succeeded(
-    Object.freeze({
-      kind: "set-episode",
-      playback: playback.value,
-      itemId: itemId.value,
-      title: title.value,
-      itemUrl: itemUrl.value,
-      artworkUrl: artworkUrl.value,
-      showId: showId.value,
-      showTitle: showTitle.value,
+  return succeeded({
+    kind: "set-episode",
+    playback: playback.value,
+    itemId: itemId.value,
+    title: title.value,
+    itemLink: itemLink.value,
+    artwork: artwork.value,
+    show: {
+      id: showId.value,
+      title: showTitle.value,
       publisher: publisher.value,
-      showUrl: showUrl.value,
-    }),
-  );
+      links: [showLink.value],
+    },
+  });
 }
 
 function parseUnsupportedCommand(
@@ -316,9 +316,7 @@ function parseUnsupportedCommand(
     case "advertisement":
     case "local-item":
     case "unknown-item-type":
-      return succeeded(
-        Object.freeze({ kind: "set-unsupported", reason: reason.value }),
-      );
+      return succeeded({ kind: "set-unsupported", reason: reason.value });
     default:
       return invalidControl();
   }
@@ -342,9 +340,7 @@ function parseProviderFailureCommand(
     return failure;
   }
 
-  return succeeded(
-    Object.freeze({ kind: "set-provider-failure", failure: failure.value }),
-  );
+  return succeeded({ kind: "set-provider-failure", failure: failure.value });
 }
 
 function parseProviderFailure(
@@ -366,9 +362,7 @@ function parseProviderFailure(
     case "permission-denied":
     case "unauthorized": {
       const exact = exactObject(source.value, ["kind"]);
-      return exact.kind === "failure"
-        ? exact
-        : succeeded(Object.freeze({ kind: kind.value }));
+      return exact.kind === "failure" ? exact : succeeded({ kind: kind.value });
     }
     case "rate-limited":
       return parseRateLimitedFailure(source.value);
@@ -395,9 +389,7 @@ function parseRateLimitedFailure(
   }
 
   if (retryAfter.value === null) {
-    return succeeded(
-      Object.freeze({ kind: "rate-limited", retryAfterMilliseconds: null }),
-    );
+    return succeeded({ kind: "rate-limited", retryAfterMilliseconds: null });
   }
 
   if (
@@ -409,12 +401,10 @@ function parseRateLimitedFailure(
     return invalidControl();
   }
 
-  return succeeded(
-    Object.freeze({
-      kind: "rate-limited",
-      retryAfterMilliseconds: retryAfter.value,
-    }),
-  );
+  return succeeded({
+    kind: "rate-limited",
+    retryAfterMilliseconds: retryAfter.value,
+  });
 }
 
 function parseStatusFailure(
@@ -439,7 +429,7 @@ function parseStatusFailure(
     return invalidControl();
   }
 
-  return succeeded(Object.freeze({ kind, status: status.value }));
+  return succeeded({ kind, status: status.value });
 }
 
 function parseFatalCommand(
@@ -459,7 +449,7 @@ function parseFatalCommand(
     return invalidControl();
   }
 
-  return succeeded(Object.freeze({ kind: "set-fatal", reason: reason.value }));
+  return succeeded({ kind: "set-fatal", reason: reason.value });
 }
 
 function trackCreatorsProperty(
@@ -481,27 +471,75 @@ function trackCreatorsProperty(
       return exact;
     }
 
-    const creatorId = nonEmptyStringProperty(exact.value, "creatorId");
-    const name = nonEmptyStringProperty(exact.value, "name");
-    const url = httpsUrlProperty(exact.value, "url");
+    const creatorId = providerItemIdProperty(exact.value, "creatorId");
+    const name = displayTextProperty(exact.value, "name");
+    const link = providerLinkProperty(exact.value, "url");
     if (
       creatorId.kind === "failure" ||
       name.kind === "failure" ||
-      url.kind === "failure"
+      link.kind === "failure"
     ) {
       return invalidControl();
     }
 
-    creators.push(
-      Object.freeze({
-        creatorId: creatorId.value,
-        name: name.value,
-        url: url.value,
-      }),
-    );
+    creators.push({
+      creatorId: creatorId.value,
+      creator: { name: name.value, links: [link.value] },
+    });
   }
 
-  return succeeded(Object.freeze(creators));
+  return succeeded(creators);
+}
+
+function providerItemIdProperty(
+  source: ParsedObject,
+  name: string,
+): Result<ProviderItemId, FakeControlParseFailure> {
+  return parseDomainValue(parseProviderItemId, source, name);
+}
+
+function providerCollectionIdProperty(
+  source: ParsedObject,
+  name: string,
+): Result<ProviderCollectionId, FakeControlParseFailure> {
+  return parseDomainValue(parseProviderCollectionId, source, name);
+}
+
+function displayTextProperty(
+  source: ParsedObject,
+  name: string,
+): Result<DisplayText, FakeControlParseFailure> {
+  return parseDomainValue(parseDisplayText, source, name);
+}
+
+function parseDomainValue<Value>(
+  parse: (value: unknown) => Result<Value, unknown>,
+  source: ParsedObject,
+  name: string,
+): Result<Value, FakeControlParseFailure> {
+  const value = dataProperty(source, name);
+  if (value.kind === "failure") {
+    return value;
+  }
+
+  const parsed = parse(value.value);
+  return parsed.kind === "success" ? parsed : invalidControl();
+}
+
+function providerLinkProperty(
+  source: ParsedObject,
+  name: string,
+): Result<ProviderLink, FakeControlParseFailure> {
+  const href = httpsUrlProperty(source, name);
+  if (href.kind === "failure") {
+    return href;
+  }
+
+  const link = createProviderLink({
+    providerId: fakeProviderId,
+    href: href.value,
+  });
+  return link.kind === "success" ? link : invalidControl();
 }
 
 function playbackProperty(
@@ -539,18 +577,20 @@ function httpsUrlProperty(
   }
 }
 
-function artworkUrlProperty(
+function artworkProperty(
   source: ParsedObject,
   name: string,
   applicationUrl: URL,
-): Result<string | null, FakeControlParseFailure> {
+): Result<OriginalArtwork, FakeControlParseFailure> {
   const value = dataProperty(source, name);
   if (value.kind === "failure") {
     return value;
   }
 
   if (value.value === null) {
-    return succeeded(null);
+    return succeeded(
+      unavailableOriginalArtwork("provider-did-not-supply-artwork"),
+    );
   }
 
   if (typeof value.value !== "string" || value.value.trim().length === 0) {
@@ -562,11 +602,18 @@ function artworkUrlProperty(
     const isHttp = url.protocol === "http:" || url.protocol === "https:";
     const isAllowedOrigin =
       url.origin === applicationUrl.origin || url.protocol === "https:";
-    return isHttp &&
+    if (!(
+      isHttp &&
       isAllowedOrigin &&
       url.username === "" &&
       url.password === ""
-      ? succeeded(url.toString())
+    )) {
+      return invalidControl();
+    }
+
+    const artworkUrl = parseOriginalArtworkUrl(url.toString());
+    return artworkUrl.kind === "success"
+      ? succeeded(availableOriginalArtwork(artworkUrl.value))
       : invalidControl();
   } catch {
     return invalidControl();
@@ -625,12 +672,12 @@ function dataProperty(
 }
 
 function succeeded<Value>(value: Value): Result<Value, never> {
-  return Object.freeze({ kind: "success", value });
+  return { kind: "success", value };
 }
 
 function invalidControl(): Result<never, FakeControlParseFailure> {
-  return Object.freeze({
+  return {
     kind: "failure",
-    error: Object.freeze({ kind: "invalid-fake-control" }),
-  });
+    error: { kind: "invalid-fake-control" },
+  };
 }

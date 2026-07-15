@@ -4,6 +4,7 @@ import {
   type BrowserPlaybackApplicationPorts,
   type BrowserPlaybackWorker,
 } from "../application.ts";
+import type { PlaybackWorkerEvent } from "../worker/protocol.ts";
 import type { BrowserConfigurationResponse } from "../configuration-response.ts";
 import { fakeBrowserIntegration } from "./browser-integration.ts";
 import { parseFakeControlEnvelope } from "./control.ts";
@@ -27,7 +28,7 @@ createRoot(rootElement).render(
 );
 
 function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
-  return Object.freeze({
+  return {
     createWorker: createPlaybackWorker,
     fetchConfiguration(): Promise<BrowserConfigurationResponse> {
       return Promise.reject(
@@ -35,13 +36,13 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
       );
     },
     integration: fakeBrowserIntegration,
-    location: Object.freeze({
+    location: {
       current(): URL {
         return new URL(window.location.href);
       },
       navigate(): void {},
       replace(): void {},
-    }),
+    },
     onPageHide(listener: () => void): () => void {
       window.addEventListener("pagehide", listener, { once: true });
       return (): void => {
@@ -57,7 +58,7 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
     visibility(): "hidden" | "visible" {
       return document.visibilityState === "visible" ? "visible" : "hidden";
     },
-  });
+  };
 }
 
 function createPlaybackWorker(): BrowserPlaybackWorker {
@@ -90,8 +91,8 @@ function createPlaybackWorker(): BrowserPlaybackWorker {
         worker.removeEventListener("error", onError);
       };
     },
-    onMessage(listener: (message: unknown) => void): () => void {
-      const onMessage = (event: MessageEvent<unknown>): void => {
+    onMessage(listener: (message: PlaybackWorkerEvent) => void): () => void {
+      const onMessage = (event: MessageEvent<PlaybackWorkerEvent>): void => {
         listener(event.data);
       };
       worker.addEventListener("message", onMessage);
@@ -108,5 +109,5 @@ function createPlaybackWorker(): BrowserPlaybackWorker {
     },
   };
 
-  return Object.freeze(playbackWorker);
+  return playbackWorker;
 }
