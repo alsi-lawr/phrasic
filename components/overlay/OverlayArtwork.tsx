@@ -3,9 +3,9 @@ import type { BrowserPlaybackApplicationSnapshot } from "../../browser/applicati
 import {
   currentPlaybackItem,
   type LastPlaybackItem,
-  type NowPlayingItem,
   type PlaybackState,
 } from "../../domain/playback.ts";
+import { type NowPlayingItem } from "../../domain/playback-item.ts";
 import { FallbackVinyl } from "./FallbackVinyl.tsx";
 import {
   overlayArtworkRoundedClipPathData,

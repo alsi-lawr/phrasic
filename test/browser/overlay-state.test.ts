@@ -12,8 +12,8 @@ import {
   providerFailure,
   transitionPlaybackState,
   type PlaybackState,
-  type Result,
 } from "../../domain/playback.ts";
+import { type Result } from "../../domain/result.ts";
 import {
   advertisementPayload,
   emptyTrackPayload,

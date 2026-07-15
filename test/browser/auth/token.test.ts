@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createSpotifyAuthFetchPort,
-  parseSpotifyRefreshTokenResponse,
   type SpotifyAuthFetchRequest,
-} from "../../../browser/auth/token.ts";
+} from "../../../browser/auth/spotify-auth-fetch.ts";
+import { parseSpotifyRefreshTokenResponse } from "../../../browser/auth/token.ts";
 import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";
 import { ManualRequestDeadlineScheduler } from "../request-deadline.fixture.ts";
 

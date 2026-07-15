@@ -1,4 +1,4 @@
-import { maximumPlatformTimerDelayMilliseconds } from "../../domain/playback.ts";
+import { maximumPlatformTimerDelayMilliseconds } from "../../domain/playback-values.ts";
 import type {
   BrowserRequestDeadline,
   BrowserRequestDeadlinePort,

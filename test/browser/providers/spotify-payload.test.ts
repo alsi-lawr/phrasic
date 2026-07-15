@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  parseSpotifyPlaybackPayload,
-  type SpotifyPlaybackParseFailure,
-} from "../../../browser/providers/spotify-payload.ts";
-import type { SpotifyArtworkSize } from "../../../browser/providers/spotify-payload.ts";
+import { parseSpotifyPlaybackPayload } from "../../../browser/providers/spotify-payload.ts";
+import { type SpotifyPlaybackParseFailure } from "../../../browser/providers/spotify-payload-contract.ts";
+import type { SpotifyArtworkSize } from "../../../browser/providers/spotify-payload-contract.ts";
 import {
   advertisementPayload,
   emptyTrackPayload,
@@ -29,11 +27,9 @@ import {
   unknownPlaybackTypePayload,
   zeroArtworkPayload,
 } from "./spotify-payload.fixture.ts";
-import type {
-  PlaybackState,
-  Result,
-  TrackItem,
-} from "../../../domain/playback.ts";
+import type { PlaybackState } from "../../../domain/playback.ts";
+import type { Result } from "../../../domain/result.ts";
+import type { TrackItem } from "../../../domain/playback-item.ts";
 
 test("Spotify playback payloads normalize playing tracks with original links and artwork", () => {
   const state = expectSuccess(parseSpotifyPlaybackPayload(playingTrackPayload));

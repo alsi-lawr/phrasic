@@ -1,7 +1,5 @@
-import {
-  maximumPlatformTimerDelayMilliseconds,
-  type PlaybackState,
-} from "../../domain/playback.ts";
+import { maximumPlatformTimerDelayMilliseconds } from "../../domain/playback-values.ts";
+import { type PlaybackState } from "../../domain/playback.ts";
 import type { AuthorizationReturnTarget } from "../auth/provider.ts";
 
 export type PlaybackWorkerInitializeCommand = {

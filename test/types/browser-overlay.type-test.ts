@@ -23,7 +23,7 @@ import {
   type OverlaySetupMode,
 } from "../../components/overlay/overlay-geometry.ts";
 import { overlayMotionDecisionForPreference } from "../../components/overlay/overlay-motion.ts";
-import type { NowPlayingItem } from "../../domain/playback.ts";
+import type { NowPlayingItem } from "../../domain/playback-item.ts";
 
 declare const application: BrowserPlaybackApplication;
 declare const item: NowPlayingItem;

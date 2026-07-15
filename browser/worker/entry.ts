@@ -1,9 +1,7 @@
 import { createBrowserPkceCryptoPort } from "../auth/pkce.ts";
-import {
-  createIndexedDbSpotifyAuthStorage,
-  createNativeIndexedDbAuthorizationPort,
-} from "../auth/storage.ts";
-import { createSpotifyAuthFetchPort } from "../auth/token.ts";
+import { createIndexedDbSpotifyAuthStorage } from "../auth/storage.ts";
+import { createNativeIndexedDbAuthorizationPort } from "../auth/indexeddb-authorization.ts";
+import { createSpotifyAuthFetchPort } from "../auth/spotify-auth-fetch.ts";
 import { createSpotifyAuthorizationProvider } from "../auth/spotify-provider.ts";
 import { createSpotifyPlaybackProvider } from "../providers/spotify.ts";
 import {
@@ -17,10 +15,12 @@ import {
 } from "./protocol.ts";
 import {
   createPlaybackWorkerRuntime,
-  type PlaybackWorkerEventSink,
   type PlaybackWorkerRuntime,
-  type PlaybackWorkerSchedulerPort,
 } from "./runtime.ts";
+import type {
+  PlaybackWorkerEventSink,
+  PlaybackWorkerSchedulerPort,
+} from "./runtime-ports.ts";
 
 type WorkerBootstrap =
   | {

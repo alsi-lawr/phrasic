@@ -1,4 +1,7 @@
-import { parseProviderId, type ProviderId } from "../../domain/playback.ts";
+import {
+  parseProviderId,
+  type ProviderId,
+} from "../../domain/playback-values.ts";
 
 export const fakeProviderId = requiredProviderId("fake");
 export const spotifyProviderId = requiredProviderId("spotify");

@@ -6,6 +6,15 @@ import {
 } from "../../../browser/config.ts";
 import {
   AuthorizationAttemptTimestamp,
+  PkceState,
+  PkceStateCandidate,
+  PkceVerifier,
+  SpotifyAuthorizationCode,
+  type BrowserPkceCryptoPort,
+  type DisplayReturnConfiguration,
+  type DisplayReturnConfigurationParseFailure,
+} from "../../../browser/auth/pkce-values.ts";
+import {
   buildQueryStrippedDisplayReturnUrl,
   buildSpotifyAuthorizationUrl,
   createBrowserPkceCryptoPort,
@@ -14,13 +23,6 @@ import {
   matchesPendingAuthorizationAttemptState,
   parseDisplayReturnConfiguration,
   parseSpotifyAuthorizationCallback,
-  PkceState,
-  PkceStateCandidate,
-  PkceVerifier,
-  SpotifyAuthorizationCode,
-  type BrowserPkceCryptoPort,
-  type DisplayReturnConfiguration,
-  type DisplayReturnConfigurationParseFailure,
   type SpotifyAuthorizationCallback,
 } from "../../../browser/auth/pkce.ts";
 

@@ -13,16 +13,16 @@ import {
   type PkceStateCandidate,
   type PkceVerifier,
   type SpotifyAuthorizationCode,
-} from "../../browser/auth/pkce.ts";
+} from "../../browser/auth/pkce-values.ts";
 import type { RefreshSpotifyConnectionResult } from "../../browser/auth/session.ts";
 import type {
   SpotifyAuthStoragePort,
   SpotifyRefreshTokenReadResult,
-} from "../../browser/auth/storage.ts";
+} from "../../browser/auth/spotify-auth-storage-contract.ts";
 import {
   type SpotifyAccessToken,
   type SpotifyRefreshToken,
-} from "../../browser/auth/token.ts";
+} from "../../browser/auth/spotify-token-values.ts";
 
 declare const clientId: SpotifyClientId;
 declare const redirectUri: SpotifyRedirectUri;

@@ -2,18 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   AuthorizationAttemptTimestamp,
-  parseDisplayReturnConfiguration,
   PendingAuthorizationAttempt,
   PkceState,
   PkceStateCandidate,
   PkceVerifier,
   type DisplayReturnConfiguration,
-} from "../../../browser/auth/pkce.ts";
-import {
-  createIndexedDbSpotifyAuthStorage,
-  type SpotifyAuthStoragePort,
-} from "../../../browser/auth/storage.ts";
-import { SpotifyRefreshToken } from "../../../browser/auth/token.ts";
+} from "../../../browser/auth/pkce-values.ts";
+import { parseDisplayReturnConfiguration } from "../../../browser/auth/pkce.ts";
+import { createIndexedDbSpotifyAuthStorage } from "../../../browser/auth/storage.ts";
+import { type SpotifyAuthStoragePort } from "../../../browser/auth/spotify-auth-storage-contract.ts";
+import { SpotifyRefreshToken } from "../../../browser/auth/spotify-token-values.ts";
 import { createControlledAuthorizationIndexedDbFixture } from "./controlled-indexed-db.ts";
 
 const pendingAuthorizationAttemptsStoreName = "pending-authorization-attempts";

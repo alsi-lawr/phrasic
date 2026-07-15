@@ -1,4 +1,5 @@
-import type { PlaybackState, ProviderId } from "../../domain/playback.ts";
+import type { PlaybackState } from "../../domain/playback.ts";
+import type { ProviderId } from "../../domain/playback-values.ts";
 import type { PlaybackCredential } from "../auth/provider.ts";
 
 export type PlaybackProviderRequest = {

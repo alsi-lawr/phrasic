@@ -1,4 +1,4 @@
-import type { Result } from "../../domain/playback.ts";
+import type { Result } from "../../domain/result.ts";
 
 export type PlaybackCredential = {
   readonly toMemoryValue: () => string;

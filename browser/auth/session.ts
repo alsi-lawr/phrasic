@@ -1,25 +1,29 @@
 import type { SpotifyPublicConfiguration } from "../config.ts";
 import {
   AuthorizationAttemptTimestamp,
+  type BrowserPkceCryptoPort,
+  type DisplayReturnConfiguration,
+} from "./pkce-values.ts";
+import {
   buildSpotifyAuthorizationUrl,
   createPkceAuthorizationAttempt,
   parseSpotifyAuthorizationCallback,
-  type BrowserPkceCryptoPort,
-  type DisplayReturnConfiguration,
   type SpotifyAuthorizationCallback,
 } from "./pkce.ts";
 import {
   type SpotifyAuthStoragePort,
   type SpotifyPendingAuthorizationAttemptConsumeResult,
-} from "./storage.ts";
+} from "./spotify-auth-storage-contract.ts";
 import {
   exchangeSpotifyAuthorizationCode,
   refreshSpotifyAccessToken,
-  type SpotifyAccessToken,
-  type SpotifyAccessTokenLifetimeSeconds,
-  type SpotifyAuthFetchPort,
   type SpotifyTokenRequestFailure,
 } from "./token.ts";
+import {
+  type SpotifyAccessToken,
+  type SpotifyAccessTokenLifetimeSeconds,
+} from "./spotify-token-values.ts";
+import { type SpotifyAuthFetchPort } from "./spotify-auth-fetch.ts";
 
 export type BrowserAuthClockPort = {
   readonly now: () => AuthorizationAttemptTimestamp;

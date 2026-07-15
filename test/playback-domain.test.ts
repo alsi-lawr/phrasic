@@ -6,10 +6,23 @@ import {
   createPlaybackSnapshot,
   createProviderLink,
   createTrackItem,
+  unavailableOriginalArtwork,
+  type OriginalArtwork,
+  type Collection,
+  type Creator,
+  type EpisodeItem,
+  type PlaybackSnapshot,
+  type ProviderLink,
+  type Show,
+  type TrackItem,
+} from "../domain/playback-item.ts";
+import {
   initialPlaybackState,
   providerFailure,
   transitionPlaybackState,
-  unavailableOriginalArtwork,
+  type PlaybackState,
+} from "../domain/playback.ts";
+import {
   parseDisplayText,
   parseOriginalArtworkUrl,
   parsePlaybackDurationMilliseconds,
@@ -17,19 +30,10 @@ import {
   parseProviderCollectionId,
   parseProviderId,
   parseProviderItemId,
-  type OriginalArtwork,
-  type Collection,
-  type Creator,
   type DisplayText,
-  type EpisodeItem,
-  type PlaybackSnapshot,
-  type PlaybackState,
   type ProviderId,
-  type ProviderLink,
-  type Result,
-  type Show,
-  type TrackItem,
-} from "../domain/playback.ts";
+} from "../domain/playback-values.ts";
+import { type Result } from "../domain/result.ts";
 
 test("validated values reject invalid boundaries and preserve distinct values", () => {
   const provider = expectSuccess(parseProviderId("spotify"));

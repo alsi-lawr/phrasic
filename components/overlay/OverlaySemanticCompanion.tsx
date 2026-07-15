@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
-import type { NowPlayingItem, PlaybackState } from "../../domain/playback.ts";
+import type { NowPlayingItem } from "../../domain/playback-item.ts";
+import type { PlaybackState } from "../../domain/playback.ts";
 import { overlayLiveAnnouncementKey } from "./overlay-identities.ts";
 import {
   artistNames,
