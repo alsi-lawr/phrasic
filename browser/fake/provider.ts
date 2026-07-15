@@ -13,32 +13,30 @@ import type {
 import {
   createEpisodeItem,
   createPlaybackSnapshot,
-  createProviderLink,
   createTrackItem,
-  availableOriginalArtwork,
-  parseDisplayText,
-  parseOriginalArtworkUrl,
   parsePlaybackDurationMilliseconds,
   parsePlaybackPositionMilliseconds,
-  parseProviderCollectionId,
-  parseProviderId,
-  parseProviderItemId,
-  unavailableOriginalArtwork,
-  type NowPlayingItem,
-  type Collection,
   type Creator,
-  type OriginalArtwork,
+  type NowPlayingItem,
   type PlaybackState,
   type PlaybackSnapshot,
   type ProviderId,
-  type Show,
+  type Result,
+  type ValueValidationError,
 } from "../../domain/playback.ts";
+import { fakeProviderId } from "../providers/provider-identifiers.ts";
 import type {
   FakeControlCommand,
   FakePlaybackMode,
   FakeProviderFailure,
-  FakeTrackCreator,
 } from "./control.ts";
+
+const fakePlaybackPosition = requiredFakeValue(
+  parsePlaybackPositionMilliseconds(45_000),
+);
+const fakePlaybackDuration = requiredFakeValue(
+  parsePlaybackDurationMilliseconds(180_000),
+);
 
 const fakeCredential: PlaybackCredential = {
   toMemoryValue(): string {
@@ -84,7 +82,7 @@ export type FakeMusicProviderRuntime = {
 };
 
 export function createFakeMusicProviderRuntime(): FakeMusicProviderRuntime {
-  const providerId = validatedProviderId();
+  const providerId = fakeProviderId;
   let authorizationState: FakeAuthorizationState = {
     kind: "missing",
   };
@@ -318,39 +316,14 @@ function trackFromCommand(
 ):
   | { readonly kind: "success"; readonly value: NowPlayingItem }
   | { readonly kind: "failure" } {
-  const itemId = parseProviderItemId(command.itemId);
-  const title = parseDisplayText(command.title);
-  const collectionId = parseProviderCollectionId(command.collectionId);
-  const collectionTitle = parseDisplayText(command.collectionTitle);
-  const itemLink = providerLink(providerId, command.itemUrl);
-  const collectionLink = providerLink(providerId, command.collectionUrl);
-  const artwork = originalArtwork(command.artworkUrl);
-  const creators = fakeCreators(command.creators, providerId);
-  if (
-    itemId.kind === "failure" ||
-    title.kind === "failure" ||
-    collectionId.kind === "failure" ||
-    collectionTitle.kind === "failure" ||
-    itemLink.kind === "failure" ||
-    collectionLink.kind === "failure" ||
-    artwork.kind === "failure" ||
-    creators.kind === "failure"
-  ) {
-    return { kind: "failure" };
-  }
-
   const track = createTrackItem({
     providerId,
-    itemId: itemId.value,
-    title: title.value,
-    artists: creators.value,
-    collection: {
-      id: collectionId.value,
-      title: collectionTitle.value,
-      links: [collectionLink.value],
-    } satisfies Collection,
-    artwork: artwork.value,
-    links: [itemLink.value],
+    itemId: command.itemId,
+    title: command.title,
+    artists: command.creators.map((creator): Creator => creator.creator),
+    collection: command.collection,
+    artwork: command.artwork,
+    links: [command.itemLink],
   });
   return track.kind === "success"
     ? { kind: "success", value: track.value }
@@ -363,87 +336,16 @@ function episodeFromCommand(
 ):
   | { readonly kind: "success"; readonly value: NowPlayingItem }
   | { readonly kind: "failure" } {
-  const itemId = parseProviderItemId(command.itemId);
-  const title = parseDisplayText(command.title);
-  const showId = parseProviderCollectionId(command.showId);
-  const showTitle = parseDisplayText(command.showTitle);
-  const publisher = parseDisplayText(command.publisher);
-  const itemLink = providerLink(providerId, command.itemUrl);
-  const showLink = providerLink(providerId, command.showUrl);
-  const artwork = originalArtwork(command.artworkUrl);
-  if (
-    itemId.kind === "failure" ||
-    title.kind === "failure" ||
-    showId.kind === "failure" ||
-    showTitle.kind === "failure" ||
-    publisher.kind === "failure" ||
-    itemLink.kind === "failure" ||
-    showLink.kind === "failure" ||
-    artwork.kind === "failure"
-  ) {
-    return { kind: "failure" };
-  }
-
   const episode = createEpisodeItem({
     providerId,
-    itemId: itemId.value,
-    title: title.value,
-    show: {
-      id: showId.value,
-      title: showTitle.value,
-      publisher: publisher.value,
-      links: [showLink.value],
-    } satisfies Show,
-    artwork: artwork.value,
-    links: [itemLink.value],
+    itemId: command.itemId,
+    title: command.title,
+    show: command.show,
+    artwork: command.artwork,
+    links: [command.itemLink],
   });
   return episode.kind === "success"
     ? { kind: "success", value: episode.value }
-    : { kind: "failure" };
-}
-
-function fakeCreators(
-  source: ReadonlyArray<FakeTrackCreator>,
-  providerId: ProviderId,
-):
-  | { readonly kind: "success"; readonly value: ReadonlyArray<Creator> }
-  | { readonly kind: "failure" } {
-  const creators: Creator[] = [];
-  for (const value of source) {
-    const name = parseDisplayText(value.name);
-    const link = providerLink(providerId, value.url);
-    if (name.kind === "failure" || link.kind === "failure") {
-      return { kind: "failure" };
-    }
-
-    creators.push({ name: name.value, links: [link.value] } satisfies Creator);
-  }
-
-  return { kind: "success", value: creators };
-}
-
-function providerLink(providerId: ProviderId, href: string) {
-  return createProviderLink({ providerId, href });
-}
-
-function originalArtwork(
-  source: string | null,
-):
-  | { readonly kind: "success"; readonly value: OriginalArtwork }
-  | { readonly kind: "failure" } {
-  if (source === null) {
-    return {
-      kind: "success",
-      value: unavailableOriginalArtwork("provider-did-not-supply-artwork"),
-    };
-  }
-
-  const url = parseOriginalArtworkUrl(source);
-  return url.kind === "success"
-    ? {
-        kind: "success",
-        value: availableOriginalArtwork(url.value),
-      }
     : { kind: "failure" };
 }
 
@@ -452,16 +354,10 @@ function fakeSnapshot(
 ):
   | { readonly kind: "success"; readonly value: PlaybackSnapshot }
   | { readonly kind: "failure" } {
-  const position = parsePlaybackPositionMilliseconds(45_000);
-  const duration = parsePlaybackDurationMilliseconds(180_000);
-  if (position.kind === "failure" || duration.kind === "failure") {
-    return { kind: "failure" };
-  }
-
   return createPlaybackSnapshot({
     item,
-    position: position.value,
-    duration: duration.value,
+    position: fakePlaybackPosition,
+    duration: fakePlaybackDuration,
   });
 }
 
@@ -472,6 +368,16 @@ function playbackState(
   return mode === "playing"
     ? { kind: "playing", snapshot }
     : { kind: "paused", snapshot };
+}
+
+function requiredFakeValue<Value>(
+  result: Result<Value, ValueValidationError>,
+): Value {
+  if (result.kind === "success") {
+    return result.value;
+  }
+
+  throw new Error("A fixed Fake Music playback value is invalid.");
 }
 
 function playbackFailure(failure: FakeProviderFailure): PlaybackProviderResult {
@@ -508,15 +414,6 @@ function playbackFailure(failure: FakeProviderFailure): PlaybackProviderResult {
   }
 
   return unreachable(failure);
-}
-
-function validatedProviderId(): ProviderId {
-  const providerId = parseProviderId("fake");
-  if (providerId.kind === "failure") {
-    throw new Error("The Fake Music provider identifier is invalid.");
-  }
-
-  return providerId.value;
 }
 
 function isFakeConfiguration(input: unknown): boolean {

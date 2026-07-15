@@ -1,13 +1,14 @@
 import type { ReactElement } from "react";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
-import type {
-  AuthorizationRequiredReason,
-  NowPlayingItem,
-  PlaybackFailure,
-  PlaybackState,
-  UnsupportedPlaybackReason,
-} from "../../domain/playback.ts";
+import type { NowPlayingItem, PlaybackState } from "../../domain/playback.ts";
 import { overlayLiveAnnouncementKey } from "./overlay-identities.ts";
+import {
+  artistNames,
+  authorizationRequiredContext,
+  playbackFailureSubtitle,
+  providerLabel,
+  unsupportedSubtitle,
+} from "./overlay-copy.ts";
 import type { OverlayPresentation } from "./overlay-presentation.ts";
 
 type OverlaySemanticCompanionProps = {
@@ -426,96 +427,6 @@ function itemAnnouncementMessage(prefix: string, item: NowPlayingItem): string {
   }
 
   return unreachable(item);
-}
-
-function authorizationRequiredContext(
-  reason: AuthorizationRequiredReason,
-  displayName: string,
-): string {
-  switch (reason) {
-    case "authorization-expired":
-      return `${displayName} authorization expired.`;
-    case "authorization-revoked":
-      return `${displayName} authorization was revoked.`;
-    case "not-authorized":
-      return `${displayName} is not connected in this browser profile.`;
-    case "permission-required":
-      return `${displayName} playback permission is required.`;
-  }
-
-  return unreachable(reason);
-}
-
-function unsupportedSubtitle(
-  reason: UnsupportedPlaybackReason,
-  displayName: string,
-): string {
-  switch (reason) {
-    case "advertisement":
-      return `${displayName} is playing an advertisement.`;
-    case "local-item":
-      return `${displayName} is playing a local item.`;
-    case "unknown-item-type":
-      return `${displayName} returned an unsupported item type.`;
-  }
-
-  return unreachable(reason);
-}
-
-function playbackFailureSubtitle(
-  failure: PlaybackFailure,
-  displayName: string,
-): string {
-  switch (failure.kind) {
-    case "authorization-failed":
-      return authorizationFailureSubtitle(failure.reason, displayName);
-    case "provider-failed":
-      return providerFailureSubtitle(failure.reason, displayName);
-  }
-
-  return unreachable(failure);
-}
-
-function authorizationFailureSubtitle(
-  reason: "authorization-denied" | "code-exchange-rejected",
-  displayName: string,
-): string {
-  switch (reason) {
-    case "authorization-denied":
-      return `${displayName} authorization was denied.`;
-    case "code-exchange-rejected":
-      return `${displayName} rejected the authorization code.`;
-  }
-
-  return unreachable(reason);
-}
-
-function providerFailureSubtitle(
-  reason: "malformed-response" | "network" | "rate-limited" | "server-error",
-  displayName: string,
-): string {
-  switch (reason) {
-    case "malformed-response":
-      return `${displayName} returned an unreadable playback response.`;
-    case "network":
-      return `The ${displayName} connection is unavailable.`;
-    case "rate-limited":
-      return `${displayName} temporarily limited playback requests.`;
-    case "server-error":
-      return `${displayName} returned a server error.`;
-  }
-
-  return unreachable(reason);
-}
-
-function artistNames(
-  item: Extract<NowPlayingItem, { readonly kind: "track" }>,
-): string {
-  return item.artists.map((artist): string => artist.name).join(", ");
-}
-
-function providerLabel(presentation: OverlayPresentation): string {
-  return presentation.displayName.toLocaleUpperCase("en-US");
 }
 
 function unreachable(value: never): never {

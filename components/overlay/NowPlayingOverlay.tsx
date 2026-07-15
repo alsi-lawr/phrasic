@@ -1,7 +1,5 @@
-import type { ReactElement } from "react";
+import { useEffect, useSyncExternalStore, type ReactElement } from "react";
 import type { BrowserPlaybackApplication } from "../../browser/application.ts";
-import { PlaybackWorkerProvider } from "../playback/PlaybackWorkerProvider.tsx";
-import { usePlaybackWorker } from "../playback/usePlaybackWorker.ts";
 import { OverlayControls } from "./OverlayControls.tsx";
 import { resolveOverlayGeometry } from "./overlay-geometry.ts";
 import { overlayMotionDecisionForPreference } from "./overlay-motion.ts";
@@ -20,21 +18,18 @@ export default function NowPlayingOverlay({
   application,
   presentation,
 }: NowPlayingOverlayProps): ReactElement {
-  return (
-    <PlaybackWorkerProvider application={application}>
-      <NowPlayingOverlayContent presentation={presentation} />
-    </PlaybackWorkerProvider>
+  const snapshot = useSyncExternalStore(
+    application.subscribe,
+    application.getSnapshot,
+    application.getSnapshot,
   );
-}
 
-type NowPlayingOverlayContentProps = {
-  readonly presentation: OverlayPresentation;
-};
+  useEffect((): (() => void) => {
+    return (): void => {
+      application.dispose();
+    };
+  }, [application]);
 
-function NowPlayingOverlayContent({
-  presentation,
-}: NowPlayingOverlayContentProps): ReactElement {
-  const { beginAuthorization, logout, retry, snapshot } = usePlaybackWorker();
   const prefersReducedMotion = useReducedMotionPreference();
   const geometry = resolveOverlayGeometry(
     new URL(window.location.href).searchParams,
@@ -58,7 +53,11 @@ function NowPlayingOverlayContent({
       />
       <OverlaySetupDiagnostic diagnostic={geometry.diagnostic} />
       <OverlayControls
-        actions={{ beginAuthorization, logout, retry }}
+        actions={{
+          beginAuthorization: application.beginAuthorization,
+          logout: application.logout,
+          retry: application.retry,
+        }}
         presentation={presentation}
         setupMode={geometry.setupMode}
         snapshot={snapshot}

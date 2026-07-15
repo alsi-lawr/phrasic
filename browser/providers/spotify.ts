@@ -1,8 +1,4 @@
-import {
-  maximumPlatformTimerDelayMilliseconds,
-  parseProviderId,
-  type ProviderId,
-} from "../../domain/playback.ts";
+import { maximumPlatformTimerDelayMilliseconds } from "../../domain/playback.ts";
 import type {
   BrowserRequestDeadline,
   BrowserRequestDeadlinePort,
@@ -13,6 +9,7 @@ import type {
   PlaybackProviderResult,
   PlaybackRetryAfter,
 } from "./provider.ts";
+import { spotifyProviderId } from "./provider-identifiers.ts";
 import { parseSpotifyPlaybackPayload } from "./spotify-payload.ts";
 
 const spotifyCurrentlyPlayingEndpoint =
@@ -21,7 +18,6 @@ const retryAfterSecondsPattern = /^(0|[1-9][0-9]*)$/;
 const maximumRetryAfterSeconds = Math.floor(
   maximumPlatformTimerDelayMilliseconds / 1_000,
 );
-
 export type CreateSpotifyPlaybackProviderOptions = {
   readonly fetchImplementation: typeof globalThis.fetch;
   readonly requestDeadline: BrowserRequestDeadlinePort;
@@ -32,7 +28,7 @@ export function createSpotifyPlaybackProvider(
   options: CreateSpotifyPlaybackProviderOptions,
 ): PlaybackProviderPort {
   const provider: PlaybackProviderPort = {
-    providerId: createSpotifyProviderId(),
+    providerId: spotifyProviderId,
     async fetchCurrentlyPlaying(
       request: PlaybackProviderRequest,
     ): Promise<PlaybackProviderResult> {
@@ -196,13 +192,4 @@ function unexpectedResponse(status: number): PlaybackProviderResult {
   };
 
   return result;
-}
-
-function createSpotifyProviderId(): ProviderId {
-  const providerId = parseProviderId("spotify");
-  if (providerId.kind === "success") {
-    return providerId.value;
-  }
-
-  throw new Error("The static Spotify provider identifier is invalid.");
 }

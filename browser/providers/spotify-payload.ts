@@ -10,7 +10,6 @@ import {
   parsePlaybackDurationMilliseconds,
   parsePlaybackPositionMilliseconds,
   parseProviderCollectionId,
-  parseProviderId,
   parseProviderItemId,
   type ArtworkUnavailableReason,
   type Collection,
@@ -32,6 +31,7 @@ import {
   type Show,
   type TrackItem,
 } from "../../domain/playback.ts";
+import { spotifyProviderId } from "./provider-identifiers.ts";
 
 export type SpotifyArtworkSize = "large" | "medium" | "small";
 
@@ -188,12 +188,7 @@ function parseTrackPlayback(
     return succeeded(unsupportedPlaybackState("local-item"));
   }
 
-  const providerId = parseSpotifyProviderId();
-  if (providerId.kind === "failure") {
-    return providerId;
-  }
-
-  const itemResult = parseTrackItem(item.value, providerId.value, artworkSize);
+  const itemResult = parseTrackItem(item.value, spotifyProviderId, artworkSize);
   if (itemResult.kind === "failure") {
     return itemResult;
   }
@@ -231,14 +226,9 @@ function parseEpisodePlayback(
     return item;
   }
 
-  const providerId = parseSpotifyProviderId();
-  if (providerId.kind === "failure") {
-    return providerId;
-  }
-
   const itemResult = parseEpisodeItem(
     item.value,
-    providerId.value,
+    spotifyProviderId,
     artworkSize,
   );
   if (itemResult.kind === "failure") {
@@ -756,13 +746,6 @@ function parseActivePlaybackState(
   }
 
   return succeeded(pausedPlaybackState(snapshot.value));
-}
-
-function parseSpotifyProviderId(): Result<
-  ProviderId,
-  SpotifyPlaybackParseFailure
-> {
-  return mapValueValidation(parseProviderId("spotify"), "$");
 }
 
 function parseObject(

@@ -777,22 +777,22 @@ function parseCallbackStateCandidate(
 ): CallbackStateCandidateOutcome {
   const values = parameters.getAll("state");
   if (values.length === 0) {
-    return callbackStateOutcome({ kind: "missing-state" });
+    return { kind: "missing-state" };
   }
 
   if (values.length !== 1) {
-    return callbackStateOutcome({ kind: "malformed-state" });
+    return { kind: "malformed-state" };
   }
 
   const candidate = PkceStateCandidate.parse(values[0]);
   if (candidate.kind === "failure") {
-    return callbackStateOutcome({ kind: "malformed-state" });
+    return { kind: "malformed-state" };
   }
 
-  return callbackStateOutcome({
+  return {
     kind: "state-candidate",
     value: candidate.value,
-  });
+  };
 }
 
 function hasUnexpectedCallbackParameter(parameters: URLSearchParams): boolean {
@@ -895,12 +895,6 @@ function failedAuthorizationCode(): ValueParseFailure<SpotifyAuthorizationCodePa
   };
 
   return failed(error);
-}
-
-function callbackStateOutcome(
-  outcome: CallbackStateCandidateOutcome,
-): CallbackStateCandidateOutcome {
-  return outcome;
 }
 
 function succeeded<Value>(value: Value): ValueParseSuccess<Value> {

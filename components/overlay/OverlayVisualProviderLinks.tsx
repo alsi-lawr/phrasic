@@ -6,6 +6,7 @@ import type {
   PlaybackState,
   ProviderLink,
 } from "../../domain/playback.ts";
+import { providerLabel } from "./overlay-copy.ts";
 import { overlayViewBox } from "./overlay-geometry.ts";
 import {
   overlayArtworkRoundedClipPathData,
@@ -387,10 +388,6 @@ function selectedProviderLink(
   providerId: string,
 ): ProviderLink | undefined {
   return links.find((link): boolean => link.providerId === providerId);
-}
-
-function providerLabel(presentation: OverlayPresentation): string {
-  return presentation.displayName.toLocaleUpperCase("en-US");
 }
 
 function creatorPrecedingText(
