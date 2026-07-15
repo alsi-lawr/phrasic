@@ -164,7 +164,17 @@ diagnostic and fall back to a safe configuration.
 
 ## Develop offline
 
-Phrasic requires Node.js 26 and npm 12.
+The locked Nix development shell provides Node.js 26 with its bundled npm,
+Chromium, and ffmpeg:
+
+```sh
+nix develop
+npm ci
+npm run dev
+```
+
+Without Nix, Phrasic requires Node.js 26 and npm 12. Install Chromium and
+ffmpeg as well when regenerating the demonstration.
 
 ```sh
 npm ci
@@ -179,7 +189,7 @@ control schema, lifecycle, examples, and deployment gate.
 Regenerate the README demonstration from start to finish with:
 
 ```sh
-docs/generate-fake-music-flow.sh
+node docs/fake-music-flow/generate.mjs
 ```
 
 The harness builds Phrasic, launches a local preview and isolated headless
