@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SpotifyAccessToken } from "../../../browser/auth/token.ts";
+import { SpotifyAccessToken } from "../../../browser/auth/spotify-token-values.ts";
 import type { PlaybackProviderPort } from "../../../browser/providers/provider.ts";
 import { createSpotifyPlaybackProvider } from "../../../browser/providers/spotify.ts";
 import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";

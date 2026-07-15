@@ -1,13 +1,12 @@
-import {
-  parseSpotifyPlaybackPayload,
-  type SpotifyPlaybackParseFailure,
-} from "../../browser/providers/spotify-payload.ts";
-import type { SpotifyAccessToken } from "../../browser/auth/token.ts";
+import { parseSpotifyPlaybackPayload } from "../../browser/providers/spotify-payload.ts";
+import { type SpotifyPlaybackParseFailure } from "../../browser/providers/spotify-payload-contract.ts";
+import type { SpotifyAccessToken } from "../../browser/auth/spotify-token-values.ts";
 import type {
   PlaybackProviderRequest,
   PlaybackProviderResult,
 } from "../../browser/providers/provider.ts";
-import type { PlaybackState, Result } from "../../domain/playback.ts";
+import type { PlaybackState } from "../../domain/playback.ts";
+import type { Result } from "../../domain/result.ts";
 
 const payload: unknown = {};
 declare const playbackState: PlaybackState;

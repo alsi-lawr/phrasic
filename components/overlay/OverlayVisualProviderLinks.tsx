@@ -3,9 +3,9 @@ import type { BrowserPlaybackApplicationSnapshot } from "../../browser/applicati
 import type {
   Creator,
   NowPlayingItem,
-  PlaybackState,
   ProviderLink,
-} from "../../domain/playback.ts";
+} from "../../domain/playback-item.ts";
+import type { PlaybackState } from "../../domain/playback.ts";
 import { providerLabel } from "./overlay-copy.ts";
 import { overlayViewBox } from "./overlay-geometry.ts";
 import {

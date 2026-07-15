@@ -14,22 +14,24 @@ import {
   createEpisodeItem,
   createPlaybackSnapshot,
   createTrackItem,
-  parsePlaybackDurationMilliseconds,
-  parsePlaybackPositionMilliseconds,
   type Creator,
   type NowPlayingItem,
-  type PlaybackState,
   type PlaybackSnapshot,
+} from "../../domain/playback-item.ts";
+import {
+  parsePlaybackDurationMilliseconds,
+  parsePlaybackPositionMilliseconds,
   type ProviderId,
-  type Result,
   type ValueValidationError,
-} from "../../domain/playback.ts";
+} from "../../domain/playback-values.ts";
+import { type PlaybackState } from "../../domain/playback.ts";
+import { type Result } from "../../domain/result.ts";
 import { fakeProviderId } from "../providers/provider-identifiers.ts";
 import type {
   FakeControlCommand,
   FakePlaybackMode,
   FakeProviderFailure,
-} from "./control.ts";
+} from "./control-contract.ts";
 
 const fakePlaybackPosition = requiredFakeValue(
   parsePlaybackPositionMilliseconds(45_000),

@@ -1,5 +1,6 @@
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
-import type { NowPlayingItem, PlaybackState } from "../../domain/playback.ts";
+import type { NowPlayingItem } from "../../domain/playback-item.ts";
+import type { PlaybackState } from "../../domain/playback.ts";
 
 export function overlayItemIdentityKey(item: NowPlayingItem): string {
   const providerId = item.providerId;

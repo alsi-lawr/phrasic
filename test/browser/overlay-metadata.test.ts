@@ -11,14 +11,14 @@ import {
   overlayItemIdentityKey,
 } from "../../components/overlay/overlay-identities.ts";
 import { overlayMotionDecisionForPreference } from "../../components/overlay/overlay-motion.ts";
+import { parseDisplayText } from "../../domain/playback-values.ts";
 import {
-  parseDisplayText,
   createPlaybackSnapshot,
   createTrackItem,
-  type PlaybackState,
-  type Result,
   type TrackItem,
-} from "../../domain/playback.ts";
+} from "../../domain/playback-item.ts";
+import { type PlaybackState } from "../../domain/playback.ts";
+import { type Result } from "../../domain/result.ts";
 import {
   pausedEpisodePayload,
   playingTrackPayload,

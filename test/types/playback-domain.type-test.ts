@@ -4,6 +4,12 @@ import {
   createPlaybackSnapshot,
   createProviderLink,
   createTrackItem,
+  type Collection,
+  type Creator,
+  type NowPlayingItem,
+  type Show,
+} from "../../domain/playback-item.ts";
+import {
   parseDisplayText,
   parseOriginalArtworkUrl,
   parsePlaybackDurationMilliseconds,
@@ -12,15 +18,11 @@ import {
   parseProviderId,
   parseProviderItemId,
   type ProviderCollectionId,
-  type Collection,
-  type Creator,
-  type NowPlayingItem,
   type ProviderId,
   type ProviderItemId,
   type PlaybackPositionMilliseconds,
-  type Result,
-  type Show,
-} from "../../domain/playback.ts";
+} from "../../domain/playback-values.ts";
+import { type Result } from "../../domain/result.ts";
 
 const providerId = expectSuccess(parseProviderId("spotify"));
 const itemId = expectSuccess(parseProviderItemId("track-1"));

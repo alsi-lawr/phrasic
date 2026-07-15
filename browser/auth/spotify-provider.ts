@@ -1,9 +1,11 @@
 import {
   buildQueryStrippedDisplayReturnUrl,
   parseDisplayReturnConfiguration,
+} from "./pkce.ts";
+import {
   type BrowserPkceCryptoPort,
   type DisplayReturnConfiguration,
-} from "./pkce.ts";
+} from "./pkce-values.ts";
 import type {
   AuthorizationConnectionResult,
   AuthorizationProviderPort,
@@ -25,8 +27,9 @@ import type {
   SpotifyPendingAuthorizationAttemptConsumeOptions,
   SpotifyPendingAuthorizationAttemptConsumeResult,
   SpotifyRefreshTokenReadResult,
-} from "./storage.ts";
-import type { SpotifyAuthFetchPort, SpotifyRefreshToken } from "./token.ts";
+} from "./spotify-auth-storage-contract.ts";
+import type { SpotifyAuthFetchPort } from "./spotify-auth-fetch.ts";
+import type { SpotifyRefreshToken } from "./spotify-token-values.ts";
 import {
   parseSpotifyPublicConfiguration,
   type SpotifyPublicConfiguration,

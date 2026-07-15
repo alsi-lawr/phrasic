@@ -15,11 +15,13 @@ import { overlayMotionDecisionForPreference } from "../../components/overlay/ove
 import {
   createPlaybackSnapshot,
   createTrackItem,
-  transitionPlaybackState,
   unavailableOriginalArtwork,
+} from "../../domain/playback-item.ts";
+import {
+  transitionPlaybackState,
   type PlaybackState,
-  type Result,
 } from "../../domain/playback.ts";
+import { type Result } from "../../domain/result.ts";
 import { playingTrackPayload } from "./providers/spotify-payload.fixture.ts";
 
 test("the artwork is full-height, flush left, and clipped at all four corners", () => {

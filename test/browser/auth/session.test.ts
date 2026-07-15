@@ -8,10 +8,12 @@ import {
   isPendingAuthorizationAttemptExpired,
   matchesPendingAuthorizationAttemptState,
   parseDisplayReturnConfiguration,
+} from "../../../browser/auth/pkce.ts";
+import {
   type BrowserPkceCryptoPort,
   type DisplayReturnConfiguration,
   type PendingAuthorizationAttempt,
-} from "../../../browser/auth/pkce.ts";
+} from "../../../browser/auth/pkce-values.ts";
 import {
   beginSpotifyAuthorization,
   consumeSpotifyAuthorizationCallback,
@@ -26,15 +28,15 @@ import {
   type SpotifyPendingAuthorizationAttemptConsumeOptions,
   type SpotifyPendingAuthorizationAttemptConsumeResult,
   type SpotifyRefreshTokenReadResult,
-} from "../../../browser/auth/storage.ts";
+} from "../../../browser/auth/spotify-auth-storage-contract.ts";
+import { SpotifyRefreshToken } from "../../../browser/auth/spotify-token-values.ts";
 import {
-  SpotifyRefreshToken,
   type SpotifyAuthFetchPort,
   type SpotifyAuthFetchRequest,
   type SpotifyAuthFetchResult,
   type SpotifyAuthFetchResponse,
   type SpotifyAuthJsonReadResult,
-} from "../../../browser/auth/token.ts";
+} from "../../../browser/auth/spotify-auth-fetch.ts";
 
 type StoredRefreshToken =
   | {

@@ -10,18 +10,22 @@ import {
   createPlaybackSnapshot,
   createProviderLink,
   createTrackItem,
-  parseDisplayText,
-  transitionPlaybackState,
-  parseProviderId,
-  type DisplayText,
   type Collection,
   type Creator,
-  type PlaybackState,
-  type ProviderId,
   type ProviderLink,
-  type Result,
   type TrackItem,
+} from "../../domain/playback-item.ts";
+import {
+  parseDisplayText,
+  parseProviderId,
+  type DisplayText,
+  type ProviderId,
+} from "../../domain/playback-values.ts";
+import {
+  transitionPlaybackState,
+  type PlaybackState,
 } from "../../domain/playback.ts";
+import { type Result } from "../../domain/result.ts";
 import {
   emptyTrackPayload,
   pausedEpisodePayload,

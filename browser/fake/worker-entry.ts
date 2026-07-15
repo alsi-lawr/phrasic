@@ -3,12 +3,12 @@ import {
   type PlaybackWorkerCommand,
   type PlaybackWorkerEvent,
 } from "../worker/protocol.ts";
-import {
-  createPlaybackWorkerRuntime,
-  type PlaybackWorkerEventSink,
-  type PlaybackWorkerSchedulerPort,
-} from "../worker/runtime.ts";
-import type { FakeControlCommand } from "./control.ts";
+import { createPlaybackWorkerRuntime } from "../worker/runtime.ts";
+import type {
+  PlaybackWorkerEventSink,
+  PlaybackWorkerSchedulerPort,
+} from "../worker/runtime-ports.ts";
+import type { FakeControlCommand } from "./control-contract.ts";
 import { createFakeMusicProviderRuntime } from "./provider.ts";
 
 const provider = createFakeMusicProviderRuntime();

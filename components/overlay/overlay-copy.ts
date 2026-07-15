@@ -1,9 +1,9 @@
 import type {
   AuthorizationRequiredReason,
-  NowPlayingItem,
   PlaybackFailure,
   UnsupportedPlaybackReason,
 } from "../../domain/playback.ts";
+import type { NowPlayingItem } from "../../domain/playback-item.ts";
 import type { OverlayPresentation } from "./overlay-presentation.ts";
 
 export function authorizationRequiredContext(

@@ -10,17 +10,21 @@ import { overlayLiveAnnouncementKey } from "../../components/overlay/overlay-ide
 import {
   parseDisplayText,
   parsePlaybackPositionMilliseconds,
+  parseProviderItemId,
+} from "../../domain/playback-values.ts";
+import {
   createPlaybackSnapshot,
   createProviderLink,
   createTrackItem,
+  type TrackItem,
+} from "../../domain/playback-item.ts";
+import {
   initialPlaybackState,
-  parseProviderItemId,
   providerFailure,
   transitionPlaybackState,
   type PlaybackState,
-  type Result,
-  type TrackItem,
 } from "../../domain/playback.ts";
+import { type Result } from "../../domain/result.ts";
 import {
   advertisementPayload,
   emptyTrackPayload,

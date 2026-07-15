@@ -1,6 +1,5 @@
 import {
   type AuthorizationConnectionResult,
-  type AuthorizationProviderPort,
   type AuthorizationSessionPort,
   type BeginAuthorizationResult,
   type ConsumeAuthorizationCallbackResult,
@@ -9,16 +8,13 @@ import {
 } from "../auth/provider.ts";
 import {
   initialPlaybackState,
-  maximumPlatformTimerDelayMilliseconds,
   providerFailure,
   transitionPlaybackState,
   type PlaybackEvent,
   type PlaybackState,
 } from "../../domain/playback.ts";
-import {
-  type PlaybackProviderPort,
-  type PlaybackProviderResult,
-} from "../providers/provider.ts";
+import { maximumPlatformTimerDelayMilliseconds } from "../../domain/playback-values.ts";
+import { type PlaybackProviderResult } from "../providers/provider.ts";
 import {
   createPlaybackWorkerFatalInitializationFailure,
   createPlaybackWorkerSafeDiagnostic,
@@ -32,6 +28,8 @@ import {
   type PlaybackWorkerEvent,
   type PlaybackWorkerInitializeCommand,
 } from "./protocol.ts";
+import type { PlaybackWorkerRuntimePorts } from "./runtime-ports.ts";
+import { createScheduledTaskSlot } from "./scheduled-task-slot.ts";
 
 const successfulPollDelayMilliseconds = 5_000;
 const accessTokenRefreshLeadMilliseconds = 60_000;
@@ -39,42 +37,6 @@ const maximumScheduledDelayMilliseconds = maximumPlatformTimerDelayMilliseconds;
 const reconnectDelayMilliseconds: ReadonlyArray<number> = [
   1_000, 2_000, 4_000, 8_000, 16_000, 30_000,
 ];
-
-export type PlaybackWorkerClockPort = {
-  readonly now: () => number;
-};
-
-export type PlaybackWorkerScheduledTask = {
-  readonly cancel: () => void;
-};
-
-export type PlaybackWorkerScheduleOptions = {
-  readonly delayMilliseconds: number;
-  readonly run: () => Promise<void>;
-};
-
-export type PlaybackWorkerSchedulerPort = {
-  readonly schedule: (
-    options: PlaybackWorkerScheduleOptions,
-  ) => PlaybackWorkerScheduledTask;
-};
-
-export type PlaybackWorkerCancellationPort = {
-  readonly create: () => AbortController;
-};
-
-export type PlaybackWorkerEventSink = {
-  readonly emit: (event: PlaybackWorkerEvent) => void;
-};
-
-export type PlaybackWorkerRuntimePorts = {
-  readonly authorization: AuthorizationProviderPort;
-  readonly cancellation: PlaybackWorkerCancellationPort;
-  readonly clock: PlaybackWorkerClockPort;
-  readonly events: PlaybackWorkerEventSink;
-  readonly playbackProvider: PlaybackProviderPort;
-  readonly scheduler: PlaybackWorkerSchedulerPort;
-};
 
 export type PlaybackWorkerRuntime = {
   readonly receive: (message: PlaybackWorkerCommand) => Promise<void>;
@@ -107,15 +69,6 @@ type AccessTokenState =
       readonly expiresAtEpochMilliseconds: number;
       readonly refreshAtEpochMilliseconds: number;
     };
-
-type ScheduledTaskSlot = {
-  readonly cancel: () => void;
-  readonly isScheduled: () => boolean;
-  readonly schedule: (
-    delayMilliseconds: number,
-    run: () => Promise<void>,
-  ) => boolean;
-};
 
 type ActiveOperation =
   | {
@@ -1361,67 +1314,6 @@ function availableAccessToken(input: {
   readonly refreshAtEpochMilliseconds: number;
 }): AccessTokenState {
   return { kind: "available", ...input };
-}
-
-function createScheduledTaskSlot(
-  scheduler: PlaybackWorkerSchedulerPort,
-  onFailure: () => void,
-): ScheduledTaskSlot {
-  let task: PlaybackWorkerScheduledTask | undefined;
-  let generation = 0;
-
-  const cancel = (): void => {
-    generation += 1;
-    const scheduledTask = task;
-    task = undefined;
-    if (scheduledTask === undefined) {
-      return;
-    }
-
-    try {
-      scheduledTask.cancel();
-    } catch {
-      onFailure();
-    }
-  };
-
-  const isScheduled = (): boolean => task !== undefined;
-
-  const schedule = (
-    delayMilliseconds: number,
-    run: () => Promise<void>,
-  ): boolean => {
-    cancel();
-    const scheduledGeneration = generation;
-    let invokedBeforeScheduleReturned = false;
-
-    try {
-      const scheduledTask = scheduler.schedule({
-        delayMilliseconds,
-        run(): Promise<void> {
-          if (generation !== scheduledGeneration) {
-            return Promise.resolve();
-          }
-
-          invokedBeforeScheduleReturned = true;
-          task = undefined;
-          return run();
-        },
-      });
-      if (
-        generation === scheduledGeneration &&
-        !invokedBeforeScheduleReturned
-      ) {
-        task = scheduledTask;
-      }
-      return true;
-    } catch {
-      onFailure();
-      return false;
-    }
-  };
-
-  return { cancel, isScheduled, schedule };
 }
 
 function noActiveOperation(): ActiveOperation {

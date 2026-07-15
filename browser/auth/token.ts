@@ -1,199 +1,23 @@
 import type { SpotifyPublicConfiguration } from "../config.ts";
+import { failed, succeeded, type Result } from "../../domain/result.ts";
+import type { PkceVerifier, SpotifyAuthorizationCode } from "./pkce-values.ts";
 import type {
-  BrowserRequestDeadline,
-  BrowserRequestDeadlinePort,
-} from "../request-deadline.ts";
-import type { PkceVerifier, SpotifyAuthorizationCode } from "./pkce.ts";
-
-type ParseSuccess<Value> = {
-  readonly kind: "success";
-  readonly value: Value;
-};
-
-type ParseFailure<Failure> = {
-  readonly kind: "failure";
-  readonly error: Failure;
-};
-
-type ParseResult<Value, Failure> = ParseSuccess<Value> | ParseFailure<Failure>;
+  SpotifyAuthFetchPort,
+  SpotifyAuthFetchRequest,
+  SpotifyAuthFetchResult,
+} from "./spotify-auth-fetch.ts";
+import {
+  SpotifyAccessToken,
+  SpotifyAccessTokenLifetimeSeconds,
+  SpotifyRefreshToken,
+  type SpotifyAuthorizationCodeTokenResponse,
+  type SpotifyRefreshTokenResponse,
+  type SpotifyRefreshTokenRotation,
+  type SpotifyTokenResponseParseFailure,
+} from "./spotify-token-values.ts";
 
 const spotifyTokenEndpoint = "https://accounts.spotify.com/api/token";
 const formContentType = "application/x-www-form-urlencoded";
-const maximumAccessTokenLifetimeSeconds = Math.floor(
-  Number.MAX_SAFE_INTEGER / 1_000,
-);
-
-export type SpotifyTokenValueParseFailure = {
-  readonly kind: "invalid-spotify-token-value";
-  readonly value: "access-token" | "refresh-token";
-  readonly code: "expected-non-empty-string";
-};
-
-export type SpotifyAccessTokenLifetimeParseFailure = {
-  readonly kind: "invalid-spotify-access-token-lifetime";
-  readonly code: "expected-positive-safe-integer-seconds";
-};
-
-export type SpotifyTokenResponseParseFailure = {
-  readonly kind: "invalid-spotify-token-response";
-  readonly exchange: "authorization-code" | "refresh-token";
-  readonly path: "$.access_token" | "$.expires_in" | "$.refresh_token" | "$";
-  readonly code:
-    | "expected-data-property"
-    | "expected-non-empty-string"
-    | "expected-object"
-    | "expected-positive-safe-integer-seconds"
-    | "missing-value";
-};
-
-export type SpotifyAuthFetchRequest = {
-  readonly url: URL;
-  readonly method: "POST";
-  readonly contentType: "application/x-www-form-urlencoded";
-  readonly body: string;
-  readonly signal: AbortSignal;
-};
-
-export type SpotifyAuthJsonReadResult =
-  | {
-      readonly kind: "json";
-      readonly value: unknown;
-    }
-  | {
-      readonly kind: "invalid-json";
-    }
-  | {
-      readonly kind: "network-failure";
-    };
-
-export type SpotifyAuthFetchResponse = {
-  readonly status: number;
-  readonly readJson: () => Promise<SpotifyAuthJsonReadResult>;
-};
-
-export type SpotifyAuthFetchResult =
-  | {
-      readonly kind: "response";
-      readonly response: SpotifyAuthFetchResponse;
-    }
-  | {
-      readonly kind: "network-failure";
-    };
-
-export type SpotifyAuthFetchPort = {
-  readonly fetch: (
-    request: SpotifyAuthFetchRequest,
-  ) => Promise<SpotifyAuthFetchResult>;
-};
-
-export type CreateSpotifyAuthFetchPortOptions = {
-  readonly fetchImplementation: typeof globalThis.fetch;
-  readonly requestDeadline: BrowserRequestDeadlinePort;
-  readonly timeoutMilliseconds: number;
-};
-
-export class SpotifyAccessToken {
-  private readonly value: string;
-
-  private constructor(value: string) {
-    this.value = value;
-  }
-
-  static parse(
-    input: unknown,
-  ): ParseResult<SpotifyAccessToken, SpotifyTokenValueParseFailure> {
-    if (!isNonEmptyTokenString(input)) {
-      return failed(tokenValueFailure("access-token"));
-    }
-
-    return succeeded(new SpotifyAccessToken(input));
-  }
-
-  toMemoryValue(): string {
-    return this.value;
-  }
-}
-
-export class SpotifyRefreshToken {
-  private readonly value: string;
-
-  private constructor(value: string) {
-    this.value = value;
-  }
-
-  static parse(
-    input: unknown,
-  ): ParseResult<SpotifyRefreshToken, SpotifyTokenValueParseFailure> {
-    if (!isNonEmptyTokenString(input)) {
-      return failed(tokenValueFailure("refresh-token"));
-    }
-
-    return succeeded(new SpotifyRefreshToken(input));
-  }
-
-  toStorageValue(): string {
-    return this.value;
-  }
-
-  toTokenRequestParameter(): string {
-    return this.value;
-  }
-}
-
-export class SpotifyAccessTokenLifetimeSeconds {
-  private readonly value: number;
-
-  private constructor(value: number) {
-    this.value = value;
-  }
-
-  static parse(
-    input: unknown,
-  ): ParseResult<
-    SpotifyAccessTokenLifetimeSeconds,
-    SpotifyAccessTokenLifetimeParseFailure
-  > {
-    if (
-      typeof input !== "number" ||
-      !Number.isSafeInteger(input) ||
-      input <= 0 ||
-      input > maximumAccessTokenLifetimeSeconds
-    ) {
-      return failed(accessTokenLifetimeFailure());
-    }
-
-    return succeeded(new SpotifyAccessTokenLifetimeSeconds(input));
-  }
-
-  toSeconds(): number {
-    return this.value;
-  }
-
-  toMilliseconds(): number {
-    return this.value * 1_000;
-  }
-}
-
-export type SpotifyAuthorizationCodeTokenResponse = {
-  readonly accessToken: SpotifyAccessToken;
-  readonly expiresIn: SpotifyAccessTokenLifetimeSeconds;
-  readonly refreshToken: SpotifyRefreshToken;
-};
-
-export type SpotifyRefreshTokenRotation =
-  | {
-      readonly kind: "refresh-token-retained";
-    }
-  | {
-      readonly kind: "refresh-token-rotated";
-      readonly refreshToken: SpotifyRefreshToken;
-    };
-
-export type SpotifyRefreshTokenResponse = {
-  readonly accessToken: SpotifyAccessToken;
-  readonly expiresIn: SpotifyAccessTokenLifetimeSeconds;
-  readonly refreshToken: SpotifyRefreshTokenRotation;
-};
 
 export type ExchangeSpotifyAuthorizationCodeOptions = {
   readonly configuration: SpotifyPublicConfiguration;
@@ -240,71 +64,9 @@ export type SpotifyTokenRequestFailure =
       readonly code: "invalid-token-response" | "token-request-rejected";
     };
 
-export function createSpotifyAuthFetchPort(
-  options: CreateSpotifyAuthFetchPortOptions,
-): SpotifyAuthFetchPort {
-  const port: SpotifyAuthFetchPort = {
-    async fetch(
-      request: SpotifyAuthFetchRequest,
-    ): Promise<SpotifyAuthFetchResult> {
-      try {
-        const deadline = options.requestDeadline.create({
-          signal: request.signal,
-          timeoutMilliseconds: options.timeoutMilliseconds,
-        });
-        try {
-          const response = await options.fetchImplementation(request.url, {
-            method: request.method,
-            headers: {
-              "Content-Type": request.contentType,
-            },
-            body: request.body,
-            signal: deadline.signal,
-          });
-          if (!hasActiveRequestDeadline(deadline)) {
-            deadline.dispose();
-            return networkFailure();
-          }
-
-          const parsedResponse: SpotifyAuthFetchResponse = {
-            status: response.status,
-            async readJson(): Promise<SpotifyAuthJsonReadResult> {
-              try {
-                const value: unknown = await response.json();
-                if (!hasActiveRequestDeadline(deadline)) {
-                  return jsonNetworkFailure();
-                }
-
-                return json(value);
-              } catch {
-                if (!hasActiveRequestDeadline(deadline)) {
-                  return jsonNetworkFailure();
-                }
-
-                return invalidJson();
-              } finally {
-                deadline.dispose();
-              }
-            },
-          };
-
-          return fetchResponse(parsedResponse);
-        } catch {
-          deadline.dispose();
-          return networkFailure();
-        }
-      } catch {
-        return networkFailure();
-      }
-    },
-  };
-
-  return port;
-}
-
 export function parseSpotifyAuthorizationCodeTokenResponse(
   input: unknown,
-): ParseResult<
+): Result<
   SpotifyAuthorizationCodeTokenResponse,
   SpotifyTokenResponseParseFailure
 > {
@@ -352,7 +114,7 @@ export function parseSpotifyAuthorizationCodeTokenResponse(
 
 export function parseSpotifyRefreshTokenResponse(
   input: unknown,
-): ParseResult<SpotifyRefreshTokenResponse, SpotifyTokenResponseParseFailure> {
+): Result<SpotifyRefreshTokenResponse, SpotifyTokenResponseParseFailure> {
   const source = parseTokenResponseObject(input, "refresh-token");
   if (source.kind === "failure") {
     return source;
@@ -541,7 +303,7 @@ async function requestSpotifyToken(options: {
 function parseTokenResponseObject(
   input: unknown,
   exchange: SpotifyTokenResponseParseFailure["exchange"],
-): ParseResult<object, SpotifyTokenResponseParseFailure> {
+): Result<object, SpotifyTokenResponseParseFailure> {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     return failed(tokenResponseFailure(exchange, "$", "expected-object"));
   }
@@ -552,7 +314,7 @@ function parseTokenResponseObject(
 function parseRequiredTokenFields(
   source: object,
   exchange: SpotifyTokenResponseParseFailure["exchange"],
-): ParseResult<SpotifyTokenResponseFields, SpotifyTokenResponseParseFailure> {
+): Result<SpotifyTokenResponseFields, SpotifyTokenResponseParseFailure> {
   const accessTokenValue = readRequiredTokenResponseField(
     source,
     "access_token",
@@ -607,7 +369,7 @@ function readRequiredTokenResponseField(
   source: object,
   fieldName: "access_token" | "expires_in" | "refresh_token",
   exchange: SpotifyTokenResponseParseFailure["exchange"],
-): ParseResult<unknown, SpotifyTokenResponseParseFailure> {
+): Result<unknown, SpotifyTokenResponseParseFailure> {
   const descriptor = Object.getOwnPropertyDescriptor(source, fieldName);
   if (descriptor === undefined) {
     return failed(
@@ -636,7 +398,7 @@ function readOptionalTokenResponseField(
   source: object,
   fieldName: "refresh_token",
   exchange: SpotifyTokenResponseParseFailure["exchange"],
-): ParseResult<OptionalTokenResponseField, SpotifyTokenResponseParseFailure> {
+): Result<OptionalTokenResponseField, SpotifyTokenResponseParseFailure> {
   const descriptor = Object.getOwnPropertyDescriptor(source, fieldName);
   if (descriptor === undefined) {
     const missing: OptionalTokenResponseField = {
@@ -666,7 +428,7 @@ function readOptionalTokenResponseField(
 
 function parseRefreshTokenRotation(
   field: OptionalTokenResponseField,
-): ParseResult<SpotifyRefreshTokenRotation, SpotifyTokenResponseParseFailure> {
+): Result<SpotifyRefreshTokenRotation, SpotifyTokenResponseParseFailure> {
   if (field.kind === "missing") {
     const retained: SpotifyRefreshTokenRotation = {
       kind: "refresh-token-retained",
@@ -707,15 +469,6 @@ function isInvalidGrant(input: unknown): boolean {
   return descriptor.value === "invalid_grant";
 }
 
-function isNonEmptyTokenString(input: unknown): input is string {
-  return (
-    typeof input === "string" &&
-    input.length > 0 &&
-    input.trim().length > 0 &&
-    input === input.trim()
-  );
-}
-
 function isSuccessfulHttpStatus(status: number): boolean {
   return status >= 200 && status < 300;
 }
@@ -740,27 +493,6 @@ function tokenResponsePath(
   throw new Error(`Unhandled Spotify token response field: ${unhandledField}`);
 }
 
-function tokenValueFailure(
-  value: SpotifyTokenValueParseFailure["value"],
-): SpotifyTokenValueParseFailure {
-  const failure: SpotifyTokenValueParseFailure = {
-    kind: "invalid-spotify-token-value",
-    value,
-    code: "expected-non-empty-string",
-  };
-
-  return failure;
-}
-
-function accessTokenLifetimeFailure(): SpotifyAccessTokenLifetimeParseFailure {
-  const failure: SpotifyAccessTokenLifetimeParseFailure = {
-    kind: "invalid-spotify-access-token-lifetime",
-    code: "expected-positive-safe-integer-seconds",
-  };
-
-  return failure;
-}
-
 function tokenResponseFailure(
   exchange: SpotifyTokenResponseParseFailure["exchange"],
   path: SpotifyTokenResponseParseFailure["path"],
@@ -774,54 +506,6 @@ function tokenResponseFailure(
   };
 
   return failure;
-}
-
-function json(value: unknown): SpotifyAuthJsonReadResult {
-  const result: SpotifyAuthJsonReadResult = {
-    kind: "json",
-    value,
-  };
-
-  return result;
-}
-
-function invalidJson(): SpotifyAuthJsonReadResult {
-  const result: SpotifyAuthJsonReadResult = {
-    kind: "invalid-json",
-  };
-
-  return result;
-}
-
-function jsonNetworkFailure(): SpotifyAuthJsonReadResult {
-  const result: SpotifyAuthJsonReadResult = {
-    kind: "network-failure",
-  };
-
-  return result;
-}
-
-function hasActiveRequestDeadline(deadline: BrowserRequestDeadline): boolean {
-  return deadline.outcome().kind === "active";
-}
-
-function fetchResponse(
-  response: SpotifyAuthFetchResponse,
-): SpotifyAuthFetchResult {
-  const result: SpotifyAuthFetchResult = {
-    kind: "response",
-    response,
-  };
-
-  return result;
-}
-
-function networkFailure(): SpotifyAuthFetchResult {
-  const result: SpotifyAuthFetchResult = {
-    kind: "network-failure",
-  };
-
-  return result;
 }
 
 function authorizationRequired(): SpotifyTokenRequestFailure {
@@ -849,24 +533,6 @@ function providerFailure(
   const result: SpotifyTokenRequestFailure = {
     kind: "provider-failure",
     code,
-  };
-
-  return result;
-}
-
-function succeeded<Value>(value: Value): ParseSuccess<Value> {
-  const result: ParseSuccess<Value> = {
-    kind: "success",
-    value,
-  };
-
-  return result;
-}
-
-function failed<Failure>(error: Failure): ParseFailure<Failure> {
-  const result: ParseFailure<Failure> = {
-    kind: "failure",
-    error,
   };
 
   return result;

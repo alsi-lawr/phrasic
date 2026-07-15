@@ -9,7 +9,7 @@ import type {
   IndexedDbRequestCompletionPort,
   IndexedDbRequestHandlers,
   IndexedDbTransactionHandlers,
-} from "../../../browser/auth/storage.ts";
+} from "../../../browser/auth/indexeddb-authorization.ts";
 
 type ControlledAuthorizationIndexedDbRecord = {
   readonly storeName: IndexedDbAuthorizationStoreName;
