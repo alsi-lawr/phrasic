@@ -9,9 +9,37 @@
         "x86_64-linux"
         "aarch64-linux"
       ];
+      forAllSystems = nixpkgs.lib.genAttrs systems;
     in
     {
-      devShells = nixpkgs.lib.genAttrs systems (
+      packages = forAllSystems (
+        system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+          package = builtins.fromJSON (builtins.readFile ./package.json);
+        in
+        {
+          default = pkgs.buildNpmPackage {
+            pname = package.name;
+            inherit (package) version;
+            src = ./.;
+
+            nodejs = pkgs.nodejs_26;
+            npmDepsHash = "sha256-ukPV78EwVSzIGBYpAzxpWaw9JRCdQNvLVW/a+P7lGUg=";
+
+            npmBuildScript = "build";
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p "$out"
+              cp -r dist/. "$out/"
+              runHook postInstall
+            '';
+          };
+        }
+      );
+
+      devShells = forAllSystems (
         system:
         let
           pkgs = import nixpkgs { inherit system; };
