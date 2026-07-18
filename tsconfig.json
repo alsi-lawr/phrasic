@@ -26,7 +26,7 @@
     "test/playback-domain.test.ts",
     "test/types/browser-*.type-test.ts",
     "test/types/playback-domain.type-test.ts",
-    "vite.config.ts"
+    "scripts/**/*.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }

@@ -71,10 +71,13 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
 }
 
 function createPlaybackWorker(): BrowserPlaybackWorker {
-  const worker = new Worker(new URL("./worker/entry.ts", import.meta.url), {
-    type: "module",
-    name: "phrasic-playback",
-  });
+  const worker = new Worker(
+    new URL("/browser/worker/entry.ts", window.location.origin),
+    {
+      type: "module",
+      name: "phrasic-playback",
+    },
+  );
 
   const playbackWorker: BrowserPlaybackWorker = {
     onError(listener: () => void): () => void {

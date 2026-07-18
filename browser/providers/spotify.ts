@@ -1,4 +1,5 @@
 import { maximumPlatformTimerDelayMilliseconds } from "../../domain/playback-values.ts";
+import type { BrowserFetch } from "../fetch.ts";
 import type {
   BrowserRequestDeadline,
   BrowserRequestDeadlinePort,
@@ -19,7 +20,7 @@ const maximumRetryAfterSeconds = Math.floor(
   maximumPlatformTimerDelayMilliseconds / 1_000,
 );
 export type CreateSpotifyPlaybackProviderOptions = {
-  readonly fetchImplementation: typeof globalThis.fetch;
+  readonly fetchImplementation: BrowserFetch;
   readonly requestDeadline: BrowserRequestDeadlinePort;
   readonly timeoutMilliseconds: number;
 };

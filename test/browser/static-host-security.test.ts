@@ -2,11 +2,9 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
-import test from "node:test";
-import { fileURLToPath } from "node:url";
-import { build } from "vite";
+import { test } from "bun:test";
+import { buildApplication } from "../../scripts/build";
 
-const projectRoot = fileURLToPath(new URL("../../", import.meta.url));
 const staticHtmlEntries: ReadonlyArray<string> = [
   "index.html",
   "spotify/index.html",
@@ -57,12 +55,7 @@ test("production artifacts preserve static-host security boundaries", async () =
   const restoreBuildEnvironment = injectSecretBuildEnvironment();
 
   try {
-    await build({
-      configFile: join(projectRoot, "vite.config.ts"),
-      logLevel: "silent",
-      root: projectRoot,
-      build: { emptyOutDir: true, outDir: outputDirectory },
-    });
+    await buildApplication(outputDirectory);
 
     for (const entry of staticHtmlEntries) {
       const metadata = documentSecurityMetadata(
@@ -98,6 +91,11 @@ test("production artifacts preserve static-host security boundaries", async () =
       textArtifacts.some((artifact) => artifact.includes("sourceMappingURL")),
       false,
       "production text must not reference source maps",
+    );
+    assert.equal(
+      textArtifacts.some((artifact) => artifact.includes("data:font/woff")),
+      false,
+      "production CSS must use the CSP-compatible public font URL",
     );
 
     for (const [name, value] of secretBuildEnvironment) {

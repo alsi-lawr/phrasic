@@ -1,0 +1,6 @@
+[install]
+omit = ["peer"]
+
+[serve.static]
+env = "disable"
+plugins = ["bun-plugin-tailwind"]

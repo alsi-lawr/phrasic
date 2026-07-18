@@ -62,10 +62,13 @@ function browserApplicationPorts(): BrowserPlaybackApplicationPorts {
 }
 
 function createPlaybackWorker(): BrowserPlaybackWorker {
-  const worker = new Worker(new URL("./worker-entry.ts", import.meta.url), {
-    type: "module",
-    name: "phrasic-fake-playback",
-  });
+  const worker = new Worker(
+    new URL("/browser/fake/worker-entry.ts", window.location.origin),
+    {
+      type: "module",
+      name: "phrasic-fake-playback",
+    },
+  );
   const forwardControl = (event: MessageEvent<unknown>): void => {
     if (event.source !== window || event.origin !== window.location.origin) {
       return;

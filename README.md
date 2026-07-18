@@ -164,21 +164,20 @@ diagnostic and fall back to a safe configuration.
 
 ## Develop offline
 
-The locked Nix development shell provides Node.js 26 with its bundled npm,
-Chromium, and ffmpeg:
+The locked Nix development shell provides Bun 1.3.13, Chromium, and ffmpeg:
 
 ```sh
 nix develop
-npm ci
-npm run dev
+bun ci --frozen-lockfile --omit peer
+bun run dev
 ```
 
-Without Nix, Phrasic requires Node.js 26 and npm 12. Install Chromium and
-ffmpeg as well when regenerating the demonstration.
+Without Nix, Phrasic requires Bun 1.3.13. Install Chromium and ffmpeg as well
+when regenerating the demonstration.
 
 ```sh
-npm ci
-npm run dev
+bun ci --frozen-lockfile --omit peer
+bun run dev
 ```
 
 Open `http://localhost:5173/fake/`, select **Connect Fake Music**, and drive the
@@ -189,7 +188,7 @@ control schema, lifecycle, examples, and deployment gate.
 Regenerate the README demonstration from start to finish with:
 
 ```sh
-node docs/fake-music-flow/generate.mjs
+bun docs/fake-music-flow/generate.mjs
 ```
 
 The harness builds Phrasic, launches a local preview and isolated headless

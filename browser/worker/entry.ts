@@ -1,4 +1,5 @@
 import { createBrowserPkceCryptoPort } from "../auth/pkce.ts";
+import type { BrowserFetch } from "../fetch.ts";
 import { createIndexedDbSpotifyAuthStorage } from "../auth/storage.ts";
 import { createNativeIndexedDbAuthorizationPort } from "../auth/indexeddb-authorization.ts";
 import { createSpotifyAuthFetchPort } from "../auth/spotify-auth-fetch.ts";
@@ -62,7 +63,7 @@ function createWorkerBootstrap(): WorkerBootstrap {
   }
 
   try {
-    const fetchImplementation: typeof globalThis.fetch = (input, init) =>
+    const fetchImplementation: BrowserFetch = (input, init) =>
       self.fetch(input, init);
     const events: PlaybackWorkerEventSink = {
       emit(event): void {

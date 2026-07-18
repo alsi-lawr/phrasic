@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "bun:test";
 import {
   createSpotifyAuthFetchPort,
   type SpotifyAuthFetchRequest,
 } from "../../../browser/auth/spotify-auth-fetch.ts";
+import type { BrowserFetch } from "../../../browser/fetch.ts";
 import { parseSpotifyRefreshTokenResponse } from "../../../browser/auth/token.ts";
 import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";
 import { ManualRequestDeadlineScheduler } from "../request-deadline.fixture.ts";
@@ -189,8 +190,8 @@ function tokenRequest(signal: AbortSignal): SpotifyAuthFetchRequest {
 
 function abortableNeverSettlingFetch(
   capture: AbortableFetchCapture,
-): typeof globalThis.fetch {
-  const fetch: typeof globalThis.fetch = (_input, init): Promise<Response> => {
+): BrowserFetch {
+  const fetch: BrowserFetch = (_input, init): Promise<Response> => {
     const signal = init?.signal;
     if (signal === undefined || signal === null) {
       return Promise.reject(new Error("Expected a request deadline signal."));

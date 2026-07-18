@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "bun:test";
 import { parseSpotifyPlaybackPayload } from "../../../browser/providers/spotify-payload.ts";
 import { type SpotifyPlaybackParseFailure } from "../../../browser/providers/spotify-payload-contract.ts";
 import type { SpotifyArtworkSize } from "../../../browser/providers/spotify-payload-contract.ts";

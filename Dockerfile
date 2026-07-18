@@ -1,16 +1,14 @@
-FROM node:26-alpine AS build
+FROM oven/bun:1.3.13-alpine AS build
 
 WORKDIR /app
 
 ENV HUSKY=0
 
-RUN npm install --global npm@12
-
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json bun.lock ./
+RUN bun ci --frozen-lockfile --omit peer
 
 COPY . .
-RUN npm run build
+RUN bun run build
 
 FROM caddy:2-alpine
 

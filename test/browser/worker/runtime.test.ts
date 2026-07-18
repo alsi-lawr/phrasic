@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "bun:test";
 import { createSpotifyAuthFetchPort } from "../../../browser/auth/spotify-auth-fetch.ts";
 import type {
   PlaybackProviderPort,

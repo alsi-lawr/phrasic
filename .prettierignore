@@ -5,7 +5,6 @@ node_modules/
 .yarn/
 
 # Generated and build output
-package-lock.json
 dist/
 coverage/
 .vercel/

@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -21,11 +21,13 @@ const childProcesses = [];
 fs.mkdirSync(framesDirectory, { recursive: true });
 
 try {
-  await run("npm", ["run", "build"]);
+  await run("bun", ["run", "build"]);
   installArtworkFixtures();
 
-  const preview = start(path.join(projectRoot, "node_modules/.bin/vite"), [
-    "preview",
+  const preview = start("bun", [
+    "./index.html",
+    "./spotify/index.html",
+    "./fake/index.html",
     "--host",
     "127.0.0.1",
     "--port",

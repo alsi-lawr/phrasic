@@ -18,14 +18,14 @@ if [ ! -s "$format_files" ]; then
     exit 0
 fi
 
-prettier_bin="$(git rev-parse --show-toplevel)/node_modules/.bin/prettier"
+prettier_entrypoint="$(git rev-parse --show-toplevel)/node_modules/prettier/bin/prettier.cjs"
 
-if [ ! -x "$prettier_bin" ]; then
-    printf '%s\n' 'pre-commit: local Prettier is unavailable; run npm ci before committing.' >&2
+if [ ! -f "$prettier_entrypoint" ]; then
+    printf '%s\n' 'pre-commit: local Prettier is unavailable; run bun ci --frozen-lockfile --omit peer before committing.' >&2
     exit 1
 fi
 
-xargs -0 "$prettier_bin" --write --ignore-unknown -- <"$format_files"
+xargs -0 bun "$prettier_entrypoint" --write --ignore-unknown -- <"$format_files"
 xargs -0 git diff --name-only -z -- <"$format_files" >"$formatted_files"
 
 if [ ! -s "$formatted_files" ]; then

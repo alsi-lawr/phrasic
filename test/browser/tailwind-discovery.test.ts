@@ -2,11 +2,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
-import test from "node:test";
-import { fileURLToPath } from "node:url";
-import { build } from "vite";
-
-const projectRoot = fileURLToPath(new URL("../../", import.meta.url));
+import { test } from "bun:test";
+import { buildApplication } from "../../scripts/build";
 
 test("Tailwind output discovers application utilities but excludes test utilities", async () => {
   const outputDirectory = mkdtempSync(
@@ -14,12 +11,7 @@ test("Tailwind output discovers application utilities but excludes test utilitie
   );
 
   try {
-    await build({
-      configFile: join(projectRoot, "vite.config.ts"),
-      logLevel: "silent",
-      root: projectRoot,
-      build: { emptyOutDir: true, outDir: outputDirectory },
-    });
+    await buildApplication(outputDirectory);
 
     const css = generatedCss(outputDirectory);
     assert.match(css, /\.animate-artwork-fade-in\{/);

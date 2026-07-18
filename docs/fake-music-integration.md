@@ -7,10 +7,10 @@ controlled demonstrations.
 
 ## Enable the entry
 
-Vite serves the entry during development:
+Bun serves the entry during development:
 
 ```sh
-npm run dev
+bun run dev
 ```
 
 Open `http://localhost:5173/fake/`. The Caddy deployment returns HTTP 404 for
@@ -36,7 +36,7 @@ transparency at 24 fps, and replaces `docs/fake-music-flow.webp`:
 docs/generate-fake-music-flow.sh
 ```
 
-It requires the repository's npm dependencies, `google-chrome`, and `ffmpeg`.
+It requires the repository's Bun dependencies, `google-chrome`, and `ffmpeg`.
 Set `CHROME_BIN`, `PREVIEW_PORT`, or `CHROME_DEBUG_PORT` to override their
 defaults. Temporary frames and the intermediate transparent GIF are removed
 after the WebP is written.
