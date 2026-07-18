@@ -1,5 +1,10 @@
 import tailwind from "bun-plugin-tailwind";
 import type { BunPlugin } from "bun";
+import {
+  createRuntimeAssetManifest,
+  serializeRuntimeAssetManifest,
+} from "../server/manifest.ts";
+import { publicRuntimeFiles } from "../server/published-files.ts";
 
 const applicationEntries = [
   "index.html",
@@ -7,21 +12,19 @@ const applicationEntries = [
   "fake/index.html",
 ] as const;
 
-const publicFiles = [
-  "fake-artwork.svg",
-  "favicon.svg",
-  "fonts/GeistVF.woff",
-  "spotify-full-logo-white.svg",
-] as const;
+const publicFiles = publicRuntimeFiles.map((file) => file.path.toString());
 const publicFontUrl = "/fonts/GeistVF.woff";
+const repositoryRoot = `${import.meta.dir}/..`;
 
 const buildMetadata = {
   bunVersion: "1.3.13",
   environment: "disabled",
   entries: applicationEntries,
+  mode: "production",
   publicFiles,
   sourceMaps: "none",
-  mode: "production",
+  runtimeHost: "server.js",
+  runtimeManifest: "server-manifest.json",
 } as const;
 
 type WorkerBuild = {
@@ -34,16 +37,21 @@ export async function buildApplication(
 ): Promise<void> {
   await Bun.$`rm -rf ${outputDirectory}`;
 
-  const workers = await Promise.all([
-    buildWorker("browser/worker/entry.ts", outputDirectory),
-    buildWorker("browser/fake/worker-entry.ts", outputDirectory),
-  ]);
-  const workerUrls = new Map(
-    workers.map((worker) => [worker.entrypoint, worker.url]),
+  const spotifyWorker = await buildWorker(
+    "browser/worker/entry.ts",
+    outputDirectory,
   );
+  const fakeWorker = await buildWorker(
+    "browser/fake/worker-entry.ts",
+    outputDirectory,
+  );
+  const workerUrls = new Map([
+    [spotifyWorker.entrypoint, spotifyWorker.url],
+    [fakeWorker.entrypoint, fakeWorker.url],
+  ]);
 
   const result = await Bun.build({
-    entrypoints: [...applicationEntries],
+    entrypoints: applicationEntries.map(sourcePath),
     define: { "process.env.NODE_ENV": JSON.stringify("production") },
     env: "disable",
     loader: { ".woff": "file" },
@@ -54,6 +62,7 @@ export async function buildApplication(
     },
     outdir: outputDirectory,
     plugins: [tailwind, generatedWorkerUrlPlugin(workerUrls)],
+    root: repositoryRoot,
     sourcemap: "none",
     splitting: true,
     target: "browser",
@@ -68,14 +77,56 @@ export async function buildApplication(
   for (const publicFile of publicFiles) {
     await Bun.write(
       `${outputDirectory}/${publicFile}`,
-      Bun.file(`public/${publicFile}`),
+      Bun.file(sourcePath(`public/${publicFile}`)),
     );
   }
+
+  await buildProductionHost(outputDirectory);
+  const manifest = createRuntimeAssetManifest(
+    await generatedAssetPaths(outputDirectory),
+  );
+  await Bun.write(
+    `${outputDirectory}/server-manifest.json`,
+    serializeRuntimeAssetManifest(manifest),
+  );
 
   await Bun.write(
     `${outputDirectory}/build-metadata.json`,
     `${JSON.stringify(buildMetadata, undefined, 2)}\n`,
   );
+}
+
+async function buildProductionHost(outputDirectory: string): Promise<void> {
+  const result = await Bun.build({
+    entrypoints: [sourcePath("server/runtime.ts")],
+    env: "disable",
+    minify: true,
+    naming: { entry: "server.js" },
+    outdir: outputDirectory,
+    root: repositoryRoot,
+    sourcemap: "none",
+    target: "bun",
+  });
+
+  if (!result.success) {
+    throw new Error("Bun did not bundle the production server.");
+  }
+}
+
+async function generatedAssetPaths(
+  outputDirectory: string,
+): Promise<ReadonlyArray<string>> {
+  const paths: string[] = [];
+  const assets = new Bun.Glob("assets/**/*");
+
+  for await (const path of assets.scan({
+    cwd: outputDirectory,
+    onlyFiles: true,
+  })) {
+    paths.push(path);
+  }
+
+  return paths;
 }
 
 async function externalizePublicFont(
@@ -106,11 +157,12 @@ async function buildWorker(
   outputDirectory: string,
 ): Promise<WorkerBuild> {
   const result = await Bun.build({
-    entrypoints: [entrypoint],
+    entrypoints: [sourcePath(entrypoint)],
     env: "disable",
     minify: true,
     naming: { entry: "assets/[dir]/[name]-[hash].[ext]" },
     outdir: outputDirectory,
+    root: repositoryRoot,
     sourcemap: "none",
     target: "browser",
   });
@@ -134,6 +186,10 @@ async function buildWorker(
   }
 
   return { entrypoint, url: relativePath };
+}
+
+function sourcePath(path: string): string {
+  return `${repositoryRoot}/${path}`;
 }
 
 function generatedWorkerUrlPlugin(
@@ -178,5 +234,5 @@ function generatedWorkerUrlPlugin(
 }
 
 if (import.meta.main) {
-  await buildApplication();
+  await buildApplication(process.argv[2]);
 }

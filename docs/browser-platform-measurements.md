@@ -68,15 +68,45 @@ the explicit public-file allowlist.
 The tracked source/config inventory counts files with `.css`, `.html`, `.json`,
 `.md`, `.mjs`, `.nix`, `.sh`, `.toml`, `.ts`, `.tsx`, or `.yml` suffixes, plus
 `.dockerignore`, `.gitattributes`, `.gitignore`, `.oxlintrc.json`,
-`.prettierignore`, `Caddyfile`, `Dockerfile`, and `package.json`. It deliberately
-excludes lockfiles and public binary assets, so it measures maintained
-source/config rather than install or deploy payload.
+`.prettierignore`, the historical pre-cutover `Caddyfile`, `Dockerfile`, and
+`package.json`. It deliberately excludes lockfiles and public binary assets,
+so it measures maintained source/config rather than install or deploy payload.
 
 | Measure                     |  Before |   After |   Delta |
 | --------------------------- | ------: | ------: | ------: |
 | Tracked source/config files |     140 |     143 |      +3 |
 | Tracked source/config bytes | 817,504 | 723,136 | -94,368 |
 | Direct package dependencies |      13 |      11 |      -2 |
+
+| Measure                     |  Before |   T-002 |   Delta |
+| --------------------------- | ------: | ------: | ------: |
+| Tracked source/config files |     140 |     150 |     +10 |
+| Tracked source/config bytes | 817,504 | 771,739 | -45,765 |
+| Direct package dependencies |      13 |      11 |      -2 |
+
+## T-002 hosted Bun runtime measurement
+
+The canonical build now also emits `server.js`, a Bun-targeted production host,
+and `server-manifest.json`, its generated hashed-asset allowlist. They contain
+no browser build dependencies and are deterministic build inputs recorded in
+`build-metadata.json`.
+
+| Measure                           |    Current T-002 result |
+| --------------------------------- | ----------------------: |
+| First clean immutable install     |                   70 ms |
+| Second clean immutable install    |                   70 ms |
+| First production build wall time  |                  160 ms |
+| Second production build wall time |                  160 ms |
+| Full deployed output              | 435,968 bytes; 19 files |
+| Browser JavaScript                |           333,324 bytes |
+| Bundled Bun host (`server.js`)    |             9,752 bytes |
+| Runtime asset manifest            |             1,033 bytes |
+| Bun-only Docker runtime image     |        45,720,713 bytes |
+| Nix hosted package                |           436,183 bytes |
+
+The two full output inventories and SHA-256 hash lists were identical. Browser
+JavaScript remains 2,502 bytes below the supplied Vite baseline; the additional
+deployed bytes are the bundled server and its explicit runtime allowlist.
 
 ## Per-system Nix dependency hashes
 

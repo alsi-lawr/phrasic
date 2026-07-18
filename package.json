@@ -8,6 +8,7 @@
     "dev": "bun scripts/dev.ts",
     "clean": "bun run scripts/clean.ts",
     "build": "bun run scripts/build.ts",
+    "serve": "bun scripts/serve.ts",
     "lint": "oxlint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

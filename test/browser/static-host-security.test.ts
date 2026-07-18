@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { test } from "bun:test";
-import { buildApplication } from "../../scripts/build";
+import { buildOutput } from "./build-output.ts";
 
 const staticHtmlEntries: ReadonlyArray<string> = [
   "index.html",
@@ -55,7 +55,7 @@ test("production artifacts preserve static-host security boundaries", async () =
   const restoreBuildEnvironment = injectSecretBuildEnvironment();
 
   try {
-    await buildApplication(outputDirectory);
+    await buildOutput(outputDirectory);
 
     for (const entry of staticHtmlEntries) {
       const metadata = documentSecurityMetadata(

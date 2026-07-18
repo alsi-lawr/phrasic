@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { test } from "bun:test";
-import { buildApplication } from "../../scripts/build";
+import { buildOutput } from "./build-output.ts";
 
 test("Tailwind output discovers application utilities but excludes test utilities", async () => {
   const outputDirectory = mkdtempSync(
@@ -11,7 +11,7 @@ test("Tailwind output discovers application utilities but excludes test utilitie
   );
 
   try {
-    await buildApplication(outputDirectory);
+    await buildOutput(outputDirectory);
 
     const css = generatedCss(outputDirectory);
     assert.match(css, /\.animate-artwork-fade-in\{/);

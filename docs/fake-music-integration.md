@@ -13,7 +13,7 @@ Bun serves the entry during development:
 bun run dev
 ```
 
-Open `http://localhost:5173/fake/`. The Caddy deployment returns HTTP 404 for
+Open `http://localhost:5173/fake/`. The Bun production host returns HTTP 404 for
 `/fake`, `/fake/`, and `/fake/index.html` by default. Enable those paths only
 when deliberately exposing the test facility:
 
@@ -23,8 +23,8 @@ docker run --rm --publish 127.0.0.1:8080:8080 \
   phrasic
 ```
 
-Hosts that do not use the bundled Caddyfile must reproduce the same default-off
-gate. Keep the route disabled in normal production deployments.
+Keep the route disabled in normal production deployments. The bundled Bun host
+is the only supported production serving route.
 
 ## Regenerate the demonstration
 

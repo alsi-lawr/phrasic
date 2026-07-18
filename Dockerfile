@@ -10,9 +10,16 @@ RUN bun ci --frozen-lockfile --omit peer
 COPY . .
 RUN bun run build
 
-FROM caddy:2-alpine
+FROM oven/bun:1.3.13-alpine
 
-COPY Caddyfile /etc/caddy/Caddyfile
-COPY --from=build /app/dist /srv
+WORKDIR /app
+
+ENV PORT=8080
+
+RUN rm -f /usr/local/bun-node-fallback-bin/node /usr/local/bun-node-fallback-bin/npm /usr/local/bun-node-fallback-bin/npx
+
+COPY --from=build /app/dist /app
 
 EXPOSE 8080
+
+CMD ["bun", "/app/server.js"]

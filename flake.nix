@@ -47,7 +47,10 @@
             inherit (package) version;
             src = ./.;
 
-            nativeBuildInputs = [ pkgs.bun ];
+            nativeBuildInputs = [
+              pkgs.bun
+              pkgs.makeWrapper
+            ];
 
             buildPhase = ''
               cp -R ${bunDeps} node_modules
@@ -58,6 +61,8 @@
               runHook preInstall
               mkdir -p "$out"
               cp -r dist/. "$out/"
+              mkdir -p "$out/bin"
+              makeWrapper ${pkgs.bun}/bin/bun "$out/bin/phrasic-host" --add-flags "$out/server.js"
               runHook postInstall
             '';
           };
