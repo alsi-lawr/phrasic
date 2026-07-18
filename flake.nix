@@ -80,6 +80,7 @@
               pkgs.bun
               pkgs.chromium
               pkgs.ffmpeg
+              pkgs.rustup
             ];
 
             shellHook = ''

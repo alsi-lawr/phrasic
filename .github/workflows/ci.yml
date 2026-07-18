@@ -32,6 +32,47 @@ jobs:
       - name: Build
         run: bun run build
 
+  rust-linux:
+    name: Rust Linux x64 glibc 2.35
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain and target libraries
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal --component rustfmt --component clippy
+          rustup target add --toolchain 1.88.0 x86_64-pc-windows-msvc x86_64-apple-darwin aarch64-unknown-linux-gnu riscv64gc-unknown-linux-gnu
+      - name: Verify Ubuntu 22.04 glibc floor
+        run: ldd --version | head -n 1 | grep -F '2.35'
+      - name: Format, lint, test, and verify target isolation
+        run: |
+          cargo +1.88.0 fmt --all -- --check
+          cargo +1.88.0 clippy --workspace --all-targets --locked -- -D warnings
+          cargo +1.88.0 test --workspace --locked
+          scripts/verify-rust-target-isolation.sh
+
+  rust-windows:
+    name: Rust Windows x64
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.88.0-x86_64-pc-windows-msvc --profile minimal
+      - name: Build workspace
+        run: cargo +1.88.0 build --workspace --locked
+      - name: Smoke test CLI
+        shell: pwsh
+        run: |
+          $configPath = Join-Path $env:RUNNER_TEMP 'phrasic-v1.toml'
+          [System.IO.File]::WriteAllText($configPath, "schema_version = 1`nport = 8080`n")
+          & .\target\debug\phrasic.exe serve $configPath
+          if ($LASTEXITCODE -ne 0) {
+            throw "phrasic CLI smoke test failed with exit code $LASTEXITCODE"
+          }
+
   publish-image:
     name: Publish Docker image
     if: startsWith(github.ref, 'refs/tags/v')

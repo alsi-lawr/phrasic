@@ -1,0 +1,19 @@
+[package]
+name = "phrasic"
+publish = false
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "phrasic"
+path = "src/main.rs"
+
+[dependencies]
+phrasic-core = { path = "../phrasic-core" }
+phrasic-rpc = { path = "../phrasic-rpc" }
+toml = "=0.8.23"
+
+[lints]
+workspace = true

@@ -156,7 +156,8 @@ diagnostic and fall back to a safe configuration.
 
 ## Develop offline
 
-The locked Nix development shell provides Bun 1.3.13, Chromium, and ffmpeg:
+The locked Nix development shell provides Bun 1.3.13, Chromium, ffmpeg, and
+rustup. The pinned Rust toolchain is declared in `rust-toolchain.toml`:
 
 ```sh
 nix develop
@@ -184,6 +185,38 @@ Run the hosted Nix package with the same Bun server route:
 ```sh
 nix build .#default
 PHRASIC_CONFIG_PATH="$(pwd)/config.json" ./result/bin/phrasic-host
+```
+
+### Local sidecar foundation
+
+The target-neutral Rust foundation exposes only `phrasic serve <config>`. It
+validates UTF-8 TOML before its currently empty adapter boundary; it does not
+yet bind a listener, launch Bun, collect native media, or perform browser
+handoff. Those effects belong to later Local tickets.
+
+```toml
+schema_version = 1
+port = 8080
+source_pin = "optional exact source identifier"
+browser_handoff = "open"
+```
+
+Only `schema_version`, `port`, optional `source_pin`, and optional
+`browser_handoff` are accepted. `schema_version` is exactly `1`; `port` is an
+integer from `1024` through `65535`; `browser_handoff` is `open` (the default)
+or `print`.
+
+```sh
+cargo +1.88.0 run --locked -p phrasic -- serve ./phrasic.toml
+```
+
+Use the pinned toolchain and locked checks:
+
+```sh
+cargo +1.88.0 fmt --all -- --check
+cargo +1.88.0 clippy --workspace --all-targets --locked -- -D warnings
+cargo +1.88.0 test --workspace --locked
+scripts/verify-rust-target-isolation.sh
 ```
 
 Open `http://localhost:5173/fake/`, select **Connect Fake Music**, and drive the
