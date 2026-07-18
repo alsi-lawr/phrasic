@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package phrasic.spike.v1;
+
+service Interop {
+  rpc Probe(ProbeRequest) returns (ProbeResponse);
+}
+
+enum Behavior {
+  BEHAVIOR_SUCCESS = 0;
+  BEHAVIOR_STATUS = 1;
+  BEHAVIOR_DELAY = 2;
+}
+
+message ProbeRequest {
+  string request_id = 1;
+  string payload = 2;
+  Behavior behavior = 3;
+  uint32 delay_milliseconds = 4;
+}
+
+message ProbeResponse {
+  string request_id = 1;
+  string payload = 2;
+  string native_transport = 3;
+}

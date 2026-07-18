@@ -73,6 +73,74 @@ jobs:
             throw "phrasic CLI smoke test failed with exit code $LASTEXITCODE"
           }
 
+  grpc-native-ipc-linux:
+    name: gRPC native IPC spike (Linux UDS)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.88.0 --profile minimal --component rustfmt --component clippy
+      - name: Install locked spike dependencies
+        working-directory: spikes/grpc-native-ipc
+        run: bun ci --frozen-lockfile
+      - name: Build before native smoke
+        working-directory: spikes/grpc-native-ipc
+        run: |
+          cargo +1.88.0 build --workspace --locked
+          bun run typecheck
+          bun run build
+      - name: Check Rust and run Linux UDS interoperability
+        working-directory: spikes/grpc-native-ipc
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: |
+          cargo +1.88.0 fmt --all -- --check
+          cargo +1.88.0 clippy --workspace --all-targets --locked -- -D warnings
+          cargo +1.88.0 test --workspace --locked
+          test -z "$(find dist -type f -name '*.map' -print -quit)"
+          bun test --seed 20260718 ./test/deadline-status.probe.ts ./test/interoperability.probe.ts
+
+  grpc-native-ipc-windows:
+    name: gRPC native IPC spike (Windows named pipe)
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.88.0-x86_64-pc-windows-msvc --profile minimal --component rustfmt --component clippy
+      - name: Install locked spike dependencies
+        working-directory: spikes/grpc-native-ipc
+        run: bun ci --frozen-lockfile
+      - name: Build before native smoke
+        working-directory: spikes/grpc-native-ipc
+        run: |
+          cargo +1.88.0 build --workspace --locked
+          bun run typecheck
+          bun run build
+      - name: Check Rust and run Windows named-pipe interoperability
+        working-directory: spikes/grpc-native-ipc
+        shell: pwsh
+        run: |
+          cargo +1.88.0 fmt --all -- --check
+          cargo +1.88.0 clippy --workspace --all-targets --locked -- -D warnings
+          cargo +1.88.0 test --workspace --locked
+          if (Get-ChildItem -Path dist -Recurse -Filter '*.map') {
+            throw 'Source maps were emitted by the spike build'
+          }
+          $env:CHROME_BIN = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+          bun test --seed 20260718 ./test/deadline-status.probe.ts ./test/interoperability.probe.ts
+
   publish-image:
     name: Publish Docker image
     if: startsWith(github.ref, 'refs/tags/v')

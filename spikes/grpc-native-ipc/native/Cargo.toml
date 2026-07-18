@@ -1,0 +1,22 @@
+[package]
+name = "phrasic-grpc-native-ipc-spike"
+publish = false
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+prost = "=0.14.4"
+tokio = { version = "=1.53.0", features = ["fs", "macros", "net", "rt-multi-thread", "sync", "time"] }
+tokio-stream = { version = "=0.1.18", features = ["net"] }
+tonic = { version = "=0.14.6", features = ["transport"] }
+tonic-prost = "=0.14.6"
+
+[build-dependencies]
+prost-build = "=0.14.4"
+protoc-bin-vendored = "=3.2.0"
+tonic-prost-build = "=0.14.6"
+
+[lints]
+workspace = true

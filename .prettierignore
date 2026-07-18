@@ -23,3 +23,7 @@ coverage/
 *.webp
 *.woff
 *.woff2
+
+# Generated and transient T-006 spike files
+spikes/grpc-native-ipc/generated/
+spikes/grpc-native-ipc/target/
