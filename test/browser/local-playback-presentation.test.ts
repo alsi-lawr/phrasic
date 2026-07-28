@@ -3,6 +3,8 @@ import { test } from "bun:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LocalPlaybackOverlay } from "../../components/local/LocalPlaybackOverlay.tsx";
+import { resolveOverlayGeometry } from "../../components/overlay/overlay-geometry.ts";
+import { overlayMotionDecisionForPreference } from "../../components/overlay/overlay-motion.ts";
 import {
   createLocalSuccessfulSnapshot,
   NativeMonotonicMilliseconds,
@@ -34,6 +36,66 @@ test("Local presentation omits absent metadata, destinations, artwork, and inter
   );
   assert.doesNotMatch(markup, /Creator|Collection| · /);
   assert.match(markup, /Local playback status updates automatically\./);
+});
+
+test("Local presentation uses the established overlay shell, geometry, metadata lines, and motion", () => {
+  const markup = renderLocal(
+    selectedPresentation({
+      collection: "Collection title",
+      creator: "Creator name",
+      title: "Track title",
+    }),
+    new URLSearchParams("width=2560"),
+    false,
+  );
+
+  assert.match(
+    markup,
+    /<svg[^>]*class="block"[^>]*width="2560"[^>]*viewBox="0 0 4725 1080"/,
+  );
+  assert.match(markup, /fill-overlay-shell opacity-90/);
+  assert.match(markup, /id="overlay-artwork-rounded-clip"/);
+  assert.match(markup, /fill-overlay-vinyl-disc/);
+  assert.match(
+    markup,
+    /font-overlay-display fill-overlay-creator text-overlay-creator-size/,
+  );
+  assert.match(
+    markup,
+    /font-overlay-display fill-overlay-title text-overlay-title-size/,
+  );
+  assert.match(
+    markup,
+    /font-overlay-display fill-overlay-detail text-overlay-detail-size/,
+  );
+  assert.match(
+    markup,
+    /font-overlay-display fill-overlay-context text-overlay-context-size/,
+  );
+  assert.match(markup, />Local playback<\/text>/);
+  assert.match(markup, /transition-\[width\]/);
+  assert.match(markup, /animate-artwork-fade-in/);
+  assert.match(markup, /animate-vinyl-spin/);
+  assert.match(markup, /<animate /);
+  assert.doesNotMatch(
+    markup,
+    /border-amber|bg-slate|max-w-xl|<a |<button|<nav|<image/,
+  );
+});
+
+test("Local presentation preserves the established reduced-motion treatment", () => {
+  const markup = renderLocal(
+    selectedPresentation({ title: "Track title" }),
+    new URLSearchParams(),
+    true,
+  );
+
+  assert.doesNotMatch(
+    markup,
+    /transition-\[width\]|animate-artwork-fade-in|animate-vinyl-spin|<animate /,
+  );
+  assert.match(markup, /fill-overlay-shell opacity-90/);
+  assert.match(markup, /fill-overlay-vinyl-disc/);
 });
 
 test("Local title absence and unavailable statuses are accessibly announced without authorization copy", () => {
@@ -146,10 +208,13 @@ function selectedPresentation(input: object) {
 
 function renderLocal(
   presentation: ReturnType<typeof selectedPresentation>,
+  parameters: URLSearchParams = new URLSearchParams(),
+  prefersReducedMotion = true,
 ): string {
   return renderToStaticMarkup(
     createElement(LocalPlaybackOverlay, {
-      prefersReducedMotion: true,
+      geometry: resolveOverlayGeometry(parameters),
+      motion: overlayMotionDecisionForPreference(prefersReducedMotion),
       presentation,
     }),
   );

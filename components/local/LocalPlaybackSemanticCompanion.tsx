@@ -15,7 +15,6 @@ export function LocalPlaybackSemanticCompanion({
 }: LocalPlaybackSemanticCompanionProps): ReactElement {
   return (
     <section aria-labelledby="local-playback-heading" className="sr-only">
-      <h1 id="local-playback-heading">Local playback</h1>
       <dl>
         <MetadataDefinition
           term="Playback state"

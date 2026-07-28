@@ -1,63 +1,34 @@
 import type { ReactElement } from "react";
 import type { LocalPlaybackPresentation } from "../../domain/local-playback.ts";
-import { FallbackVinyl } from "../overlay/FallbackVinyl.tsx";
-import { OverlayItemAppearance } from "../overlay/OverlayItemAppearance.tsx";
-import { overlayMotionDecisionForPreference } from "../overlay/overlay-motion.ts";
-import { LocalPlaybackMetadata } from "./LocalPlaybackMetadata.tsx";
+import type { OverlayGeometry } from "../overlay/overlay-geometry.ts";
+import type { OverlayMotionDecision } from "../overlay/overlay-motion.ts";
+import { OverlaySetupDiagnostic } from "../overlay/OverlaySetupDiagnostic.tsx";
 import { LocalPlaybackSemanticCompanion } from "./LocalPlaybackSemanticCompanion.tsx";
+import { LocalPlaybackVisual } from "./LocalPlaybackVisual.tsx";
 
 type LocalPlaybackOverlayProps = {
+  readonly geometry: OverlayGeometry;
+  readonly motion: OverlayMotionDecision;
   readonly presentation: LocalPlaybackPresentation;
-  readonly prefersReducedMotion: boolean;
 };
 
 export function LocalPlaybackOverlay({
+  geometry,
+  motion,
   presentation,
-  prefersReducedMotion,
 }: LocalPlaybackOverlayProps): ReactElement {
-  const motion = overlayMotionDecisionForPreference(prefersReducedMotion);
-
   return (
     <main className="m-0 flex w-full flex-col items-start justify-start p-0 font-sans">
+      <h1 id="local-playback-heading" className="sr-only">
+        Local playback now playing
+      </h1>
       <LocalPlaybackSemanticCompanion presentation={presentation} />
-      <div className="m-0 flex w-full items-center gap-2 p-2">
-        <svg
-          aria-hidden="true"
-          className="relative shrink-0"
-          height={96}
-          viewBox="0 0 1080 1080"
-          width={96}
-        >
-          <OverlayItemAppearance
-            identity={localPresentationAnimationKey(presentation)}
-            motion={motion}
-          >
-            <FallbackVinyl motion={motion} />
-          </OverlayItemAppearance>
-        </svg>
-        <LocalPlaybackMetadata presentation={presentation} />
-      </div>
+      <LocalPlaybackVisual
+        geometry={geometry}
+        motion={motion}
+        presentation={presentation}
+      />
+      <OverlaySetupDiagnostic diagnostic={geometry.diagnostic} />
     </main>
   );
-}
-
-function localPresentationAnimationKey(
-  presentation: LocalPlaybackPresentation,
-): string {
-  switch (presentation.kind) {
-    case "content":
-      return "local-content";
-    case "stale-content":
-      return "local-stale-content";
-    case "metadata-unavailable":
-      return "metadata-unavailable";
-    case "unavailable":
-      return `unavailable:${presentation.status}`;
-  }
-
-  return unreachable(presentation);
-}
-
-function unreachable(value: never): never {
-  throw new Error(`Unexpected Local overlay value: ${String(value)}`);
 }

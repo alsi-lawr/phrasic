@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import {
   createBrowserLocalApplication,
+  type BrowserLocalApplicationPorts,
   type BrowserLocalWorker,
 } from "./application.ts";
 import { LocalApplication } from "./LocalApplication.tsx";
@@ -14,16 +15,9 @@ if (rootElement === null) {
 
 const application = createBrowserLocalApplication(browserPorts());
 application.start();
-createRoot(rootElement).render(
-  <LocalApplication
-    application={application}
-    prefersReducedMotion={
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    }
-  />,
-);
+createRoot(rootElement).render(<LocalApplication application={application} />);
 
-function browserPorts() {
+function browserPorts(): BrowserLocalApplicationPorts {
   return {
     createWorker(): BrowserLocalWorker {
       const worker = new Worker(

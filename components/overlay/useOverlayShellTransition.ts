@@ -1,46 +1,51 @@
 import { useEffect, useReducer } from "react";
-import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
-import { overlayAnimationIdentityKey } from "./overlay-identities.ts";
 import type { OverlayMotionDecision } from "./overlay-motion.ts";
 
 export type OverlayShellTransitionPhase = "collapsing" | "opening" | "stable";
 
 const shellTransitionDurationMilliseconds = 1_000;
 
-type OverlayShellTransitionState = {
-  readonly phase: OverlayShellTransitionPhase;
-  readonly snapshot: BrowserPlaybackApplicationSnapshot;
+export type OverlayTransitionSnapshot<Snapshot> = {
+  readonly identity: string;
+  readonly snapshot: Snapshot;
 };
 
-type OverlayShellTransitionAction =
+type OverlayShellTransitionState<Snapshot> = {
+  readonly identity: string;
+  readonly phase: OverlayShellTransitionPhase;
+  readonly snapshot: Snapshot;
+};
+
+type OverlayShellTransitionAction<Snapshot> =
   | { readonly kind: "begin-collapse" }
   | { readonly kind: "finish-opening" }
   | {
       readonly kind: "show-snapshot";
-      readonly snapshot: BrowserPlaybackApplicationSnapshot;
+      readonly current: OverlayTransitionSnapshot<Snapshot>;
     }
   | {
       readonly kind: "synchronize";
-      readonly snapshot: BrowserPlaybackApplicationSnapshot;
+      readonly current: OverlayTransitionSnapshot<Snapshot>;
     };
 
-export type OverlayShellTransition = {
+export type OverlayShellTransition<Snapshot> = {
   readonly completeWidthTransition: () => void;
+  readonly identity: string;
   readonly phase: OverlayShellTransitionPhase;
-  readonly snapshot: BrowserPlaybackApplicationSnapshot;
+  readonly snapshot: Snapshot;
 };
 
-export function useOverlayShellTransition(
-  snapshot: BrowserPlaybackApplicationSnapshot,
+export function useOverlayShellTransition<Snapshot>(
+  current: OverlayTransitionSnapshot<Snapshot>,
   motion: OverlayMotionDecision,
-): OverlayShellTransition {
+): OverlayShellTransition<Snapshot> {
   const [state, dispatch] = useReducer(
-    overlayShellTransitionReducer,
-    snapshot,
+    overlayShellTransitionReducer<Snapshot>,
+    current,
     initialOverlayShellTransitionState,
   );
-  const currentIdentity = overlayAnimationIdentityKey(snapshot);
-  const displayedIdentity = overlayAnimationIdentityKey(state.snapshot);
+  const currentIdentity = current.identity;
+  const currentSnapshot = current.snapshot;
 
   useEffect(() => {
     if (motion.kind === "reduced" || state.phase === "stable") {
@@ -50,11 +55,17 @@ export function useOverlayShellTransition(
     const timeout = globalThis.setTimeout(() => {
       switch (state.phase) {
         case "collapsing":
-          dispatch({ kind: "show-snapshot", snapshot });
+          dispatch({
+            kind: "show-snapshot",
+            current: {
+              identity: currentIdentity,
+              snapshot: currentSnapshot,
+            },
+          });
           return;
         case "opening":
           dispatch(
-            currentIdentity === displayedIdentity
+            currentIdentity === state.identity
               ? { kind: "finish-opening" }
               : { kind: "begin-collapse" },
           );
@@ -63,20 +74,30 @@ export function useOverlayShellTransition(
     }, shellTransitionDurationMilliseconds);
 
     return () => globalThis.clearTimeout(timeout);
-  }, [currentIdentity, displayedIdentity, motion.kind, snapshot, state.phase]);
+  }, [
+    currentIdentity,
+    currentSnapshot,
+    motion.kind,
+    state.identity,
+    state.phase,
+  ]);
 
   if (
     motion.kind === "reduced" &&
-    (state.phase !== "stable" || currentIdentity !== displayedIdentity)
+    (state.phase !== "stable" || currentIdentity !== state.identity)
   ) {
-    dispatch({ kind: "synchronize", snapshot });
-    return immediateOverlayShellTransition(snapshot);
+    const synchronized = {
+      identity: currentIdentity,
+      snapshot: currentSnapshot,
+    };
+    dispatch({ kind: "synchronize", current: synchronized });
+    return immediateOverlayShellTransition(synchronized);
   }
 
   if (
     motion.kind === "enabled" &&
     state.phase === "stable" &&
-    currentIdentity !== displayedIdentity
+    currentIdentity !== state.identity
   ) {
     dispatch({ kind: "begin-collapse" });
   }
@@ -84,11 +105,17 @@ export function useOverlayShellTransition(
   const completeWidthTransition = (): void => {
     switch (state.phase) {
       case "collapsing":
-        dispatch({ kind: "show-snapshot", snapshot });
+        dispatch({
+          kind: "show-snapshot",
+          current: {
+            identity: currentIdentity,
+            snapshot: currentSnapshot,
+          },
+        });
         return;
       case "opening":
         dispatch(
-          currentIdentity === displayedIdentity
+          currentIdentity === state.identity
             ? { kind: "finish-opening" }
             : { kind: "begin-collapse" },
         );
@@ -102,40 +129,42 @@ export function useOverlayShellTransition(
 
   return {
     completeWidthTransition,
+    identity: state.identity,
     phase: state.phase,
     snapshot: state.snapshot,
   };
 }
 
-function initialOverlayShellTransitionState(
-  snapshot: BrowserPlaybackApplicationSnapshot,
-): OverlayShellTransitionState {
-  return { phase: "stable", snapshot };
+function initialOverlayShellTransitionState<Snapshot>(
+  current: OverlayTransitionSnapshot<Snapshot>,
+): OverlayShellTransitionState<Snapshot> {
+  return { ...current, phase: "stable" };
 }
 
-function immediateOverlayShellTransition(
-  snapshot: BrowserPlaybackApplicationSnapshot,
-): OverlayShellTransition {
+function immediateOverlayShellTransition<Snapshot>(
+  current: OverlayTransitionSnapshot<Snapshot>,
+): OverlayShellTransition<Snapshot> {
   return {
     completeWidthTransition: noOperation,
+    identity: current.identity,
     phase: "stable",
-    snapshot,
+    snapshot: current.snapshot,
   };
 }
 
-function overlayShellTransitionReducer(
-  state: OverlayShellTransitionState,
-  action: OverlayShellTransitionAction,
-): OverlayShellTransitionState {
+function overlayShellTransitionReducer<Snapshot>(
+  state: OverlayShellTransitionState<Snapshot>,
+  action: OverlayShellTransitionAction<Snapshot>,
+): OverlayShellTransitionState<Snapshot> {
   switch (action.kind) {
     case "begin-collapse":
       return { ...state, phase: "collapsing" };
     case "finish-opening":
       return { ...state, phase: "stable" };
     case "show-snapshot":
-      return { phase: "opening", snapshot: action.snapshot };
+      return { ...action.current, phase: "opening" };
     case "synchronize":
-      return { phase: "stable", snapshot: action.snapshot };
+      return { ...action.current, phase: "stable" };
   }
 
   return unreachable(action);
