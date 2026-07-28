@@ -17,6 +17,8 @@ case "${1:-}" in
     bun test --seed 20260713
     bun run build
     bun run build:local-host linux
+    cargo build --locked -p phrasic
+    bun run scripts/verify-native-local-gateway.ts linux
     cargo fmt --all -- --check
     cargo clippy --workspace --all-targets --locked -- -D warnings
     cargo test --workspace --locked
@@ -24,6 +26,8 @@ case "${1:-}" in
     ;;
   win-x64)
     bun run build:local-host windows
+    cargo build --locked -p phrasic
+    bun run scripts/verify-native-local-gateway.ts windows
     cargo test --workspace --locked
     ;;
   *)

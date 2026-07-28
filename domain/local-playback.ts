@@ -24,6 +24,10 @@ export class LocalText {
     return succeeded(new LocalText(input));
   }
 
+  static trusted(value: string): LocalText {
+    return new LocalText(value);
+  }
+
   toString(): string {
     return this.#value;
   }
@@ -44,6 +48,10 @@ export class LocalDestination {
       input,
       (value: string): LocalDestination => new LocalDestination(value),
     );
+  }
+
+  static trusted(value: string): LocalDestination {
+    return new LocalDestination(value);
   }
 
   toString(): string {
@@ -94,6 +102,10 @@ export class LocalNativeIdentity {
     }
 
     return succeeded(new LocalNativeIdentity(input));
+  }
+
+  static trusted(value: string): LocalNativeIdentity {
+    return new LocalNativeIdentity(value);
   }
 
   toString(): string {
@@ -149,6 +161,10 @@ export class NativeMonotonicMilliseconds {
     return succeeded(new NativeMonotonicMilliseconds(input));
   }
 
+  static trusted(value: number): NativeMonotonicMilliseconds {
+    return new NativeMonotonicMilliseconds(value);
+  }
+
   elapsedSince(
     previous: NativeMonotonicMilliseconds,
   ): Result<number, LocalMetadataValidationError> {
@@ -187,6 +203,10 @@ export class LocalDurationMilliseconds {
     return succeeded(new LocalDurationMilliseconds(input));
   }
 
+  static trusted(value: number): LocalDurationMilliseconds {
+    return new LocalDurationMilliseconds(value);
+  }
+
   toNumber(): number {
     return this.#value;
   }
@@ -213,6 +233,10 @@ export class LocalPositionMilliseconds {
     }
 
     return succeeded(new LocalPositionMilliseconds(input));
+  }
+
+  static trusted(value: number): LocalPositionMilliseconds {
+    return new LocalPositionMilliseconds(value);
   }
 
   toNumber(): number {

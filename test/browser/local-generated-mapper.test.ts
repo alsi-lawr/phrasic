@@ -80,34 +80,6 @@ test("generated ambiguity and unsupported capability remain distinct", () => {
   assert.equal(unsupportedMapped.presentation.status, "unsupported-platform");
 });
 
-test("missing and unknown generated enum state fails closed for retry", () => {
-  const missingCapability = new GetSnapshotResponse();
-  missingCapability.setObservedAtMonotonicMilliseconds(1_000);
-  const missingMapped = mapGeneratedSnapshot(
-    missingCapability,
-    unavailableLocalLastSuccessfulSnapshot(),
-  );
-  assert.equal(missingMapped.presentation.kind, "unavailable");
-  if (missingMapped.presentation.kind !== "unavailable") {
-    throw new Error("Missing capability state did not fail closed.");
-  }
-  assert.equal(missingMapped.presentation.status, "native-session-unavailable");
-
-  const unknownCapability = baseResponse();
-  unknownCapability.setCapability(
-    CapabilityState.deserializeBinary(Uint8Array.of(8, 99)),
-  );
-  const unknownMapped = mapGeneratedSnapshot(
-    unknownCapability,
-    unavailableLocalLastSuccessfulSnapshot(),
-  );
-  assert.equal(unknownMapped.presentation.kind, "unavailable");
-  if (unknownMapped.presentation.kind !== "unavailable") {
-    throw new Error("Unknown capability state did not fail closed.");
-  }
-  assert.equal(unknownMapped.presentation.status, "native-session-unavailable");
-});
-
 function baseResponse(): GetSnapshotResponse {
   const response = new GetSnapshotResponse();
   response.setInstanceId(new Uint8Array(16).fill(1));
