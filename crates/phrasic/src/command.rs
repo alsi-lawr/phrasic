@@ -18,6 +18,13 @@ pub enum DiagnosticCode {
     ConfigInvalidPort,
     ConfigInvalidSourcePin,
     ConfigInvalidBrowserHandoff,
+    NativeRuntimeUnavailable,
+    NativeIpcUnavailable,
+    NativeReadinessFailed,
+    LifecycleForcedTermination,
+    BunLaunchFailed,
+    BunControlFailed,
+    BunExited,
 }
 
 impl DiagnosticCode {
@@ -33,6 +40,13 @@ impl DiagnosticCode {
             Self::ConfigInvalidPort => "config.invalid_port",
             Self::ConfigInvalidSourcePin => "config.invalid_source_pin",
             Self::ConfigInvalidBrowserHandoff => "config.invalid_browser_handoff",
+            Self::NativeRuntimeUnavailable => "native.runtime_unavailable",
+            Self::NativeIpcUnavailable => "native.ipc_unavailable",
+            Self::NativeReadinessFailed => "native.readiness_failed",
+            Self::LifecycleForcedTermination => "lifecycle.forced_termination",
+            Self::BunLaunchFailed => "bun.launch_failed",
+            Self::BunControlFailed => "bun.control_failed",
+            Self::BunExited => "bun.exited",
         }
     }
 }
@@ -219,7 +233,7 @@ pub fn main_entry() -> ExitCode {
             std::fs::read(configuration_path)
                 .map_err(|_| Diagnostic::new(DiagnosticCode::ConfigReadFailed))
         },
-        crate::platform::run_empty_adapter,
+        crate::platform::run_adapter,
     );
 
     match result {
@@ -392,7 +406,7 @@ mod tests {
     }
 
     #[test]
-    fn configuration_errors_happen_before_the_empty_adapter_boundary() {
+    fn configuration_errors_happen_before_the_runtime_adapter_boundary() {
         let effects = Cell::new(0_u8);
         let invalid = run_before_effects(
             &args(&["phrasic", "serve", "config.toml"]),
@@ -411,7 +425,7 @@ mod tests {
     }
 
     #[test]
-    fn valid_configuration_reaches_the_empty_adapter_boundary() {
+    fn valid_configuration_reaches_the_runtime_adapter_boundary() {
         let effects = Cell::new(0_u8);
         let result = run_before_effects(
             &args(&["phrasic", "serve", "config.toml"]),
@@ -438,12 +452,23 @@ mod tests {
             DiagnosticCode::ConfigInvalidPort,
             DiagnosticCode::ConfigInvalidSourcePin,
             DiagnosticCode::ConfigInvalidBrowserHandoff,
+            DiagnosticCode::NativeRuntimeUnavailable,
+            DiagnosticCode::NativeIpcUnavailable,
+            DiagnosticCode::NativeReadinessFailed,
+            DiagnosticCode::LifecycleForcedTermination,
+            DiagnosticCode::BunLaunchFailed,
+            DiagnosticCode::BunControlFailed,
+            DiagnosticCode::BunExited,
         ];
 
         for diagnostic in diagnostics {
             assert!(diagnostic.as_str().contains('.'));
             assert!(!diagnostic.as_str().contains('\n'));
         }
+        assert_eq!(
+            DiagnosticCode::LifecycleForcedTermination.as_str(),
+            "lifecycle.forced_termination"
+        );
     }
 
     #[cfg(all(
@@ -453,8 +478,8 @@ mod tests {
         target_vendor = "unknown"
     ))]
     #[test]
-    fn linux_build_compiles_only_the_linux_empty_adapter() {
-        assert_eq!(crate::platform::MODULE_MARKER, *b"linux-empty-adapter");
+    fn linux_build_compiles_only_the_linux_adapter() {
+        assert_eq!(crate::platform::MODULE_MARKER, *b"linux-native-ipc");
     }
 
     #[cfg(all(
@@ -464,7 +489,7 @@ mod tests {
         target_vendor = "pc"
     ))]
     #[test]
-    fn windows_build_compiles_only_the_windows_empty_adapter() {
-        assert_eq!(crate::platform::MODULE_MARKER, *b"windows-empty-adapter");
+    fn windows_build_compiles_only_the_windows_adapter() {
+        assert_eq!(crate::platform::MODULE_MARKER, *b"windows-native-ipc");
     }
 }

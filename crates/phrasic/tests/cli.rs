@@ -20,7 +20,7 @@ fn run(arguments: &[&str]) -> Result<(ExitStatus, String, String), std::io::Erro
 }
 
 #[test]
-fn valid_serve_configures_the_empty_adapter_without_output()
+fn valid_serve_reaches_the_sidecar_boundary_with_a_redacted_failure()
 -> Result<(), Box<dyn std::error::Error>> {
     let path = fixture_path("valid.toml");
     fs::write(&path, "schema_version = 1\nport = 8080\n")?;
@@ -29,14 +29,14 @@ fn valid_serve_configures_the_empty_adapter_without_output()
     fs::remove_file(&path)?;
     let (status, stdout, stderr) = result?;
 
-    assert!(status.success());
+    assert!(!status.success());
     assert_eq!(stdout, "");
-    assert_eq!(stderr, "");
+    assert!(stderr.starts_with("native.") || stderr.starts_with("bun."));
     Ok(())
 }
 
 #[test]
-fn browser_handoff_configuration_has_no_effect_in_the_foundation()
+fn browser_handoff_does_not_bypass_native_runtime_readiness()
 -> Result<(), Box<dyn std::error::Error>> {
     let path = fixture_path("print-handoff.toml");
     fs::write(
@@ -48,9 +48,9 @@ fn browser_handoff_configuration_has_no_effect_in_the_foundation()
     fs::remove_file(&path)?;
     let (status, stdout, stderr) = result?;
 
-    assert!(status.success());
+    assert!(!status.success());
     assert_eq!(stdout, "");
-    assert_eq!(stderr, "");
+    assert!(stderr.starts_with("native.") || stderr.starts_with("bun."));
     Ok(())
 }
 

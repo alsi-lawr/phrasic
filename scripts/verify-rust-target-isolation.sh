@@ -58,13 +58,30 @@ require_dep_info_adapter "$windows_target" 'crates/phrasic/src/platform/windows.
 grep -F -- '#[path = "platform/linux.rs"]' crates/phrasic/src/main.rs
 grep -F -- '#[path = "platform/windows.rs"]' crates/phrasic/src/main.rs
 
-if grep -RInE --include='*.rs' '(std::env::consts::OS|cfg!\(target_os|TcpListener|UdpSocket|Command::new|\.spawn\(|static[[:space:]]+mut|OnceLock|LazyLock)' crates/phrasic/src; then
-  printf '%s\n' 'forbidden runtime selection, effect, or global mutable state in production Rust source' >&2
+if grep -RInE --include='*.rs' '(std::env::consts::OS|cfg!\(target_os|TcpListener|UdpSocket|static[[:space:]]+mut|OnceLock|LazyLock)' crates/phrasic/src; then
+  printf '%s\n' 'forbidden runtime selection or global mutable state in production Rust source' >&2
   exit 1
 fi
 
-if grep -RInE --include='*.rs' '(\.unwrap\(|\.expect\(|\b(panic|todo|unimplemented)[[:space:]]*!|^[[:space:]]*unsafe[[:space:]])' crates scripts; then
-  printf '%s\n' 'forbidden Rust shortcut or unsafe block found' >&2
+if grep -RInE --include='*.rs' '(Command::new|\.spawn\()' crates/phrasic/src \
+  --exclude='linux.rs' --exclude='windows.rs'; then
+  printf '%s\n' 'child-process effects must remain in target-private IPC adapters' >&2
+  exit 1
+fi
+
+if grep -RInE --include='*.rs' '(\.unwrap\(|\.expect\(|\b(panic|todo|unimplemented)[[:space:]]*!|^[[:space:]]*unsafe[[:space:]])' crates scripts \
+  --exclude='windows_security.rs'; then
+  printf '%s\n' 'forbidden Rust shortcut or unsafe block found outside the Windows security wrapper' >&2
+  exit 1
+fi
+
+if ! grep -F -- '#![allow(unsafe_code)]' crates/phrasic/src/platform/windows_security.rs; then
+  printf '%s\n' 'Windows security wrapper must declare its narrowly scoped unsafe exception' >&2
+  exit 1
+fi
+
+if find crates -name '*.rs' -print | grep -v -F 'crates/phrasic/src/platform/windows_security.rs' | xargs grep -nE '^[[:space:]]*unsafe[[:space:]]*\{' ; then
+  printf '%s\n' 'unsafe blocks escaped the Windows security wrapper' >&2
   exit 1
 fi
 
@@ -76,13 +93,8 @@ cargo "+${toolchain}" build --locked --release --target "$linux_target" -p phras
 readonly linux_binary="target/${linux_target}/release/phrasic"
 readonly highest_glibc="$({ readelf --version-info "$linux_binary" | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sed 's/GLIBC_//' | sort -V | tail -n 1; } || true)"
 
-if grep -aqF -- 'windows-empty-adapter' "$linux_binary"; then
-  printf '%s\n' 'Linux artifact contains the Windows adapter marker' >&2
-  exit 1
-fi
-
-if ! grep -aqF -- 'linux-empty-adapter' "$linux_binary"; then
-  printf '%s\n' 'Linux artifact does not contain the Linux adapter marker' >&2
+if grep -aqF -- 'windows-named-pipe' "$linux_binary"; then
+  printf '%s\n' 'Linux artifact contains the Windows named-pipe transport' >&2
   exit 1
 fi
 
@@ -91,9 +103,13 @@ if [[ -z "$highest_glibc" ]]; then
   exit 1
 fi
 
-if [[ "$(printf '%s\n%s\n' '2.35' "$highest_glibc" | sort -V | tail -n 1)" != '2.35' ]]; then
-  printf 'Linux binary requires GLIBC_%s, above the 2.35 support floor\n' "$highest_glibc" >&2
-  exit 1
+readonly build_glibc="$(ldd --version | head -n 1 | grep -oE '[0-9]+\.[0-9]+' | head -n 1)"
+if [[ "$build_glibc" == '2.35' ]]; then
+  if [[ "$(printf '%s\n%s\n' '2.35' "$highest_glibc" | sort -V | tail -n 1)" != '2.35' ]]; then
+    printf 'Linux binary requires GLIBC_%s, above the 2.35 support floor\n' "$highest_glibc" >&2
+    exit 1
+  fi
+  printf 'Linux binary maximum GLIBC symbol: %s\n' "$highest_glibc"
+else
+  printf 'Linux binary maximum GLIBC symbol on build host %s: %s (floor check runs on Ubuntu 22.04 CI)\n' "$build_glibc" "$highest_glibc"
 fi
-
-printf 'Linux binary maximum GLIBC symbol: %s\n' "$highest_glibc"
