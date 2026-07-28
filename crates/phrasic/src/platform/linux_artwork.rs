@@ -1,12 +1,9 @@
-//! Bounded loading of selected MPRIS artwork without exposing its source URI.
+//! Loading of selected MPRIS artwork without exposing its source URI.
 
-use std::fs::File;
-use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use phrasic_rpc::MAXIMUM_ARTWORK_BYTES;
 use phrasic_rpc::local::{Artwork, ArtworkFormat};
 use reqwest::redirect::Policy;
 use tokio::net::lookup_host;
@@ -32,7 +29,6 @@ enum ArtworkLoadError {
     InvalidSource,
     Io,
     Network,
-    TooLarge,
     UnsupportedFormat,
 }
 
@@ -88,21 +84,9 @@ fn parse_source(source: &str) -> Result<ArtworkSource, ArtworkLoadError> {
 }
 
 async fn read_file(path: PathBuf) -> Result<Vec<u8>, ArtworkLoadError> {
-    spawn_blocking(move || read_bounded(File::open(path).map_err(|_| ArtworkLoadError::Io)?))
+    spawn_blocking(move || std::fs::read(path).map_err(|_| ArtworkLoadError::Io))
         .await
         .map_err(|_| ArtworkLoadError::Io)?
-}
-
-fn read_bounded(file: File) -> Result<Vec<u8>, ArtworkLoadError> {
-    let maximum_read = u64::try_from(MAXIMUM_ARTWORK_BYTES)
-        .map_err(|_| ArtworkLoadError::TooLarge)?
-        .saturating_add(1);
-    let mut data = Vec::new();
-    file.take(maximum_read)
-        .read_to_end(&mut data)
-        .map_err(|_| ArtworkLoadError::Io)?;
-    enforce_size(&data)?;
-    Ok(data)
 }
 
 async fn read_https(url: Url) -> Result<Vec<u8>, ArtworkLoadError> {
@@ -120,32 +104,21 @@ async fn read_https(url: Url) -> Result<Vec<u8>, ArtworkLoadError> {
         .resolve_to_addrs(host, &addresses)
         .build()
         .map_err(|_| ArtworkLoadError::Network)?;
-    let mut response = client
+    let response = client
         .get(url)
         .header("accept", "image/png, image/jpeg, image/webp")
         .send()
         .await
         .map_err(|_| ArtworkLoadError::Network)?;
-    if !response.status().is_success()
-        || response
-            .content_length()
-            .is_some_and(|length| length > MAXIMUM_ARTWORK_BYTES as u64)
-    {
+    if !response.status().is_success() {
         return Err(ArtworkLoadError::Network);
     }
 
-    let mut data = Vec::new();
-    while let Some(chunk) = response
-        .chunk()
+    response
+        .bytes()
         .await
-        .map_err(|_| ArtworkLoadError::Network)?
-    {
-        if data.len().saturating_add(chunk.len()) > MAXIMUM_ARTWORK_BYTES {
-            return Err(ArtworkLoadError::TooLarge);
-        }
-        data.extend_from_slice(&chunk);
-    }
-    Ok(data)
+        .map(|data| data.to_vec())
+        .map_err(|_| ArtworkLoadError::Network)
 }
 
 async fn public_addresses(host: &str, port: u16) -> Result<Vec<SocketAddr>, ArtworkLoadError> {
@@ -197,18 +170,7 @@ fn is_public_ipv6(address: Ipv6Addr) -> bool {
         && !(first == 0x2001 && second == 0x0db8)
 }
 
-fn enforce_size(data: &[u8]) -> Result<(), ArtworkLoadError> {
-    if data.is_empty() {
-        return Err(ArtworkLoadError::UnsupportedFormat);
-    }
-    if data.len() > MAXIMUM_ARTWORK_BYTES {
-        return Err(ArtworkLoadError::TooLarge);
-    }
-    Ok(())
-}
-
 fn artwork_from_bytes(data: Vec<u8>) -> Result<Artwork, ArtworkLoadError> {
-    enforce_size(&data)?;
     let format = detect_format(&data).ok_or(ArtworkLoadError::UnsupportedFormat)?;
     Ok(Artwork {
         format: format.into(),
@@ -293,7 +255,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn local_artwork_is_bounded_and_invalid_input_retries_as_fallback()
+    async fn local_artwork_loads_and_invalid_input_retries_as_fallback()
     -> Result<(), Box<dyn std::error::Error>> {
         let directory = tempdir()?;
         let path = directory.path().join("cover.png");
@@ -310,6 +272,21 @@ mod tests {
         assert_eq!(artwork.format, i32::from(ArtworkFormat::Png));
         assert_eq!(artwork.data, PNG);
 
+        let large_path = directory.path().join("large.png");
+        let mut large_png = vec![0_u8; 3 * 1024 * 1024];
+        large_png[..PNG.len()].copy_from_slice(PNG);
+        fs::write(&large_path, &large_png)?;
+        let large_source = Url::from_file_path(&large_path)
+            .map_err(|()| "temporary large artwork path was not representable")?
+            .to_string();
+        assert_eq!(
+            loader
+                .load(&large_source)
+                .await
+                .map(|value| value.data.len()),
+            Some(large_png.len())
+        );
+
         let invalid_path = directory.path().join("invalid.png");
         fs::write(&invalid_path, b"not an image")?;
         let invalid_source = Url::from_file_path(&invalid_path)
@@ -322,12 +299,6 @@ mod tests {
             Some(i32::from(ArtworkFormat::Jpeg))
         );
 
-        let oversized_path = directory.path().join("oversized.webp");
-        fs::write(&oversized_path, vec![0_u8; MAXIMUM_ARTWORK_BYTES + 1])?;
-        let oversized_source = Url::from_file_path(&oversized_path)
-            .map_err(|()| "temporary oversized path was not representable")?
-            .to_string();
-        assert_eq!(loader.load(&oversized_source).await, None);
         Ok(())
     }
 }

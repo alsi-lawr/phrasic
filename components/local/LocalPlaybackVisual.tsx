@@ -80,6 +80,7 @@ function LocalPlaybackArtwork({
         />
       );
     }
+    case "idle":
     case "metadata-unavailable":
     case "unavailable":
       return <OverlayFallbackArtwork identity={identity} motion={motion} />;

@@ -213,9 +213,9 @@ The default `open` handoff launches the one-use fragment URL. `print` writes it
 only to a controlling terminal. Pairing creates one process-lifetime browser
 session; restart `phrasic serve` to pair a different browser.
 
-On Linux, the selected MPRIS source may provide PNG, JPEG, or WebP artwork up to
-512 KiB through a local `file://` URL or a public HTTPS URL. Phrasic reads only
-the selected source, follows no redirects, and sends embedded image bytes to the
+On Linux, the selected MPRIS source may provide PNG, JPEG, or WebP artwork
+through a local `file://` URL or a public HTTPS URL. Phrasic reads only the
+selected source, follows no redirects, and sends embedded image bytes to the
 browser rather than the source URL. Missing, invalid, inaccessible, or slow
 artwork keeps playback metadata available and uses the vinyl fallback.
 

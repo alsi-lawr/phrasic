@@ -24,6 +24,10 @@ export type LocalPlaybackView =
     }
   | {
       readonly action: LocalAutomaticAction;
+      readonly kind: "idle";
+    }
+  | {
+      readonly action: LocalAutomaticAction;
       readonly kind: "metadata-unavailable";
     }
   | {
@@ -48,6 +52,7 @@ export function localPlaybackView(
         kind: presentation.kind,
         snapshot: snapshotView(presentation.snapshot),
       });
+    case "idle":
     case "metadata-unavailable":
       return Object.freeze({
         action: presentation.action,

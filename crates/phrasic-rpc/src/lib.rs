@@ -8,6 +8,4 @@ pub mod local {
 
 mod service;
 
-pub const MAXIMUM_ARTWORK_BYTES: usize = 512 * 1024;
-
 pub use service::{InstanceId, LocalMediaService, SnapshotState};

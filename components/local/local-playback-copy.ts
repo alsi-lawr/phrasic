@@ -7,6 +7,8 @@ export function localPresentationLabel(
   switch (presentation.kind) {
     case "content":
       return localActivityLabel(presentation.snapshot.activity);
+    case "idle":
+      return "LOCAL PLAYBACK";
     case "metadata-unavailable":
       return "PLAYBACK METADATA UNAVAILABLE";
     case "stale-content":
@@ -24,6 +26,8 @@ export function localPresentationMessage(
   switch (presentation.kind) {
     case "content":
       return `${localActivityLabel(presentation.snapshot.activity)} local playback.`;
+    case "idle":
+      return "Waiting for active playback.";
     case "metadata-unavailable":
       return "Playback metadata unavailable.";
     case "stale-content":

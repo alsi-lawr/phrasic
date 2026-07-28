@@ -5,7 +5,6 @@ import {
 } from "./native-client.ts";
 
 const maximumGrpcWebRequestBytes = 64 * 1_024;
-const maximumGrpcWebResponseBytes = 1_024 * 1_024;
 
 export async function translateGrpcWeb(
   request: Request,
@@ -16,9 +15,6 @@ export async function translateGrpcWeb(
     const body = new Uint8Array(await request.arrayBuffer());
     const payload = decodeUnaryDataFrame(body);
     const response = await nativeClient.invoke(method, payload, request.signal);
-    if (response.byteLength > maximumGrpcWebResponseBytes) {
-      return grpcWebStatus(8);
-    }
     return grpcWebSuccess(response);
   } catch (caught: unknown) {
     return isNativeClientFailure(caught)

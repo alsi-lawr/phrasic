@@ -44,6 +44,7 @@ function presentationKind(
 ): LocalPlaybackPresentation["kind"] {
   switch (presentation.kind) {
     case "content":
+    case "idle":
     case "metadata-unavailable":
     case "stale-content":
     case "unavailable":

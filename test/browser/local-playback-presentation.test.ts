@@ -157,7 +157,7 @@ test("Local title absence and unavailable statuses are accessibly announced with
 
 test("Local stale content retains only honest present metadata and announces staleness", () => {
   const snapshot = createLocalSuccessfulSnapshot({
-    activity: "paused",
+    activity: "playing",
     metadata: metadata({
       collection: "Collection title",
       title: "Track title",
@@ -168,7 +168,7 @@ test("Local stale content retains only honest present metadata and announces sta
     lastSuccessful: unavailableLocalLastSuccessfulSnapshot(),
     now: monotonic(5_001),
     outcome: trustedSelectedLocalPlayback({
-      reason: "sole-not-playing",
+      reason: "sole-playing",
       snapshot,
     }),
   });
@@ -179,6 +179,37 @@ test("Local stale content retains only honest present metadata and announces sta
   assert.match(markup, />Collection title</);
   assert.doesNotMatch(markup, /Creator| · /);
   assert.match(markup, /Local playback is stale\./);
+});
+
+test("Local paused playback returns to the neutral spinning-vinyl state", () => {
+  const snapshot = createLocalSuccessfulSnapshot({
+    activity: "paused",
+    metadata: metadata({
+      artwork: "https://media.example/previous-artwork.png",
+      collection: "Previous collection",
+      creator: "Previous creator",
+      title: "Previous title",
+    }),
+    observedAt: monotonic(0),
+  });
+  const presentation = resolveLocalPlaybackPresentation({
+    lastSuccessful: unavailableLocalLastSuccessfulSnapshot(),
+    now: monotonic(0),
+    outcome: trustedSelectedLocalPlayback({
+      reason: "sole-not-playing",
+      snapshot,
+    }),
+  });
+  const markup = renderLocal(presentation, new URLSearchParams(), false);
+
+  assert.equal(presentation.kind, "idle");
+  assert.match(markup, /fill-overlay-vinyl-disc/);
+  assert.match(markup, /animate-vinyl-spin/);
+  assert.doesNotMatch(
+    markup,
+    /Previous title|Previous creator|Previous collection|<image/,
+  );
+  assert.match(markup, /Waiting for active playback\./);
 });
 
 test("Local unsupported, native-session, and API states expose distinct accessible status", () => {
