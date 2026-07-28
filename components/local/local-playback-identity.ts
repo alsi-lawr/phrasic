@@ -7,6 +7,8 @@ export function localAnimationIdentityKey(
     case "content":
     case "stale-content":
       return localItemIdentityKey(presentation);
+    case "idle":
+      return "animation:local:idle";
     case "metadata-unavailable":
       return "animation:local:metadata-unavailable";
     case "unavailable":

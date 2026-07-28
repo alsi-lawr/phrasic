@@ -29,14 +29,13 @@ export type LocalNativeClient = {
 
 const nativeDeadlineMilliseconds = 2_000;
 const maximumNativeRequestBytes = 64 * 1_024;
-const maximumNativeResponseBytes = 1_024 * 1_024;
 
 export function createLocalNativeClient(endpoint: string): LocalNativeClient {
   const client = new grpc.Client(
     `unix:${endpoint}`,
     grpc.credentials.createInsecure(),
     {
-      "grpc.max_receive_message_length": maximumNativeResponseBytes,
+      "grpc.max_receive_message_length": -1,
       "grpc.max_send_message_length": maximumNativeRequestBytes,
     },
   );

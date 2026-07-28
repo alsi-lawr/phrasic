@@ -423,6 +423,10 @@ export type LocalPlaybackPresentation =
     }
   | {
       readonly action: LocalAutomaticAction;
+      readonly kind: "idle";
+    }
+  | {
+      readonly action: LocalAutomaticAction;
       readonly kind: "metadata-unavailable";
     }
   | {
@@ -516,6 +520,13 @@ function presentationForSnapshot(
   snapshot: LocalSuccessfulSnapshot,
   unavailableStatus: LocalUnavailableStatus,
 ): LocalPlaybackPresentation {
+  if (snapshot.activity !== "playing") {
+    return Object.freeze({
+      action: Object.freeze({ kind: "automatic-status" }),
+      kind: "idle",
+    });
+  }
+
   if (snapshot.metadata.title === undefined) {
     return Object.freeze({
       action: Object.freeze({ kind: "automatic-status" }),

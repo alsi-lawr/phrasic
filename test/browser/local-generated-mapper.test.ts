@@ -80,6 +80,27 @@ test("generated Local artwork maps to a CSP-compatible embedded image", () => {
   );
 });
 
+test("generated Local artwork is not rejected for its byte size", () => {
+  const data = new Uint8Array(3 * 1_024 * 1_024);
+  data.set(pngArtwork);
+  const item = new PlaybackItem();
+  item.setTitle("Large artwork title");
+  item.setArtwork(generatedArtwork(ArtworkFormat.ARTWORK_FORMAT_PNG, data));
+
+  const mapped = mapGeneratedSnapshot(
+    availableResponse(item),
+    unavailableLocalLastSuccessfulSnapshot(),
+  );
+
+  assert.equal(mapped.presentation.kind, "content");
+  if (mapped.presentation.kind !== "content") {
+    throw new Error("Large generated artwork did not map to content.");
+  }
+  const artwork = mapped.presentation.snapshot.metadata.artwork?.toString();
+  assert.equal(artwork?.startsWith("data:image/png;base64,"), true);
+  assert.ok((artwork?.length ?? 0) > data.byteLength);
+});
+
 test("invalid generated artwork falls back without discarding playback metadata", () => {
   const cases: ReadonlyArray<Artwork> = [
     generatedArtwork(
@@ -87,10 +108,6 @@ test("invalid generated artwork falls back without discarding playback metadata"
       new Uint8Array([0xff, 0xd8, 0xff, 0xff, 0xd9]),
     ),
     generatedArtwork(ArtworkFormat.ARTWORK_FORMAT_UNSPECIFIED, pngArtwork),
-    generatedArtwork(
-      ArtworkFormat.ARTWORK_FORMAT_PNG,
-      new Uint8Array(512 * 1_024 + 1).fill(0x89),
-    ),
   ];
 
   for (const artwork of cases) {

@@ -57,6 +57,7 @@ function OptionalLocalDefinitions({
         </>
       );
     }
+    case "idle":
     case "metadata-unavailable":
     case "unavailable":
       return null;

@@ -64,6 +64,8 @@ function MetadataForPresentation({
           presentation={presentation}
         />
       );
+    case "idle":
+      return <></>;
     case "metadata-unavailable":
     case "unavailable":
       return (

@@ -94,6 +94,32 @@ test("Local title absence is a non-content metadata-unavailable state", () => {
   });
 });
 
+test("Local paused and stopped snapshots are neutral idle states", () => {
+  for (const activity of ["paused", "stopped"] as const) {
+    const snapshot = createLocalSuccessfulSnapshot({
+      activity,
+      metadata: metadata({
+        artwork: "https://media.example/previous-artwork.png",
+        title: "Previous title",
+      }),
+      observedAt: monotonic(0),
+    });
+    const presentation = resolveLocalPlaybackPresentation({
+      lastSuccessful: unavailableLocalLastSuccessfulSnapshot(),
+      now: monotonic(0),
+      outcome: trustedSelectedLocalPlayback({
+        reason: "sole-not-playing",
+        snapshot,
+      }),
+    });
+
+    assert.deepEqual(presentation, {
+      action: { kind: "automatic-status" },
+      kind: "idle",
+    });
+  }
+});
+
 test("Local monotonic freshness is inclusive at five and thirty seconds", () => {
   const snapshot = successfulSnapshot(0, metadata({ title: "Track title" }));
   const outcome = trustedSelectedLocalPlayback({

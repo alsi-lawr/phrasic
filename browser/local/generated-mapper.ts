@@ -28,8 +28,6 @@ import {
   type TrustedLocalPlaybackOutcome,
 } from "../../domain/local-playback.ts";
 
-const maximumLocalArtworkBytes = 512 * 1_024;
-
 export type MappedLocalSnapshot = {
   readonly lastSuccessful: LocalLastSuccessfulSnapshot;
   readonly nativeNowMilliseconds: number;
@@ -193,7 +191,6 @@ function optionalArtwork(artwork: Artwork | undefined): {
   const data = artwork.getData_asU8();
   if (
     data.byteLength === 0 ||
-    data.byteLength > maximumLocalArtworkBytes ||
     !matchesArtworkFormat(artwork.getFormat(), data)
   ) {
     return {};

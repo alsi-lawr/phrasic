@@ -67,6 +67,44 @@ test("the Local gateway translates one generated binary gRPC-Web call to native 
   assert.match(new TextDecoder().decode(frames), /grpc-status: 0/);
 });
 
+test("the Local gateway does not impose an artwork-sized response ceiling", async () => {
+  const payload = new Uint8Array(3 * 1_024 * 1_024);
+  const nativeClient: LocalNativeClient = {
+    close(): void {},
+    invoke(): Promise<Uint8Array> {
+      return Promise.resolve(payload);
+    },
+    proveReadiness(): Promise<boolean> {
+      return Promise.resolve(true);
+    },
+  };
+  const request = new Request(
+    "http://127.0.0.1:43123/phrasic.local.v1.LocalMedia/GetSnapshot",
+    {
+      body: bodyBuffer(unaryFrame(new Uint8Array())),
+      headers: { "content-type": "application/grpc-web+proto" },
+      method: "POST",
+    },
+  );
+
+  const response = await translateGrpcWeb(
+    request,
+    localNativeMethods.getSnapshot,
+    nativeClient,
+  );
+  const frames = new Uint8Array(await response.arrayBuffer());
+
+  assert.equal(frames[0], 0);
+  assert.equal(
+    new DataView(frames.buffer, frames.byteOffset, frames.byteLength).getUint32(
+      1,
+      false,
+    ),
+    payload.byteLength,
+  );
+  assert.equal(frames[5 + payload.byteLength], 0x80);
+});
+
 function unaryFrame(payload: Uint8Array): Uint8Array {
   const frame = new Uint8Array(payload.byteLength + 5);
   frame[0] = 0;
