@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/favicon.svg" alt="Phrasic logo" width="88" height="88">
+<img src="assets/phrasic.svg" alt="Phrasic logo" width="128" height="128">
 
 # Phrasic
 
@@ -11,10 +11,8 @@ attribution, long-text motion, and resilient connection states—without an
 application server.
 
 <p>
-  <img alt="Provider-neutral" src="https://img.shields.io/badge/Providers-Pluggable-7C3AED?style=for-the-badge">
-  <img alt="Browser-only architecture" src="https://img.shields.io/badge/Architecture-Browser_Only-0F766E?style=for-the-badge">
-  <img alt="Spotify PKCE authorization" src="https://img.shields.io/badge/Spotify-PKCE-1DB954?style=for-the-badge&logo=spotify&logoColor=white">
-  <img alt="Docker deployment" src="https://img.shields.io/badge/Deploy-Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white">
+  <a href="https://github.com/alsi-lawr/phrasic/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/alsi-lawr/phrasic/actions/workflows/ci.yml/badge.svg?branch=master"></a>
+  <a href="https://github.com/alsi-lawr/phrasic/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/alsi-lawr/phrasic?display_name=tag&sort=semver"></a>
 </p>
 
 [Providers](#providers) · [Quick start](#quick-start) ·

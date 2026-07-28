@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Phrasic</title>
+  <rect width="64" height="64" rx="18" fill="#17151f" />
+  <path
+    d="M19 49V15h16c8.4 0 14 5 14 12.5S43.4 40 35 40H19"
+    fill="none"
+    stroke="#f5f3ff"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="7"
+  />
+  <circle cx="47" cy="28" r="4" fill="#a78bfa" />
+</svg>
