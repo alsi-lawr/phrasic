@@ -1,5 +1,8 @@
 //! Linux-only Unix-domain-socket ownership and child supervision.
 
+#[path = "linux_mpris.rs"]
+mod mpris;
+
 use std::ffi::OsString;
 use std::fs::{File, OpenOptions};
 
@@ -131,12 +134,17 @@ async fn run_with_shutdown(
     configuration: &ServingConfiguration,
     external_shutdown: CancellationToken,
 ) -> Result<(), Diagnostic> {
-    let _source_pin = configuration.source_pin();
     let instance_id =
         InstanceId::random().map_err(|_| Diagnostic::new(DiagnosticCode::NativeIpcUnavailable))?;
-    let state = SnapshotState::with_fake_collector(instance_id.clone());
+    let state = SnapshotState::with_native_collector(instance_id.clone());
     let mut endpoint = EndpointGuard::prepare(configuration.port().get())?;
     let listener = endpoint.bind_listener()?;
+    let collector_shutdown = CancellationToken::new();
+    let collector = tokio::spawn(mpris::run(
+        state.clone(),
+        configuration.source_pin().cloned(),
+        collector_shutdown.clone(),
+    ));
     let server_shutdown = CancellationToken::new();
     let child_shutdown = CancellationToken::new();
     let mut server = start_server(listener, state, server_shutdown.clone());
@@ -144,6 +152,8 @@ async fn run_with_shutdown(
     if let Err(error) = prove_readiness(endpoint.path(), &instance_id).await {
         server_shutdown.cancel();
         let server_result = stop_server(&mut server).await;
+        collector_shutdown.cancel();
+        let _ = collector.await;
         return if is_forced_termination(&server_result) {
             server_result
         } else {
@@ -158,14 +168,17 @@ async fn run_with_shutdown(
         child_shutdown.clone(),
     ));
 
-    supervise_lifecycle(
+    let result = supervise_lifecycle(
         &mut server,
         &mut child,
         server_shutdown,
         child_shutdown,
         external_shutdown,
     )
-    .await
+    .await;
+    collector_shutdown.cancel();
+    let _ = collector.await;
+    result
 }
 
 async fn stop_server(

@@ -22,6 +22,7 @@ case "${1:-}" in
     cargo fmt --all -- --check
     cargo clippy --workspace --all-targets --locked -- -D warnings
     cargo test --workspace --locked
+    dbus-run-session -- env PHRASIC_PRIVATE_DBUS_TEST=1 cargo test --locked -p phrasic private_bus -- --ignored --test-threads=1
     scripts/verify-rust-target-isolation.sh
     ;;
   win-x64)
