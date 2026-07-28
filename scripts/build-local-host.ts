@@ -13,6 +13,9 @@ const outputRoot = resolve(
 const scratchRoot = join(outputRoot, ".build");
 const executableName =
   target === "windows" ? "phrasic-local-host.exe" : "phrasic-local-host";
+const compilingForCurrentHost =
+  (target === "linux" && process.platform === "linux") ||
+  (target === "windows" && process.platform === "win32");
 
 await rm(outputRoot, { force: true, recursive: true });
 await mkdir(scratchRoot, { recursive: true });
@@ -30,10 +33,14 @@ try {
       autoloadBunfig: false,
       autoloadDotenv: false,
       outfile: join(outputRoot, executableName),
-      target:
-        target === "windows"
-          ? "bun-windows-x64-baseline"
-          : "bun-linux-x64-baseline",
+      ...(compilingForCurrentHost
+        ? {}
+        : {
+            target:
+              target === "windows"
+                ? "bun-windows-x64-baseline"
+                : "bun-linux-x64-baseline",
+          }),
     },
     entrypoints: [wrapper],
     env: "disable",

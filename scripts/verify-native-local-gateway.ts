@@ -50,10 +50,6 @@ async function smoke(target: string | undefined): Promise<void> {
         autoloadBunfig: false,
         autoloadDotenv: false,
         outfile: proxyPath,
-        target:
-          platform === "windows"
-            ? "bun-windows-x64-baseline"
-            : "bun-linux-x64-baseline",
       },
       entrypoints: [import.meta.path],
       env: "disable",
