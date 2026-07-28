@@ -47,10 +47,13 @@ try {
     define: { "process.env.NODE_ENV": JSON.stringify("production") },
     entrypoints: [wrapper],
     env: "disable",
-    external: [fontPublicPath],
     loader: { ".woff": "file" },
     minify: true,
-    plugins: [tailwind, localWorkerUrlPlugin(workerPublicPath)],
+    plugins: [
+      tailwind,
+      externalFontUrlPlugin(),
+      localWorkerUrlPlugin(workerPublicPath),
+    ],
     sourcemap: "none",
     target: "bun",
   });
@@ -120,6 +123,18 @@ async function writeWrapper(
   ].join("\n");
   await Bun.write(wrapperPath, source);
   return wrapperPath;
+}
+
+function externalFontUrlPlugin(): BunPlugin {
+  return {
+    name: "phrasic-local-font-url",
+    setup(build): void {
+      build.onResolve({ filter: /^\/fonts\/GeistVF\.woff$/ }, () => ({
+        external: true,
+        path: fontPublicPath,
+      }));
+    },
+  };
 }
 
 function localWorkerUrlPlugin(workerPublicPath: string): BunPlugin {
