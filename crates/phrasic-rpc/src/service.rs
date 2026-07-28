@@ -55,14 +55,20 @@ pub struct SnapshotState {
 }
 
 impl SnapshotState {
+    /// Creates state for a native collector that has not completed its first observation.
     #[must_use]
-    pub fn with_fake_collector(instance_id: InstanceId) -> Self {
+    pub fn with_native_collector(instance_id: InstanceId) -> Self {
         let snapshot = unavailable_snapshot(&instance_id, 0);
         Self {
             instance_id,
             started_at: Instant::now(),
             snapshot: Arc::new(RwLock::new(snapshot)),
         }
+    }
+
+    #[must_use]
+    pub fn with_fake_collector(instance_id: InstanceId) -> Self {
+        Self::with_native_collector(instance_id)
     }
 
     #[must_use]
