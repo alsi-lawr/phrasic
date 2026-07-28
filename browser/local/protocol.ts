@@ -1,4 +1,4 @@
-import type { LocalPlaybackPresentation } from "../../domain/local-playback.ts";
+import type { LocalPlaybackView } from "./presentation-view.ts";
 
 export type LocalWorkerCommand =
   | {
@@ -14,7 +14,7 @@ export type LocalWorkerCommand =
 
 export type LocalWorkerEvent = {
   readonly kind: "presentation";
-  readonly presentation: LocalPlaybackPresentation;
+  readonly presentation: LocalPlaybackView;
 };
 
 export type LocalPageVisibility = "hidden" | "visible";

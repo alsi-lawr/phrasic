@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import type { LocalPlaybackPresentation } from "../../domain/local-playback.ts";
+import type { LocalPlaybackView } from "../../browser/local/presentation-view.ts";
 import {
   overlayMetadataLayout,
   type OverlayTextMeasurementReporter,
@@ -19,7 +19,7 @@ type LocalPlaybackMetadataProps = {
   readonly availableWidth: number;
   readonly motion: OverlayMotionDecision;
   readonly onTextMeasurement: OverlayTextMeasurementReporter;
-  readonly presentation: LocalPlaybackPresentation;
+  readonly presentation: LocalPlaybackView;
 };
 
 export function LocalPlaybackMetadata({
@@ -88,7 +88,7 @@ type LocalItemMetadataProps = Omit<
   "presentation"
 > & {
   readonly presentation: Extract<
-    LocalPlaybackPresentation,
+    LocalPlaybackView,
     { readonly kind: "content" | "stale-content" }
   >;
 };
@@ -111,7 +111,7 @@ function LocalItemMetadata({
           line={overlayMetadataLayout.creatorLine}
           motion={motion}
           onTextMeasurement={onTextMeasurement}
-          text={metadata.creator.toString()}
+          text={metadata.creator}
           textClass="font-overlay-display fill-overlay-creator text-overlay-creator-size font-semibold tracking-overlay-normal uppercase"
         />
       )}
@@ -121,7 +121,7 @@ function LocalItemMetadata({
         line={overlayMetadataLayout.titleLine}
         motion={motion}
         onTextMeasurement={onTextMeasurement}
-        text={metadata.title.toString()}
+        text={metadata.title}
         textClass="font-overlay-display fill-overlay-title text-overlay-title-size font-normal tracking-overlay-normal"
       />
       {metadata.collection === undefined ? null : (
@@ -131,7 +131,7 @@ function LocalItemMetadata({
           line={overlayMetadataLayout.detailLine}
           motion={motion}
           onTextMeasurement={onTextMeasurement}
-          text={metadata.collection.toString()}
+          text={metadata.collection}
           textClass="font-overlay-display fill-overlay-detail text-overlay-detail-size font-medium tracking-overlay-detail"
         />
       )}

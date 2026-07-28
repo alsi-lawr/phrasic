@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import type { LocalPlaybackPresentation } from "../../domain/local-playback.ts";
+import type { LocalPlaybackView } from "../../browser/local/presentation-view.ts";
 import {
   localAutomaticActionMessage,
   localPresentationLabel,
@@ -7,7 +7,7 @@ import {
 } from "./local-playback-copy.ts";
 
 type LocalPlaybackSemanticCompanionProps = {
-  readonly presentation: LocalPlaybackPresentation;
+  readonly presentation: LocalPlaybackView;
 };
 
 export function LocalPlaybackSemanticCompanion({
@@ -47,18 +47,12 @@ function OptionalLocalDefinitions({
       const metadata = presentation.snapshot.metadata;
       return (
         <>
-          <MetadataDefinition term="Title" value={metadata.title.toString()} />
+          <MetadataDefinition term="Title" value={metadata.title} />
           {metadata.creator === undefined ? null : (
-            <MetadataDefinition
-              term="Creator"
-              value={metadata.creator.toString()}
-            />
+            <MetadataDefinition term="Creator" value={metadata.creator} />
           )}
           {metadata.collection === undefined ? null : (
-            <MetadataDefinition
-              term="Collection"
-              value={metadata.collection.toString()}
-            />
+            <MetadataDefinition term="Collection" value={metadata.collection} />
           )}
         </>
       );

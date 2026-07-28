@@ -7,7 +7,7 @@ import {
 } from "./native-client.ts";
 import { createPairingAuthority, type PairingAuthority } from "./pairing.ts";
 
-export type EmbeddedLocalWorker = {
+export type EmbeddedLocalFile = {
   readonly embeddedPath: string;
   readonly publicPath: string;
 };
@@ -20,10 +20,11 @@ export type LocalHost = {
 
 export type LocalHostConfiguration = {
   readonly browserPort: number;
+  readonly font: EmbeddedLocalFile;
   readonly localPage: Bun.HTMLBundle;
   readonly nativeClient: LocalNativeClient;
   readonly pairingAuthority?: PairingAuthority;
-  readonly worker: EmbeddedLocalWorker;
+  readonly worker: EmbeddedLocalFile;
 };
 
 type StaticLocalAsset = {
@@ -61,7 +62,11 @@ export async function startLocalHost(
   const origin = `http://127.0.0.1:${configuration.browserPort}`;
   const expectedHost = `127.0.0.1:${configuration.browserPort}`;
   const pairing = configuration.pairingAuthority ?? createPairingAuthority();
-  const assets = prepareAssets(configuration.localPage, configuration.worker);
+  const assets = prepareAssets(
+    configuration.localPage,
+    configuration.font,
+    configuration.worker,
+  );
   let activeRpcRequests = 0;
   let stopping = false;
 
@@ -152,7 +157,8 @@ export async function startLocalHost(
 
 function prepareAssets(
   localPage: Bun.HTMLBundle,
-  worker: EmbeddedLocalWorker,
+  font: EmbeddedLocalFile,
+  worker: EmbeddedLocalFile,
 ): ReadonlyMap<string, StaticLocalAsset> {
   const files = localPage.files ?? [];
   const html = files.find((file): boolean => file.path === localPage.index);
@@ -181,6 +187,13 @@ function prepareAssets(
       publicPath,
     });
   }
+  assets.set(font.publicPath, {
+    bodyPath: font.embeddedPath,
+    contentType: "font/woff",
+    etag: font.publicPath,
+    kind: "asset",
+    publicPath: font.publicPath,
+  });
   assets.set(worker.publicPath, {
     bodyPath: worker.embeddedPath,
     contentType: "text/javascript; charset=utf-8",

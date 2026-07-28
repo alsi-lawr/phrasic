@@ -1,16 +1,20 @@
 import type { ReactElement } from "react";
-import type { LocalPlaybackPresentation } from "../../domain/local-playback.ts";
+import type { LocalPlaybackView } from "../../browser/local/presentation-view.ts";
 import type { OverlayGeometry } from "../overlay/overlay-geometry.ts";
 import type { OverlayMotionDecision } from "../overlay/overlay-motion.ts";
-import { OverlayFallbackArtwork } from "../overlay/OverlayArtwork.tsx";
+import {
+  OverlayFallbackArtwork,
+  OverlayReferencedArtwork,
+} from "../overlay/OverlayArtwork.tsx";
 import { OverlayVisualFrame } from "../overlay/OverlayVisualFrame.tsx";
 import { LocalPlaybackAttribution } from "./LocalPlaybackAttribution.tsx";
 import { LocalPlaybackMetadata } from "./LocalPlaybackMetadata.tsx";
+import { localAnimationIdentityKey } from "./local-playback-identity.ts";
 
 type LocalPlaybackVisualProps = {
   readonly geometry: OverlayGeometry;
   readonly motion: OverlayMotionDecision;
-  readonly presentation: LocalPlaybackPresentation;
+  readonly presentation: LocalPlaybackView;
 };
 
 export function LocalPlaybackVisual({
@@ -24,9 +28,9 @@ export function LocalPlaybackVisual({
       geometry={geometry}
       motion={motion}
       renderArtwork={({ motion: displayedMotion, snapshot }) => (
-        <OverlayFallbackArtwork
-          identity={localAnimationIdentityKey(snapshot)}
+        <LocalPlaybackArtwork
           motion={displayedMotion}
+          presentation={snapshot}
         />
       )}
       renderAttribution={(shellWidth): ReactElement => (
@@ -52,45 +56,38 @@ export function LocalPlaybackVisual({
   );
 }
 
-function localAnimationIdentityKey(
-  presentation: LocalPlaybackPresentation,
-): string {
+type LocalPlaybackArtworkProps = {
+  readonly motion: OverlayMotionDecision;
+  readonly presentation: LocalPlaybackView;
+};
+
+function LocalPlaybackArtwork({
+  motion,
+  presentation,
+}: LocalPlaybackArtworkProps): ReactElement {
+  const identity = localAnimationIdentityKey(presentation);
   switch (presentation.kind) {
     case "content":
-    case "stale-content":
-      return localItemIdentityKey(presentation);
+    case "stale-content": {
+      const artwork = presentation.snapshot.metadata.artwork;
+      return artwork === undefined ? (
+        <OverlayFallbackArtwork identity={identity} motion={motion} />
+      ) : (
+        <OverlayReferencedArtwork
+          href={artwork}
+          identity={identity}
+          motion={motion}
+        />
+      );
+    }
     case "metadata-unavailable":
-      return "animation:local:metadata-unavailable";
     case "unavailable":
-      return `animation:local:unavailable:${presentation.status}`;
+      return <OverlayFallbackArtwork identity={identity} motion={motion} />;
   }
 
   return unreachable(presentation);
 }
 
-function localItemIdentityKey(
-  presentation: Extract<
-    LocalPlaybackPresentation,
-    { readonly kind: "content" | "stale-content" }
-  >,
-): string {
-  const metadata = presentation.snapshot.metadata;
-  const nativeIdentity = metadata.nativeIdentity?.toString();
-  if (nativeIdentity !== undefined) {
-    return `animation:local:item:${nativeIdentity.length}:${nativeIdentity}`;
-  }
-
-  const title = metadata.title.toString();
-  const creator = metadata.creator?.toString() ?? "";
-  const collection = metadata.collection?.toString() ?? "";
-  return [
-    "animation:local:item",
-    `${title.length}:${title}`,
-    `${creator.length}:${creator}`,
-    `${collection.length}:${collection}`,
-  ].join(":");
-}
-
 function unreachable(value: never): never {
-  throw new Error(`Unexpected Local overlay value: ${String(value)}`);
+  throw new Error(`Unexpected Local artwork value: ${String(value)}`);
 }

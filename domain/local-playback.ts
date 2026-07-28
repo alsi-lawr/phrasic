@@ -77,6 +77,10 @@ export class LocalArtworkReference {
     );
   }
 
+  static trusted(value: string): LocalArtworkReference {
+    return new LocalArtworkReference(value);
+  }
+
   toString(): string {
     return this.#value;
   }

@@ -16,6 +16,7 @@ const executableName =
 const compilingForCurrentHost =
   (target === "linux" && process.platform === "linux") ||
   (target === "windows" && process.platform === "win32");
+const fontPublicPath = "/fonts/GeistVF.woff";
 
 await rm(outputRoot, { force: true, recursive: true });
 await mkdir(scratchRoot, { recursive: true });
@@ -27,6 +28,7 @@ try {
     scratchRoot,
     worker.path,
     workerPublicPath,
+    join(repositoryRoot, "public", "fonts", "GeistVF.woff"),
   );
   const result = await Bun.build({
     compile: {
@@ -42,8 +44,11 @@ try {
                 : "bun-linux-x64-baseline",
           }),
     },
+    define: { "process.env.NODE_ENV": JSON.stringify("production") },
     entrypoints: [wrapper],
     env: "disable",
+    external: [fontPublicPath],
+    loader: { ".woff": "file" },
     minify: true,
     plugins: [tailwind, localWorkerUrlPlugin(workerPublicPath)],
     sourcemap: "none",
@@ -102,13 +107,15 @@ async function writeWrapper(
   outputDirectory: string,
   workerPath: string,
   workerPublicPath: string,
+  fontPath: string,
 ): Promise<string> {
   const wrapperPath = join(outputDirectory, "local-host-entry.ts");
   const source = [
     `import localPage from ${JSON.stringify(join(repositoryRoot, "local", "index.html"))};`,
     `import workerPath from ${JSON.stringify(workerPath)} with { type: "file" };`,
+    `import fontPath from ${JSON.stringify(fontPath)} with { type: "file" };`,
     `import { runLocalHost } from ${JSON.stringify(join(repositoryRoot, "server", "local", "runtime.ts"))};`,
-    `await runLocalHost({ localPage, worker: { embeddedPath: workerPath, publicPath: ${JSON.stringify(workerPublicPath)} } });`,
+    `await runLocalHost({ font: { embeddedPath: fontPath, publicPath: ${JSON.stringify(fontPublicPath)} }, localPage, worker: { embeddedPath: workerPath, publicPath: ${JSON.stringify(workerPublicPath)} } });`,
     "",
   ].join("\n");
   await Bun.write(wrapperPath, source);

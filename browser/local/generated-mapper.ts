@@ -1,16 +1,19 @@
 import {
   AmbiguityReason,
+  ArtworkFormat,
   CapabilityStatus,
   GetSnapshotResponse,
   PlaybackActivity,
   SelectionReason,
   UnavailableReason,
+  type Artwork,
   type AvailableSnapshot,
 } from "../generated/phrasic/local/v1/local_media_pb.js";
 import {
   createLocalSuccessfulSnapshot,
   LocalDestination,
   LocalDurationMilliseconds,
+  LocalArtworkReference,
   LocalNativeIdentity,
   LocalPositionMilliseconds,
   LocalText,
@@ -24,6 +27,8 @@ import {
   type LocalSuccessfulSnapshot,
   type TrustedLocalPlaybackOutcome,
 } from "../../domain/local-playback.ts";
+
+const maximumLocalArtworkBytes = 512 * 1_024;
 
 export type MappedLocalSnapshot = {
   readonly lastSuccessful: LocalLastSuccessfulSnapshot;
@@ -155,6 +160,7 @@ function successfulSnapshot(
           nativeIdentity: LocalNativeIdentity.trusted(item.getNativeIdentity()),
         }
       : {}),
+    ...optionalArtwork(item?.getArtwork()),
     ...(timeline?.hasDurationMilliseconds() === true
       ? {
           duration: LocalDurationMilliseconds.trusted(
@@ -176,6 +182,82 @@ function successfulSnapshot(
     metadata,
     observedAt,
   });
+}
+
+function optionalArtwork(artwork: Artwork | undefined): {
+  readonly artwork?: LocalArtworkReference;
+} {
+  if (artwork === undefined) {
+    return {};
+  }
+  const data = artwork.getData_asU8();
+  if (
+    data.byteLength === 0 ||
+    data.byteLength > maximumLocalArtworkBytes ||
+    !matchesArtworkFormat(artwork.getFormat(), data)
+  ) {
+    return {};
+  }
+  const mediaType = artworkMediaType(artwork.getFormat());
+  if (mediaType === undefined) {
+    return {};
+  }
+  return {
+    artwork: LocalArtworkReference.trusted(
+      `data:${mediaType};base64,${artwork.getData_asB64()}`,
+    ),
+  };
+}
+
+function artworkMediaType(format: ArtworkFormat): string | undefined {
+  switch (format) {
+    case ArtworkFormat.ARTWORK_FORMAT_PNG:
+      return "image/png";
+    case ArtworkFormat.ARTWORK_FORMAT_JPEG:
+      return "image/jpeg";
+    case ArtworkFormat.ARTWORK_FORMAT_WEBP:
+      return "image/webp";
+    case ArtworkFormat.ARTWORK_FORMAT_UNSPECIFIED:
+      return undefined;
+  }
+  return undefined;
+}
+
+function matchesArtworkFormat(
+  format: ArtworkFormat,
+  data: Uint8Array,
+): boolean {
+  switch (format) {
+    case ArtworkFormat.ARTWORK_FORMAT_PNG:
+      return startsWithBytes(
+        data,
+        [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+      );
+    case ArtworkFormat.ARTWORK_FORMAT_JPEG:
+      return (
+        startsWithBytes(data, [0xff, 0xd8, 0xff]) &&
+        data.at(-2) === 0xff &&
+        data.at(-1) === 0xd9
+      );
+    case ArtworkFormat.ARTWORK_FORMAT_WEBP:
+      return (
+        startsWithBytes(data, [0x52, 0x49, 0x46, 0x46]) &&
+        startsWithBytes(data.subarray(8), [0x57, 0x45, 0x42, 0x50])
+      );
+    case ArtworkFormat.ARTWORK_FORMAT_UNSPECIFIED:
+      return false;
+  }
+  return false;
+}
+
+function startsWithBytes(
+  data: Uint8Array,
+  expected: ReadonlyArray<number>,
+): boolean {
+  return (
+    data.byteLength >= expected.length &&
+    expected.every((value, index): boolean => data[index] === value)
+  );
 }
 
 function localActivity(value: PlaybackActivity): LocalActivity {

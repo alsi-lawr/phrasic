@@ -1,9 +1,5 @@
 import type { ReactElement, ReactNode } from "react";
-import {
-  overlayItemAppearanceDurationSeconds,
-  overlayItemAppearanceKeySpline,
-  type OverlayMotionDecision,
-} from "./overlay-motion.ts";
+import type { OverlayMotionDecision } from "./overlay-motion.ts";
 
 type OverlayItemAppearanceProps = {
   readonly children: ReactNode;
@@ -17,34 +13,20 @@ export function OverlayItemAppearance({
   motion,
 }: OverlayItemAppearanceProps): ReactElement {
   return (
-    <g key={identity}>
-      <ItemAppearanceAnimation motion={motion} />
+    <g key={identity} className={itemAppearanceClass(motion)}>
       {children}
     </g>
   );
 }
 
-type ItemAppearanceAnimationProps = {
-  readonly motion: OverlayMotionDecision;
-};
-
-function ItemAppearanceAnimation({
-  motion,
-}: ItemAppearanceAnimationProps): ReactElement | null {
+function itemAppearanceClass(
+  motion: OverlayMotionDecision,
+): string | undefined {
   switch (motion.kind) {
     case "enabled":
-      return (
-        <animate
-          attributeName="opacity"
-          from="0"
-          to="1"
-          dur={`${overlayItemAppearanceDurationSeconds}s`}
-          calcMode="spline"
-          keySplines={overlayItemAppearanceKeySpline}
-        />
-      );
+      return "animate-overlay-item-appearance";
     case "reduced":
-      return null;
+      return undefined;
   }
 
   return unreachable(motion);

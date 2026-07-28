@@ -3,6 +3,8 @@ import { test } from "bun:test";
 import {
   AmbiguityReason,
   AmbiguousSnapshot,
+  Artwork,
+  ArtworkFormat,
   AvailableSnapshot,
   CapabilityState,
   CapabilityStatus,
@@ -14,6 +16,10 @@ import {
 } from "../../browser/generated/phrasic/local/v1/local_media_pb.js";
 import { mapGeneratedSnapshot } from "../../browser/local/generated-mapper.ts";
 import { unavailableLocalLastSuccessfulSnapshot } from "../../domain/local-playback.ts";
+
+const pngArtwork = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01,
+]);
 
 test("generated Local snapshots map partial playback without fabricated fields", () => {
   const item = new PlaybackItem();
@@ -48,6 +54,64 @@ test("generated Local snapshots map partial playback without fabricated fields",
   );
   assert.equal(mapped.presentation.snapshot.metadata.collection, undefined);
   assert.equal(mapped.presentation.snapshot.metadata.destination, undefined);
+});
+
+test("generated Local artwork maps to a CSP-compatible embedded image", () => {
+  const item = new PlaybackItem();
+  item.setTitle("Artwork title");
+  const artwork = generatedArtwork(
+    ArtworkFormat.ARTWORK_FORMAT_PNG,
+    pngArtwork,
+  );
+  item.setArtwork(artwork);
+
+  const mapped = mapGeneratedSnapshot(
+    availableResponse(item),
+    unavailableLocalLastSuccessfulSnapshot(),
+  );
+
+  assert.equal(mapped.presentation.kind, "content");
+  if (mapped.presentation.kind !== "content") {
+    throw new Error("Generated artwork did not map to content.");
+  }
+  assert.equal(
+    mapped.presentation.snapshot.metadata.artwork?.toString(),
+    `data:image/png;base64,${artwork.getData_asB64()}`,
+  );
+});
+
+test("invalid generated artwork falls back without discarding playback metadata", () => {
+  const cases: ReadonlyArray<Artwork> = [
+    generatedArtwork(
+      ArtworkFormat.ARTWORK_FORMAT_PNG,
+      new Uint8Array([0xff, 0xd8, 0xff, 0xff, 0xd9]),
+    ),
+    generatedArtwork(ArtworkFormat.ARTWORK_FORMAT_UNSPECIFIED, pngArtwork),
+    generatedArtwork(
+      ArtworkFormat.ARTWORK_FORMAT_PNG,
+      new Uint8Array(512 * 1_024 + 1).fill(0x89),
+    ),
+  ];
+
+  for (const artwork of cases) {
+    const item = new PlaybackItem();
+    item.setTitle("Retained title");
+    item.setArtwork(artwork);
+    const mapped = mapGeneratedSnapshot(
+      availableResponse(item),
+      unavailableLocalLastSuccessfulSnapshot(),
+    );
+
+    assert.equal(mapped.presentation.kind, "content");
+    if (mapped.presentation.kind !== "content") {
+      throw new Error("Invalid artwork discarded valid playback metadata.");
+    }
+    assert.equal(
+      mapped.presentation.snapshot.metadata.title.toString(),
+      "Retained title",
+    );
+    assert.equal(mapped.presentation.snapshot.metadata.artwork, undefined);
+  }
 });
 
 test("generated ambiguity and unsupported capability remain distinct", () => {
@@ -89,4 +153,21 @@ function baseResponse(): GetSnapshotResponse {
   capability.setStatus(CapabilityStatus.CAPABILITY_STATUS_AVAILABLE);
   response.setCapability(capability);
   return response;
+}
+
+function availableResponse(item: PlaybackItem): GetSnapshotResponse {
+  const available = new AvailableSnapshot();
+  available.setActivity(PlaybackActivity.PLAYBACK_ACTIVITY_PLAYING);
+  available.setItem(item);
+  available.setSelectionReason(SelectionReason.SELECTION_REASON_SOLE_PLAYING);
+  const response = baseResponse();
+  response.setAvailable(available);
+  return response;
+}
+
+function generatedArtwork(format: ArtworkFormat, data: Uint8Array): Artwork {
+  const artwork = new Artwork();
+  artwork.setFormat(format);
+  artwork.setData(data);
+  return artwork;
 }
