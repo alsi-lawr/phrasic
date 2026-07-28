@@ -1,10 +1,8 @@
-import type {
-  LocalPlaybackPresentation,
-  LocalUnavailableStatus,
-} from "../../domain/local-playback.ts";
+import type { LocalUnavailableStatus } from "../../domain/local-playback.ts";
+import type { LocalPlaybackView } from "../../browser/local/presentation-view.ts";
 
 export function localPresentationLabel(
-  presentation: LocalPlaybackPresentation,
+  presentation: LocalPlaybackView,
 ): string {
   switch (presentation.kind) {
     case "content":
@@ -21,7 +19,7 @@ export function localPresentationLabel(
 }
 
 export function localPresentationMessage(
-  presentation: LocalPlaybackPresentation,
+  presentation: LocalPlaybackView,
 ): string {
   switch (presentation.kind) {
     case "content":
@@ -38,7 +36,7 @@ export function localPresentationMessage(
 }
 
 export function localAutomaticActionMessage(
-  presentation: LocalPlaybackPresentation,
+  presentation: LocalPlaybackView,
 ): string {
   switch (presentation.action.kind) {
     case "automatic-status":

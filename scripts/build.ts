@@ -54,6 +54,7 @@ export async function buildApplication(
     entrypoints: applicationEntries.map(sourcePath),
     define: { "process.env.NODE_ENV": JSON.stringify("production") },
     env: "disable",
+    external: [publicFontUrl],
     loader: { ".woff": "file" },
     minify: true,
     naming: {
@@ -141,8 +142,10 @@ async function externalizePublicFont(
       /url\(data:font\/woff;base64,[^)]+\)/g,
       `url(${JSON.stringify(publicFontUrl)})`,
     );
-    if (rewrittenCss !== css) {
+    if (rewrittenCss.includes(publicFontUrl)) {
       replacedFont = true;
+    }
+    if (rewrittenCss !== css) {
       await Bun.write(output.path, rewrittenCss);
     }
   }

@@ -46,6 +46,24 @@ export function OverlayFallbackArtwork({
   );
 }
 
+type OverlayReferencedArtworkProps = {
+  readonly href: string;
+  readonly identity: string;
+  readonly motion: OverlayMotionDecision;
+};
+
+export function OverlayReferencedArtwork({
+  href,
+  identity,
+  motion,
+}: OverlayReferencedArtworkProps): ReactElement {
+  return (
+    <OverlayArtworkFrame identity={identity} motion={motion}>
+      <ArtworkImage href={href} />
+    </OverlayArtworkFrame>
+  );
+}
+
 type OverlayArtworkFrameProps = {
   readonly children: ReactNode;
   readonly identity: string;
@@ -187,21 +205,29 @@ type CurrentArtworkProps = {
 function CurrentArtwork({ item, motion }: CurrentArtworkProps): ReactElement {
   switch (item.artwork.kind) {
     case "available":
-      return (
-        <image
-          href={item.artwork.url}
-          x={overlayArtworkRectangle.x}
-          y={overlayArtworkRectangle.y}
-          width={overlayArtworkRectangle.width}
-          height={overlayArtworkRectangle.height}
-          preserveAspectRatio="xMidYMid meet"
-        />
-      );
+      return <ArtworkImage href={item.artwork.url} />;
     case "unavailable":
       return <FallbackVinyl motion={motion} />;
   }
 
   return unreachable(item.artwork);
+}
+
+type ArtworkImageProps = {
+  readonly href: string;
+};
+
+function ArtworkImage({ href }: ArtworkImageProps): ReactElement {
+  return (
+    <image
+      href={href}
+      x={overlayArtworkRectangle.x}
+      y={overlayArtworkRectangle.y}
+      width={overlayArtworkRectangle.width}
+      height={overlayArtworkRectangle.height}
+      preserveAspectRatio="xMidYMid meet"
+    />
+  );
 }
 
 function unreachable(value: never): never {

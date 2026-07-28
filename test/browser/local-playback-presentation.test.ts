@@ -3,6 +3,8 @@ import { test } from "bun:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LocalPlaybackOverlay } from "../../components/local/LocalPlaybackOverlay.tsx";
+import { localPlaybackView } from "../../browser/local/presentation-view.ts";
+import { localAnimationIdentityKey } from "../../components/local/local-playback-identity.ts";
 import { resolveOverlayGeometry } from "../../components/overlay/overlay-geometry.ts";
 import { overlayMotionDecisionForPreference } from "../../components/overlay/overlay-motion.ts";
 import {
@@ -17,7 +19,7 @@ import {
 } from "../../domain/local-playback.ts";
 import type { Result } from "../../domain/result.ts";
 
-test("Local presentation omits absent metadata, destinations, artwork, and interactive controls", () => {
+test("Local presentation renders artwork without exposing other private metadata or controls", () => {
   const markup = renderLocal(
     selectedPresentation({
       artwork: "https://media.example/private-artwork.png",
@@ -30,10 +32,15 @@ test("Local presentation omits absent metadata, destinations, artwork, and inter
   );
 
   assert.match(markup, />Track title</);
+  assert.match(
+    markup,
+    /<image[^>]*href="https:\/\/media\.example\/private-artwork\.png"/,
+  );
   assert.doesNotMatch(
     markup,
-    /private-artwork|private-destination|private-native-identity|120000|60000|<a |<button/,
+    /private-destination|private-native-identity|120000|60000|<a |<button/,
   );
+  assert.doesNotMatch(markup, /fill-overlay-vinyl-disc/);
   assert.doesNotMatch(markup, /Creator|Collection| · /);
   assert.match(markup, /Local playback status updates automatically\./);
 });
@@ -75,8 +82,8 @@ test("Local presentation uses the established overlay shell, geometry, metadata 
   assert.match(markup, />Local playback<\/text>/);
   assert.match(markup, /transition-\[width\]/);
   assert.match(markup, /animate-artwork-fade-in/);
+  assert.match(markup, /animate-overlay-item-appearance/);
   assert.match(markup, /animate-vinyl-spin/);
-  assert.match(markup, /<animate /);
   assert.doesNotMatch(
     markup,
     /border-amber|bg-slate|max-w-xl|<a |<button|<nav|<image/,
@@ -92,10 +99,30 @@ test("Local presentation preserves the established reduced-motion treatment", ()
 
   assert.doesNotMatch(
     markup,
-    /transition-\[width\]|animate-artwork-fade-in|animate-vinyl-spin|<animate /,
+    /transition-\[width\]|animate-artwork-fade-in|animate-overlay-item-appearance|animate-vinyl-spin/,
   );
   assert.match(markup, /fill-overlay-shell opacity-90/);
   assert.match(markup, /fill-overlay-vinyl-disc/);
+});
+
+test("Local animation identity changes with playback from the same native player", () => {
+  const first = localPlaybackView(
+    selectedPresentation({
+      nativeIdentity: "Mozilla zen",
+      title: "First track",
+    }),
+  );
+  const second = localPlaybackView(
+    selectedPresentation({
+      nativeIdentity: "Mozilla zen",
+      title: "Second track",
+    }),
+  );
+
+  assert.notEqual(
+    localAnimationIdentityKey(first),
+    localAnimationIdentityKey(second),
+  );
 });
 
 test("Local title absence and unavailable statuses are accessibly announced without authorization copy", () => {
@@ -215,7 +242,7 @@ function renderLocal(
     createElement(LocalPlaybackOverlay, {
       geometry: resolveOverlayGeometry(parameters),
       motion: overlayMotionDecisionForPreference(prefersReducedMotion),
-      presentation,
+      presentation: localPlaybackView(presentation),
     }),
   );
 }

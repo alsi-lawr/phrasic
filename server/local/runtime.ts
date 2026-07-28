@@ -1,10 +1,11 @@
 import { parseLocalHostOptions } from "./options.ts";
-import { startLocalHost, type EmbeddedLocalWorker } from "./host.ts";
+import { startLocalHost, type EmbeddedLocalFile } from "./host.ts";
 import { createLocalNativeClient } from "./native-client.ts";
 
 export async function runLocalHost(input: {
+  readonly font: EmbeddedLocalFile;
   readonly localPage: Bun.HTMLBundle;
-  readonly worker: EmbeddedLocalWorker;
+  readonly worker: EmbeddedLocalFile;
 }): Promise<void> {
   const parsed = parseLocalHostOptions(process.argv.slice(2));
   if (parsed.kind === "failure") {
@@ -21,6 +22,7 @@ export async function runLocalHost(input: {
 
   const host = await startLocalHost({
     browserPort: parsed.value.browserPort,
+    font: input.font,
     localPage: input.localPage,
     nativeClient,
     worker: input.worker,

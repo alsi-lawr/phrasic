@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import type { LocalPlaybackPresentation } from "../../domain/local-playback.ts";
+import type { LocalPlaybackView } from "../../browser/local/presentation-view.ts";
 import type { OverlayGeometry } from "../overlay/overlay-geometry.ts";
 import type { OverlayMotionDecision } from "../overlay/overlay-motion.ts";
 import { OverlaySetupDiagnostic } from "../overlay/OverlaySetupDiagnostic.tsx";
@@ -9,7 +9,7 @@ import { LocalPlaybackVisual } from "./LocalPlaybackVisual.tsx";
 type LocalPlaybackOverlayProps = {
   readonly geometry: OverlayGeometry;
   readonly motion: OverlayMotionDecision;
-  readonly presentation: LocalPlaybackPresentation;
+  readonly presentation: LocalPlaybackView;
 };
 
 export function LocalPlaybackOverlay({

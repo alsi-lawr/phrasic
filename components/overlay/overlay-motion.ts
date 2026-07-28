@@ -6,9 +6,6 @@ export type OverlayMotionDecision =
       readonly kind: "reduced";
     };
 
-export const overlayItemAppearanceDurationSeconds = 2;
-export const overlayItemAppearanceKeySpline = "0.42 0 0.58 1";
-
 const enabledMotionDecision = {
   kind: "enabled",
 } satisfies OverlayMotionDecision;

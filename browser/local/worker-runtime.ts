@@ -8,6 +8,7 @@ import {
   mapTransportFailure,
   type MappedLocalSnapshot,
 } from "./generated-mapper.ts";
+import { localPlaybackView } from "./presentation-view.ts";
 import type {
   LocalPageVisibility,
   LocalWorkerCommand,
@@ -166,7 +167,7 @@ export function createLocalWorkerRuntime(
     lastResponseAt = ports.monotonicNow();
     ports.publish({
       kind: "presentation",
-      presentation: mapped.presentation,
+      presentation: localPlaybackView(mapped.presentation),
     });
   }
 

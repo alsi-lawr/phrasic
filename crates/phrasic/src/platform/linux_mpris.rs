@@ -4,9 +4,13 @@
 //! has no property signal. Name-owner, property, and seek signals trigger
 //! immediate refreshes between polls. It declares no player-control methods.
 
+#[path = "linux_artwork.rs"]
+mod artwork;
+
 use std::collections::HashMap;
 use std::time::Duration;
 
+use artwork::ArtworkLoader;
 use phrasic_core::{
     AmbiguousActivity, AvailableSource, AvailableSources, PlaybackActivity, SelectionReason,
     SourceIdentifier, SourceSelection, UnavailableReason, select_source,
@@ -14,8 +18,8 @@ use phrasic_core::{
 use phrasic_rpc::SnapshotState;
 use phrasic_rpc::local::get_snapshot_response::Outcome;
 use phrasic_rpc::local::{
-    AmbiguityReason, AmbiguousSnapshot, AvailableSnapshot, CapabilityState, CapabilityStatus,
-    GetSnapshotResponse, PlaybackActivity as RpcPlaybackActivity, PlaybackItem,
+    AmbiguityReason, AmbiguousSnapshot, Artwork, AvailableSnapshot, CapabilityState,
+    CapabilityStatus, GetSnapshotResponse, PlaybackActivity as RpcPlaybackActivity, PlaybackItem,
     SelectionReason as RpcSelectionReason, Timeline, UnavailableReason as RpcUnavailableReason,
     UnavailableSnapshot,
 };
@@ -100,8 +104,9 @@ async fn drive_connection(
     let mut poll = interval(POLL_INTERVAL);
     poll.set_missed_tick_behavior(MissedTickBehavior::Skip);
     poll.tick().await;
+    let mut artwork_loader = ArtworkLoader::default();
 
-    refresh(state, strict_pin, connection).await?;
+    refresh(state, strict_pin, connection, &mut artwork_loader).await?;
 
     loop {
         tokio::select! {
@@ -117,7 +122,7 @@ async fn drive_connection(
             }
             _ = poll.tick() => {}
         }
-        refresh(state, strict_pin, connection).await?;
+        refresh(state, strict_pin, connection, &mut artwork_loader).await?;
     }
 }
 
@@ -125,10 +130,25 @@ async fn refresh(
     state: &SnapshotState,
     strict_pin: Option<&SourceIdentifier>,
     connection: &Connection,
+    artwork_loader: &mut ArtworkLoader,
 ) -> zbus::Result<()> {
     let candidates = read_candidates(connection).await?;
+    let selection = candidate_selection(&candidates, strict_pin);
+    let artwork = match selection {
+        CandidateSelection::Selected { index, .. } => {
+            let source = candidates
+                .get(index)
+                .and_then(|candidate| candidate.art_url.as_deref())
+                .map(str::to_owned);
+            match source {
+                Some(source) => artwork_loader.load(&source).await,
+                None => None,
+            }
+        }
+        CandidateSelection::Ambiguous { .. } | CandidateSelection::Unavailable { .. } => None,
+    };
     state
-        .replace(snapshot_from_candidates(candidates, strict_pin))
+        .replace(snapshot_from_selection(&candidates, selection, artwork))
         .await;
     Ok(())
 }
@@ -199,16 +219,40 @@ async fn read_candidate(
             destination: metadata_http_url(&metadata, "xesam:url"),
             native_identity,
         },
+        art_url: metadata_string(&metadata, "mpris:artUrl"),
         position_milliseconds,
         duration_milliseconds: metadata_i64(&metadata, "mpris:length")
             .and_then(microseconds_to_milliseconds),
     }))
 }
 
+#[cfg(test)]
 fn snapshot_from_candidates(
     candidates: Vec<MprisCandidate>,
     strict_pin: Option<&SourceIdentifier>,
 ) -> GetSnapshotResponse {
+    let selection = candidate_selection(&candidates, strict_pin);
+    snapshot_from_selection(&candidates, selection, None)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CandidateSelection {
+    Selected {
+        index: usize,
+        reason: SelectionReason,
+    },
+    Ambiguous {
+        activity: AmbiguousActivity,
+    },
+    Unavailable {
+        reason: UnavailableReason,
+    },
+}
+
+fn candidate_selection(
+    candidates: &[MprisCandidate],
+    strict_pin: Option<&SourceIdentifier>,
+) -> CandidateSelection {
     let available = candidates
         .iter()
         .map(|candidate| AvailableSource::new(candidate.identifier.clone(), candidate.activity))
@@ -221,22 +265,41 @@ fn snapshot_from_candidates(
     };
 
     match selection {
-        SourceSelection::Selected { identifier, reason } => {
-            match candidates
-                .iter()
-                .find(|candidate| candidate.identifier == identifier)
-            {
-                Some(candidate) => available_snapshot(candidate, reason),
-                None => no_source_snapshot(),
-            }
-        }
-        SourceSelection::Ambiguous { activity } => ambiguous_snapshot(activity),
-        SourceSelection::Unavailable { reason } => unavailable_snapshot(reason),
+        SourceSelection::Selected { identifier, reason } => match candidates
+            .iter()
+            .position(|candidate| candidate.identifier == identifier)
+        {
+            Some(index) => CandidateSelection::Selected { index, reason },
+            None => CandidateSelection::Unavailable {
+                reason: UnavailableReason::NoSource,
+            },
+        },
+        SourceSelection::Ambiguous { activity } => CandidateSelection::Ambiguous { activity },
+        SourceSelection::Unavailable { reason } => CandidateSelection::Unavailable { reason },
     }
 }
 
-fn available_snapshot(candidate: &MprisCandidate, reason: SelectionReason) -> GetSnapshotResponse {
-    let item = candidate.item.to_rpc();
+fn snapshot_from_selection(
+    candidates: &[MprisCandidate],
+    selection: CandidateSelection,
+    artwork: Option<Artwork>,
+) -> GetSnapshotResponse {
+    match selection {
+        CandidateSelection::Selected { index, reason } => match candidates.get(index) {
+            Some(candidate) => available_snapshot(candidate, reason, artwork),
+            None => no_source_snapshot(),
+        },
+        CandidateSelection::Ambiguous { activity } => ambiguous_snapshot(activity),
+        CandidateSelection::Unavailable { reason } => unavailable_snapshot(reason),
+    }
+}
+
+fn available_snapshot(
+    candidate: &MprisCandidate,
+    reason: SelectionReason,
+    artwork: Option<Artwork>,
+) -> GetSnapshotResponse {
+    let item = candidate.item.to_rpc(artwork);
     let timeline = match (
         candidate.position_milliseconds,
         candidate.duration_milliseconds,
@@ -427,6 +490,7 @@ struct MprisCandidate {
     identifier: SourceIdentifier,
     activity: PlaybackActivity,
     item: MprisItem,
+    art_url: Option<String>,
     position_milliseconds: Option<u64>,
     duration_milliseconds: Option<u64>,
 }
@@ -441,7 +505,7 @@ struct MprisItem {
 }
 
 impl MprisItem {
-    fn to_rpc(&self) -> Option<PlaybackItem> {
+    fn to_rpc(&self, artwork: Option<Artwork>) -> Option<PlaybackItem> {
         if self == &Self::default() {
             return None;
         }
@@ -451,14 +515,14 @@ impl MprisItem {
             collection: self.collection.clone(),
             destination: self.destination.clone(),
             native_identity: self.native_identity.clone(),
-            // Linux V1 never dereferences mpris:artUrl.
-            artwork: None,
+            artwork,
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::future::Future;
 
     use phrasic_rpc::local::get_snapshot_response::Outcome;
@@ -476,6 +540,7 @@ mod tests {
 
     const FIRST_NAME: &str = "org.mpris.MediaPlayer2.PhrasicFakeOne";
     const SECOND_NAME: &str = "org.mpris.MediaPlayer2.PhrasicFakeTwo";
+    const TEST_PNG: &[u8] = b"\x89PNG\r\n\x1a\ntransport-artwork";
 
     #[derive(Clone, Debug)]
     struct FakeRoot {
@@ -762,6 +827,7 @@ mod tests {
             identifier: identifier(FIRST_NAME)?,
             activity,
             item: MprisItem::default(),
+            art_url: None,
             position_milliseconds: None,
             duration_milliseconds: None,
         })
@@ -874,10 +940,8 @@ mod tests {
         );
         metadata.insert(
             "mpris:artUrl".to_owned(),
-            owned(Value::from(
-                "https://example.invalid/never-dereferenced.png",
-            ))
-            .map_err(|error| error.to_string())?,
+            owned(Value::from("https://example.invalid/cover.png"))
+                .map_err(|error| error.to_string())?,
         );
         metadata.insert("mpris:length".to_owned(), (-1_i64).into());
 
@@ -896,7 +960,11 @@ mod tests {
             metadata_i64(&metadata, "mpris:length").and_then(microseconds_to_milliseconds),
             None
         );
-        assert_eq!(MprisItem::default().to_rpc(), None);
+        assert_eq!(
+            metadata_string(&metadata, "mpris:artUrl").as_deref(),
+            Some("https://example.invalid/cover.png")
+        );
+        assert_eq!(MprisItem::default().to_rpc(None), None);
         Ok(())
     }
 
@@ -1202,11 +1270,27 @@ mod tests {
     async fn private_bus_full_generated_grpc_snapshot_mapping_is_exact()
     -> Result<(), Box<dyn std::error::Error>> {
         private_bus()?;
-        let fake = fake_service(FIRST_NAME, FakePlayer::playing(), false, false).await?;
+        let artwork_directory = tempfile::tempdir()?;
+        let artwork_path = artwork_directory.path().join("cover.png");
+        fs::write(&artwork_path, TEST_PNG)?;
+        let artwork_url = url::Url::from_file_path(&artwork_path)
+            .map_err(|()| "temporary artwork path was not representable")?
+            .to_string();
+        let fake = fake_service(
+            FIRST_NAME,
+            FakePlayer {
+                art_url: Some(artwork_url),
+                ..FakePlayer::playing()
+            },
+            false,
+            false,
+        )
+        .await?;
         let instance_id = InstanceId::from_bytes([11_u8; 16]);
         let state = SnapshotState::with_native_collector(instance_id.clone());
         let observer = Connection::session().await?;
-        refresh(&state, None, &observer).await?;
+        let mut artwork_loader = ArtworkLoader::default();
+        refresh(&state, None, &observer, &mut artwork_loader).await?;
 
         let service = LocalMediaService::new(state);
         let info = service
@@ -1252,7 +1336,14 @@ mod tests {
             item.native_identity.as_deref(),
             Some("org.mpris.MediaPlayer2.PhrasicFakeOne.identity")
         );
-        assert_eq!(item.artwork, None);
+        assert_eq!(
+            item.artwork.as_ref().map(|artwork| artwork.format),
+            Some(i32::from(phrasic_rpc::local::ArtworkFormat::Png))
+        );
+        assert_eq!(
+            item.artwork.as_ref().map(|artwork| artwork.data.as_slice()),
+            Some(TEST_PNG)
+        );
         assert_eq!(timeline.position_milliseconds, Some(12_345));
         assert_eq!(timeline.duration_milliseconds, Some(180_123));
         drop(fake);

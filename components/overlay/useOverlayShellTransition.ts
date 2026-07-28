@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import type { OverlayMotionDecision } from "./overlay-motion.ts";
 
 export type OverlayShellTransitionPhase = "collapsing" | "opening" | "stable";
@@ -46,6 +46,14 @@ export function useOverlayShellTransition<Snapshot>(
   );
   const currentIdentity = current.identity;
   const currentSnapshot = current.snapshot;
+  const currentRef = useRef(current);
+
+  useEffect(() => {
+    currentRef.current = {
+      identity: currentIdentity,
+      snapshot: currentSnapshot,
+    };
+  }, [currentIdentity, currentSnapshot]);
 
   useEffect(() => {
     if (motion.kind === "reduced" || state.phase === "stable") {
@@ -57,15 +65,12 @@ export function useOverlayShellTransition<Snapshot>(
         case "collapsing":
           dispatch({
             kind: "show-snapshot",
-            current: {
-              identity: currentIdentity,
-              snapshot: currentSnapshot,
-            },
+            current: currentRef.current,
           });
           return;
         case "opening":
           dispatch(
-            currentIdentity === state.identity
+            currentRef.current.identity === state.identity
               ? { kind: "finish-opening" }
               : { kind: "begin-collapse" },
           );
@@ -74,13 +79,7 @@ export function useOverlayShellTransition<Snapshot>(
     }, shellTransitionDurationMilliseconds);
 
     return () => globalThis.clearTimeout(timeout);
-  }, [
-    currentIdentity,
-    currentSnapshot,
-    motion.kind,
-    state.identity,
-    state.phase,
-  ]);
+  }, [currentIdentity, motion.kind, state.identity, state.phase]);
 
   if (
     motion.kind === "reduced" &&
@@ -131,7 +130,8 @@ export function useOverlayShellTransition<Snapshot>(
     completeWidthTransition,
     identity: state.identity,
     phase: state.phase,
-    snapshot: state.snapshot,
+    snapshot:
+      state.identity === currentIdentity ? currentSnapshot : state.snapshot,
   };
 }
 

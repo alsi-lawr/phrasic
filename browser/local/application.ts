@@ -2,7 +2,6 @@ import {
   NativeMonotonicMilliseconds,
   resolveLocalPlaybackPresentation,
   unavailableLocalLastSuccessfulSnapshot,
-  type LocalPlaybackPresentation,
 } from "../../domain/local-playback.ts";
 import type {
   LocalPageVisibility,
@@ -10,6 +9,10 @@ import type {
   LocalWorkerEvent,
 } from "./protocol.ts";
 import { redeemPairingCapability } from "./pairing.ts";
+import {
+  localPlaybackView,
+  type LocalPlaybackView,
+} from "./presentation-view.ts";
 
 export type BrowserLocalWorker = {
   readonly onError: (listener: () => void) => () => void;
@@ -35,7 +38,7 @@ export type BrowserLocalApplicationPorts = {
 
 export type BrowserLocalApplication = {
   readonly dispose: () => void;
-  readonly getSnapshot: () => LocalPlaybackPresentation;
+  readonly getSnapshot: () => LocalPlaybackView;
   readonly start: () => void;
   readonly subscribe: (listener: () => void) => () => void;
 };
@@ -94,7 +97,7 @@ export function createBrowserLocalApplication(
       }
     },
 
-    getSnapshot(): LocalPlaybackPresentation {
+    getSnapshot(): LocalPlaybackView {
       return snapshot;
     },
 
@@ -199,7 +202,7 @@ export function createBrowserLocalApplication(
     }
   }
 
-  function replaceSnapshot(next: LocalPlaybackPresentation): void {
+  function replaceSnapshot(next: LocalPlaybackView): void {
     snapshot = next;
     for (const subscriber of subscribers) {
       subscriber();
@@ -207,15 +210,17 @@ export function createBrowserLocalApplication(
   }
 }
 
-function unavailablePresentation(): LocalPlaybackPresentation {
+function unavailablePresentation(): LocalPlaybackView {
   const now = NativeMonotonicMilliseconds.parse(0);
   if (now.kind === "failure") {
     throw new Error("The fixed Local monotonic origin is invalid.");
   }
 
-  return resolveLocalPlaybackPresentation({
-    lastSuccessful: unavailableLocalLastSuccessfulSnapshot(),
-    now: now.value,
-    outcome: { kind: "native-session-unavailable" },
-  });
+  return localPlaybackView(
+    resolveLocalPlaybackPresentation({
+      lastSuccessful: unavailableLocalLastSuccessfulSnapshot(),
+      now: now.value,
+      outcome: { kind: "native-session-unavailable" },
+    }),
+  );
 }
