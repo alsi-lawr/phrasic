@@ -156,8 +156,8 @@ diagnostic and fall back to a safe configuration.
 
 ## Develop offline
 
-The locked Nix development shell provides Bun 1.3.13, Chromium, ffmpeg, and
-rustup. The pinned Rust toolchain is declared in `rust-toolchain.toml`:
+The locked Nix development shell provides Bun, Chromium, ffmpeg, and rustup.
+The current stable Rust toolchain is declared in `rust-toolchain.toml`:
 
 ```sh
 nix develop
@@ -165,8 +165,8 @@ bun ci --frozen-lockfile --omit peer
 bun run dev
 ```
 
-Without Nix, Phrasic requires Bun 1.3.13. Install Chromium and ffmpeg as well
-when regenerating the demonstration.
+Without Nix, Phrasic tracks the latest stable Bun release. Install Chromium and
+ffmpeg as well when regenerating the demonstration.
 
 ```sh
 bun ci --frozen-lockfile --omit peer
@@ -187,12 +187,11 @@ nix build .#default
 PHRASIC_CONFIG_PATH="$(pwd)/config.json" ./result/bin/phrasic-host
 ```
 
-### Local sidecar foundation
+### Local playback
 
-The target-neutral Rust foundation exposes only `phrasic serve <config>`. It
-validates UTF-8 TOML before its currently empty adapter boundary; it does not
-yet bind a listener, launch Bun, collect native media, or perform browser
-handoff. Those effects belong to later Local tickets.
+On supported x86-64 Linux and Windows hosts, `phrasic serve <config>` starts the
+private native gRPC service and the paired Local browser page on the configured
+`127.0.0.1` port. Build the matching Bun host before running from source:
 
 ```toml
 schema_version = 1
@@ -207,15 +206,21 @@ integer from `1024` through `65535`; `browser_handoff` is `open` (the default)
 or `print`.
 
 ```sh
-cargo +1.88.0 run --locked -p phrasic -- serve ./phrasic.toml
+bun run build:local-host
+PHRASIC_LOCAL_HOST="$(pwd)/dist/native/linux/phrasic-local-host" \
+  cargo run --locked -p phrasic -- serve ./phrasic.toml
 ```
 
-Use the pinned toolchain and locked checks:
+The default `open` handoff launches the one-use fragment URL. `print` writes it
+only to a controlling terminal. Pairing creates one process-lifetime browser
+session; restart `phrasic serve` to pair a different browser.
+
+Use the stable toolchain and locked checks:
 
 ```sh
-cargo +1.88.0 fmt --all -- --check
-cargo +1.88.0 clippy --workspace --all-targets --locked -- -D warnings
-cargo +1.88.0 test --workspace --locked
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
 scripts/verify-rust-target-isolation.sh
 ```
 

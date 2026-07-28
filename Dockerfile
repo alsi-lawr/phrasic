@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.13-alpine AS build
+FROM oven/bun:alpine AS build
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ RUN bun ci --frozen-lockfile --omit peer
 COPY . .
 RUN bun run build
 
-FROM oven/bun:1.3.13-alpine
+FROM oven/bun:alpine
 
 WORKDIR /app
 
