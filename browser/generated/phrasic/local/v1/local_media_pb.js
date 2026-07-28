@@ -13,7 +13,7 @@
 
 var jspb = require('google-protobuf');
 var goog = jspb;
-var global = (function() { return this || window || global || self || Function('return this')(); }).call(null);
+var global = globalThis;
 
 goog.exportSymbol('proto.phrasic.local.v1.AmbiguityReason', null, global);
 goog.exportSymbol('proto.phrasic.local.v1.AmbiguousSnapshot', null, global);
@@ -353,7 +353,7 @@ proto.phrasic.local.v1.GetInstanceInfoRequest.toObject = function(includeInstanc
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.GetInstanceInfoRequest}
  */
 proto.phrasic.local.v1.GetInstanceInfoRequest.deserializeBinary = function(bytes) {
@@ -441,8 +441,8 @@ proto.phrasic.local.v1.GetInstanceInfoResponse.prototype.toObject = function(opt
  */
 proto.phrasic.local.v1.GetInstanceInfoResponse.toObject = function(includeInstance, msg) {
   var f, obj = {
-    instanceId: msg.getInstanceId_asB64(),
-    capability: (f = msg.getCapability()) && proto.phrasic.local.v1.CapabilityState.toObject(includeInstance, f)
+instanceId: msg.getInstanceId_asB64(),
+capability: (f = msg.getCapability()) && proto.phrasic.local.v1.CapabilityState.toObject(includeInstance, f)
   };
 
   if (includeInstance) {
@@ -455,7 +455,7 @@ proto.phrasic.local.v1.GetInstanceInfoResponse.toObject = function(includeInstan
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.GetInstanceInfoResponse}
  */
 proto.phrasic.local.v1.GetInstanceInfoResponse.deserializeBinary = function(bytes) {
@@ -646,7 +646,7 @@ proto.phrasic.local.v1.GetSnapshotRequest.prototype.toObject = function(opt_incl
  */
 proto.phrasic.local.v1.GetSnapshotRequest.toObject = function(includeInstance, msg) {
   var f, obj = {
-    expectedInstanceId: msg.getExpectedInstanceId_asB64()
+expectedInstanceId: msg.getExpectedInstanceId_asB64()
   };
 
   if (includeInstance) {
@@ -659,7 +659,7 @@ proto.phrasic.local.v1.GetSnapshotRequest.toObject = function(includeInstance, m
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.GetSnapshotRequest}
  */
 proto.phrasic.local.v1.GetSnapshotRequest.deserializeBinary = function(bytes) {
@@ -829,16 +829,16 @@ proto.phrasic.local.v1.GetSnapshotResponse.prototype.toObject = function(opt_inc
  */
 proto.phrasic.local.v1.GetSnapshotResponse.toObject = function(includeInstance, msg) {
   var f, obj = {
-    instanceId: msg.getInstanceId_asB64(),
-    revision: jspb.Message.getFieldWithDefault(msg, 2, 0),
-    observedAtMonotonicMilliseconds: jspb.Message.getFieldWithDefault(msg, 3, 0),
-    pollHintMilliseconds: jspb.Message.getFieldWithDefault(msg, 4, 0),
-    capability: (f = msg.getCapability()) && proto.phrasic.local.v1.CapabilityState.toObject(includeInstance, f),
-    available: (f = msg.getAvailable()) && proto.phrasic.local.v1.AvailableSnapshot.toObject(includeInstance, f),
-    empty: (f = msg.getEmpty()) && proto.phrasic.local.v1.EmptySnapshot.toObject(includeInstance, f),
-    ambiguous: (f = msg.getAmbiguous()) && proto.phrasic.local.v1.AmbiguousSnapshot.toObject(includeInstance, f),
-    unavailable: (f = msg.getUnavailable()) && proto.phrasic.local.v1.UnavailableSnapshot.toObject(includeInstance, f),
-    stale: (f = msg.getStale()) && proto.phrasic.local.v1.StaleSnapshot.toObject(includeInstance, f)
+instanceId: msg.getInstanceId_asB64(),
+revision: jspb.Message.getFieldWithDefault(msg, 2, 0),
+observedAtMonotonicMilliseconds: jspb.Message.getFieldWithDefault(msg, 3, 0),
+pollHintMilliseconds: jspb.Message.getFieldWithDefault(msg, 4, 0),
+capability: (f = msg.getCapability()) && proto.phrasic.local.v1.CapabilityState.toObject(includeInstance, f),
+available: (f = msg.getAvailable()) && proto.phrasic.local.v1.AvailableSnapshot.toObject(includeInstance, f),
+empty: (f = msg.getEmpty()) && proto.phrasic.local.v1.EmptySnapshot.toObject(includeInstance, f),
+ambiguous: (f = msg.getAmbiguous()) && proto.phrasic.local.v1.AmbiguousSnapshot.toObject(includeInstance, f),
+unavailable: (f = msg.getUnavailable()) && proto.phrasic.local.v1.UnavailableSnapshot.toObject(includeInstance, f),
+stale: (f = msg.getStale()) && proto.phrasic.local.v1.StaleSnapshot.toObject(includeInstance, f)
   };
 
   if (includeInstance) {
@@ -851,7 +851,7 @@ proto.phrasic.local.v1.GetSnapshotResponse.toObject = function(includeInstance, 
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.GetSnapshotResponse}
  */
 proto.phrasic.local.v1.GetSnapshotResponse.deserializeBinary = function(bytes) {
@@ -1379,7 +1379,7 @@ proto.phrasic.local.v1.CapabilityState.prototype.toObject = function(opt_include
  */
 proto.phrasic.local.v1.CapabilityState.toObject = function(includeInstance, msg) {
   var f, obj = {
-    status: jspb.Message.getFieldWithDefault(msg, 1, 0)
+status: jspb.Message.getFieldWithDefault(msg, 1, 0)
   };
 
   if (includeInstance) {
@@ -1392,7 +1392,7 @@ proto.phrasic.local.v1.CapabilityState.toObject = function(includeInstance, msg)
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.CapabilityState}
  */
 proto.phrasic.local.v1.CapabilityState.deserializeBinary = function(bytes) {
@@ -1509,10 +1509,10 @@ proto.phrasic.local.v1.AvailableSnapshot.prototype.toObject = function(opt_inclu
  */
 proto.phrasic.local.v1.AvailableSnapshot.toObject = function(includeInstance, msg) {
   var f, obj = {
-    activity: jspb.Message.getFieldWithDefault(msg, 1, 0),
-    item: (f = msg.getItem()) && proto.phrasic.local.v1.PlaybackItem.toObject(includeInstance, f),
-    timeline: (f = msg.getTimeline()) && proto.phrasic.local.v1.Timeline.toObject(includeInstance, f),
-    selectionReason: jspb.Message.getFieldWithDefault(msg, 4, 0)
+activity: jspb.Message.getFieldWithDefault(msg, 1, 0),
+item: (f = msg.getItem()) && proto.phrasic.local.v1.PlaybackItem.toObject(includeInstance, f),
+timeline: (f = msg.getTimeline()) && proto.phrasic.local.v1.Timeline.toObject(includeInstance, f),
+selectionReason: jspb.Message.getFieldWithDefault(msg, 4, 0)
   };
 
   if (includeInstance) {
@@ -1525,7 +1525,7 @@ proto.phrasic.local.v1.AvailableSnapshot.toObject = function(includeInstance, ms
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.AvailableSnapshot}
  */
 proto.phrasic.local.v1.AvailableSnapshot.deserializeBinary = function(bytes) {
@@ -1771,7 +1771,7 @@ proto.phrasic.local.v1.EmptySnapshot.prototype.toObject = function(opt_includeIn
  */
 proto.phrasic.local.v1.EmptySnapshot.toObject = function(includeInstance, msg) {
   var f, obj = {
-    selectionReason: jspb.Message.getFieldWithDefault(msg, 1, 0)
+selectionReason: jspb.Message.getFieldWithDefault(msg, 1, 0)
   };
 
   if (includeInstance) {
@@ -1784,7 +1784,7 @@ proto.phrasic.local.v1.EmptySnapshot.toObject = function(includeInstance, msg) {
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.EmptySnapshot}
  */
 proto.phrasic.local.v1.EmptySnapshot.deserializeBinary = function(bytes) {
@@ -1901,7 +1901,7 @@ proto.phrasic.local.v1.AmbiguousSnapshot.prototype.toObject = function(opt_inclu
  */
 proto.phrasic.local.v1.AmbiguousSnapshot.toObject = function(includeInstance, msg) {
   var f, obj = {
-    reason: jspb.Message.getFieldWithDefault(msg, 1, 0)
+reason: jspb.Message.getFieldWithDefault(msg, 1, 0)
   };
 
   if (includeInstance) {
@@ -1914,7 +1914,7 @@ proto.phrasic.local.v1.AmbiguousSnapshot.toObject = function(includeInstance, ms
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.AmbiguousSnapshot}
  */
 proto.phrasic.local.v1.AmbiguousSnapshot.deserializeBinary = function(bytes) {
@@ -2031,7 +2031,7 @@ proto.phrasic.local.v1.UnavailableSnapshot.prototype.toObject = function(opt_inc
  */
 proto.phrasic.local.v1.UnavailableSnapshot.toObject = function(includeInstance, msg) {
   var f, obj = {
-    reason: jspb.Message.getFieldWithDefault(msg, 1, 0)
+reason: jspb.Message.getFieldWithDefault(msg, 1, 0)
   };
 
   if (includeInstance) {
@@ -2044,7 +2044,7 @@ proto.phrasic.local.v1.UnavailableSnapshot.toObject = function(includeInstance, 
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.UnavailableSnapshot}
  */
 proto.phrasic.local.v1.UnavailableSnapshot.deserializeBinary = function(bytes) {
@@ -2161,9 +2161,9 @@ proto.phrasic.local.v1.StaleSnapshot.prototype.toObject = function(opt_includeIn
  */
 proto.phrasic.local.v1.StaleSnapshot.toObject = function(includeInstance, msg) {
   var f, obj = {
-    lastSnapshot: (f = msg.getLastSnapshot()) && proto.phrasic.local.v1.AvailableSnapshot.toObject(includeInstance, f),
-    reason: jspb.Message.getFieldWithDefault(msg, 2, 0),
-    lastSuccessAgeMilliseconds: jspb.Message.getFieldWithDefault(msg, 3, 0)
+lastSnapshot: (f = msg.getLastSnapshot()) && proto.phrasic.local.v1.AvailableSnapshot.toObject(includeInstance, f),
+reason: jspb.Message.getFieldWithDefault(msg, 2, 0),
+lastSuccessAgeMilliseconds: jspb.Message.getFieldWithDefault(msg, 3, 0)
   };
 
   if (includeInstance) {
@@ -2176,7 +2176,7 @@ proto.phrasic.local.v1.StaleSnapshot.toObject = function(includeInstance, msg) {
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.StaleSnapshot}
  */
 proto.phrasic.local.v1.StaleSnapshot.deserializeBinary = function(bytes) {
@@ -2372,12 +2372,12 @@ proto.phrasic.local.v1.PlaybackItem.prototype.toObject = function(opt_includeIns
  */
 proto.phrasic.local.v1.PlaybackItem.toObject = function(includeInstance, msg) {
   var f, obj = {
-    title: jspb.Message.getFieldWithDefault(msg, 1, ""),
-    creator: jspb.Message.getFieldWithDefault(msg, 2, ""),
-    collection: jspb.Message.getFieldWithDefault(msg, 3, ""),
-    destination: jspb.Message.getFieldWithDefault(msg, 4, ""),
-    nativeIdentity: jspb.Message.getFieldWithDefault(msg, 5, ""),
-    artwork: (f = msg.getArtwork()) && proto.phrasic.local.v1.Artwork.toObject(includeInstance, f)
+title: (f = jspb.Message.getField(msg, 1)) == null ? undefined : f,
+creator: (f = jspb.Message.getField(msg, 2)) == null ? undefined : f,
+collection: (f = jspb.Message.getField(msg, 3)) == null ? undefined : f,
+destination: (f = jspb.Message.getField(msg, 4)) == null ? undefined : f,
+nativeIdentity: (f = jspb.Message.getField(msg, 5)) == null ? undefined : f,
+artwork: (f = msg.getArtwork()) && proto.phrasic.local.v1.Artwork.toObject(includeInstance, f)
   };
 
   if (includeInstance) {
@@ -2390,7 +2390,7 @@ proto.phrasic.local.v1.PlaybackItem.toObject = function(includeInstance, msg) {
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.PlaybackItem}
  */
 proto.phrasic.local.v1.PlaybackItem.deserializeBinary = function(bytes) {
@@ -2415,23 +2415,23 @@ proto.phrasic.local.v1.PlaybackItem.deserializeBinaryFromReader = function(msg, 
     var field = reader.getFieldNumber();
     switch (field) {
     case 1:
-      var value = /** @type {string} */ (reader.readString());
+      var value = /** @type {string} */ (reader.readStringRequireUtf8());
       msg.setTitle(value);
       break;
     case 2:
-      var value = /** @type {string} */ (reader.readString());
+      var value = /** @type {string} */ (reader.readStringRequireUtf8());
       msg.setCreator(value);
       break;
     case 3:
-      var value = /** @type {string} */ (reader.readString());
+      var value = /** @type {string} */ (reader.readStringRequireUtf8());
       msg.setCollection(value);
       break;
     case 4:
-      var value = /** @type {string} */ (reader.readString());
+      var value = /** @type {string} */ (reader.readStringRequireUtf8());
       msg.setDestination(value);
       break;
     case 5:
-      var value = /** @type {string} */ (reader.readString());
+      var value = /** @type {string} */ (reader.readStringRequireUtf8());
       msg.setNativeIdentity(value);
       break;
     case 6:
@@ -2763,8 +2763,8 @@ proto.phrasic.local.v1.Timeline.prototype.toObject = function(opt_includeInstanc
  */
 proto.phrasic.local.v1.Timeline.toObject = function(includeInstance, msg) {
   var f, obj = {
-    positionMilliseconds: jspb.Message.getFieldWithDefault(msg, 1, 0),
-    durationMilliseconds: jspb.Message.getFieldWithDefault(msg, 2, 0)
+positionMilliseconds: (f = jspb.Message.getField(msg, 1)) == null ? undefined : f,
+durationMilliseconds: (f = jspb.Message.getField(msg, 2)) == null ? undefined : f
   };
 
   if (includeInstance) {
@@ -2777,7 +2777,7 @@ proto.phrasic.local.v1.Timeline.toObject = function(includeInstance, msg) {
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.Timeline}
  */
 proto.phrasic.local.v1.Timeline.deserializeBinary = function(bytes) {
@@ -2959,8 +2959,8 @@ proto.phrasic.local.v1.Artwork.prototype.toObject = function(opt_includeInstance
  */
 proto.phrasic.local.v1.Artwork.toObject = function(includeInstance, msg) {
   var f, obj = {
-    format: jspb.Message.getFieldWithDefault(msg, 1, 0),
-    data: msg.getData_asB64()
+format: jspb.Message.getFieldWithDefault(msg, 1, 0),
+data: msg.getData_asB64()
   };
 
   if (includeInstance) {
@@ -2973,7 +2973,7 @@ proto.phrasic.local.v1.Artwork.toObject = function(includeInstance, msg) {
 
 /**
  * Deserializes binary data (in protobuf wire format).
- * @param {jspb.ByteSource} bytes The bytes to deserialize.
+ * @param {jspb.binary.bytesource.ByteSource} bytes The bytes to deserialize.
  * @return {!proto.phrasic.local.v1.Artwork}
  */
 proto.phrasic.local.v1.Artwork.deserializeBinary = function(bytes) {

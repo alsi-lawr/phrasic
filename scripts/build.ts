@@ -17,7 +17,7 @@ const publicFontUrl = "/fonts/GeistVF.woff";
 const repositoryRoot = `${import.meta.dir}/..`;
 
 const buildMetadata = {
-  bunVersion: "1.3.13",
+  bunVersion: Bun.version,
   environment: "disabled",
   entries: applicationEntries,
   mode: "production",

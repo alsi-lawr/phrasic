@@ -83,10 +83,7 @@ impl SnapshotState {
     }
 
     fn elapsed_milliseconds(&self) -> u64 {
-        match u64::try_from(self.started_at.elapsed().as_millis()) {
-            Ok(value) => value,
-            Err(_) => u64::MAX,
-        }
+        u64::try_from(self.started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
     }
 }
 

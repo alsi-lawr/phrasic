@@ -7,16 +7,16 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-getrandom = "=0.3.4"
-prost = "=0.14.4"
-tokio = { version = "=1.53.0", features = ["sync", "time"] }
-tonic = { version = "=0.14.6", features = ["transport"] }
-tonic-prost = "=0.14.6"
+getrandom = "0.4.3"
+prost = "0.14.4"
+tokio = { version = "1.53.1", features = ["sync", "time"] }
+tonic = { version = "0.14.6", features = ["transport"] }
+tonic-prost = "0.14.6"
 
 [build-dependencies]
-prost-build = "=0.14.4"
-protoc-bin-vendored = "=3.2.0"
-tonic-prost-build = "=0.14.6"
+prost-build = "0.14.4"
+protoc-bin-vendored = "3.2.0"
+tonic-prost-build = "0.14.6"
 
 [lints]
 workspace = true

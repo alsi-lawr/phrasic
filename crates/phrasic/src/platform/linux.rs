@@ -255,7 +255,7 @@ async fn supervise_bun(
     shutdown: CancellationToken,
 ) -> Result<(), Diagnostic> {
     supervise_bun_command(
-        child_command(&endpoint, &instance_id),
+        child_command(&endpoint, browser_port, &instance_id),
         browser_port,
         shutdown,
         move |url| deliver_control_message(url, handoff),
@@ -428,7 +428,7 @@ fn host_program() -> OsString {
     }
 }
 
-fn child_command(endpoint: &Path, instance_id: &InstanceId) -> Command {
+fn child_command(endpoint: &Path, browser_port: u16, instance_id: &InstanceId) -> Command {
     let program = host_program();
     let mut command = Command::new(program);
     command
@@ -436,6 +436,8 @@ fn child_command(endpoint: &Path, instance_id: &InstanceId) -> Command {
         .arg(endpoint)
         .arg("--expected-instance-id")
         .arg(hex_instance_id(instance_id))
+        .arg("--browser-port")
+        .arg(browser_port.to_string())
         .stdin(Stdio::piped())
         // stdout is the inherited private typed control channel, not a log sink.
         .stdout(Stdio::piped())
@@ -1070,12 +1072,13 @@ mod tests {
     }
 
     #[test]
-    fn child_arguments_expose_only_the_native_endpoint_and_expected_instance() {
+    fn child_arguments_expose_only_non_secret_connection_data() {
         let endpoint = Path::new("/private/runtime/phrasic/v1-8080.sock");
-        let command = child_command(endpoint, &InstanceId::from_bytes([1_u8; 16]));
+        let command = child_command(endpoint, 8080, &InstanceId::from_bytes([1_u8; 16]));
         let debug = format!("{command:?}");
         assert!(debug.contains("--native-endpoint"));
         assert!(debug.contains("--expected-instance-id"));
+        assert!(debug.contains("--browser-port"));
         assert!(!debug.contains("api-major"));
     }
 }

@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
-import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { createRequire } from "node:module";
@@ -10,6 +17,10 @@ type GeneratorTooling = {
   readonly grpcWebFile: string;
   readonly grpcWebSha256: string;
   readonly grpcWebUrl: string;
+  readonly javascriptArchiveFile: string;
+  readonly javascriptArchiveSha256: string;
+  readonly javascriptArchiveUrl: string;
+  readonly javascriptExecutable: string;
   readonly protocArchiveFile: string;
   readonly protocArchiveSha256: string;
   readonly protocArchiveUrl: string;
@@ -29,6 +40,7 @@ const workspaceRoot = join(import.meta.dir, "..");
 const cacheRoot = join(
   Bun.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"),
   "phrasic-codegen",
+  "protoc-35.1-js-4.0.2-grpc-web-2.0.2",
 );
 const generatedRoot = join(workspaceRoot, "browser", "generated");
 const fixtureRoot = join(workspaceRoot, "fixtures", "local-media", "v1");
@@ -48,11 +60,17 @@ const linuxX64: GeneratorPlatform = {
     "10ff6c6e58018ff9e684cff1d9c008b8cc79d915c4f8be4fd47791333e1be299",
   grpcWebUrl:
     "https://github.com/grpc/grpc-web/releases/download/2.0.2/protoc-gen-grpc-web-2.0.2-linux-x86_64",
-  protocArchiveFile: "protoc-3.20.3-linux-x86_64.zip",
+  javascriptArchiveFile: "protobuf-javascript-4.0.2-linux-x86_64.zip",
+  javascriptArchiveSha256:
+    "e4b0bc2c9fe32a21167c6d84a50df21c2f405552f9a6ed7d5e858d92cac46d22",
+  javascriptArchiveUrl:
+    "https://github.com/protocolbuffers/protobuf-javascript/releases/download/v4.0.2/protobuf-javascript-4.0.2-linux-x86_64.zip",
+  javascriptExecutable: join("bin", "protoc-gen-js"),
+  protocArchiveFile: "protoc-35.1-linux-x86_64.zip",
   protocArchiveSha256:
-    "44a6b498e996b845edef83864734c0e52f42197e85c9d567af55f4e3ff09d755",
+    "6930ebf62bd4ea607b98fff052596c6ee564b9835b4ce172c75a3f53ae9d91b7",
   protocArchiveUrl:
-    "https://github.com/protocolbuffers/protobuf/releases/download/v3.20.3/protoc-3.20.3-linux-x86_64.zip",
+    "https://github.com/protocolbuffers/protobuf/releases/download/v35.1/protoc-35.1-linux-x86_64.zip",
   protocExecutable: join("bin", "protoc"),
   unzipCommand: ["unzip", "-q"],
 };
@@ -64,29 +82,52 @@ const windowsX64: GeneratorPlatform = {
     "9cf57127b2893f5def6f04bf70c53b190c440e4d315f068346798a43ac4834ce",
   grpcWebUrl:
     "https://github.com/grpc/grpc-web/releases/download/2.0.2/protoc-gen-grpc-web-2.0.2-windows-x86_64.exe",
-  protocArchiveFile: "protoc-3.20.3-win64.zip",
+  javascriptArchiveFile: "protobuf-javascript-4.0.2-win64.zip",
+  javascriptArchiveSha256:
+    "3366089810f67c20c7c84d3e77607ab751e20eb1c5be295a2472363866ca07e1",
+  javascriptArchiveUrl:
+    "https://github.com/protocolbuffers/protobuf-javascript/releases/download/v4.0.2/protobuf-javascript-4.0.2-win64.zip",
+  javascriptExecutable: join("bin", "protoc-gen-js.exe"),
+  protocArchiveFile: "protoc-35.1-win64.zip",
   protocArchiveSha256:
-    "08e885a5d4dc1306cf31d0861527abd1d0953d6b8ad9a1fbadccecda6c4e4ba0",
+    "5d3ff218d7d91eea95f7569bcb5a98f3030f8996d44151279d9772edcff76082",
   protocArchiveUrl:
-    "https://github.com/protocolbuffers/protobuf/releases/download/v3.20.3/protoc-3.20.3-win64.zip",
+    "https://github.com/protocolbuffers/protobuf/releases/download/v35.1/protoc-35.1-win64.zip",
   protocExecutable: join("bin", "protoc.exe"),
 };
 
 const platform = resolvePlatform();
 await mkdir(cacheRoot, { recursive: true });
-const protoc = await prepareProtoc(platform);
+const protoc = await prepareArchivedTool(
+  platform,
+  platform.protocArchiveUrl,
+  platform.protocArchiveFile,
+  platform.protocArchiveSha256,
+  platform.protocExecutable,
+);
+const javascriptPlugin = await prepareArchivedTool(
+  platform,
+  platform.javascriptArchiveUrl,
+  platform.javascriptArchiveFile,
+  platform.javascriptArchiveSha256,
+  platform.javascriptExecutable,
+);
 const grpcWebPlugin = await downloadVerified(
   platform.grpcWebUrl,
   platform.grpcWebFile,
   platform.grpcWebSha256,
 );
 await chmod(grpcWebPlugin, 0o755);
+if (platform.kind === "linux") {
+  await chmod(javascriptPlugin, 0o755);
+}
 
 await run("cargo", ["build", "--locked", "--package", "phrasic-rpc"]);
 await rm(join(generatedRoot, "phrasic"), { force: true, recursive: true });
 await mkdir(generatedRoot, { recursive: true });
 await run(protoc, [
   `--proto_path=${protoRoot}`,
+  `--plugin=protoc-gen-js=${javascriptPlugin}`,
   `--plugin=protoc-gen-grpc-web=${grpcWebPlugin}`,
   `--js_out=import_style=commonjs,binary:${generatedRoot}`,
   `--grpc-web_out=import_style=commonjs+dts,mode=grpcweb:${generatedRoot}`,
@@ -105,13 +146,19 @@ function resolvePlatform(): GeneratorPlatform {
   throw new Error("codegen supports Linux x64 and Windows x64 only");
 }
 
-async function prepareProtoc(platform: GeneratorPlatform): Promise<string> {
+async function prepareArchivedTool(
+  platform: GeneratorPlatform,
+  archiveUrl: string,
+  archiveFile: string,
+  archiveSha256: string,
+  executablePath: string,
+): Promise<string> {
   const archive = await downloadVerified(
-    platform.protocArchiveUrl,
-    platform.protocArchiveFile,
-    platform.protocArchiveSha256,
+    archiveUrl,
+    archiveFile,
+    archiveSha256,
   );
-  const executable = join(cacheRoot, platform.protocExecutable);
+  const executable = join(cacheRoot, executablePath);
   if (await exists(executable)) {
     return executable;
   }
@@ -180,7 +227,16 @@ async function run(
   command: string,
   arguments_: ReadonlyArray<string>,
 ): Promise<void> {
-  const process_ = Bun.spawn([command, ...arguments_], {
+  const executable = Bun.which(command);
+  if (executable === null) {
+    throw new Error(`codegen command unavailable: ${command}`);
+  }
+  const resolvedExecutable = await realpath(executable);
+  const invocation =
+    command === "cargo" && basename(resolvedExecutable) === "rustup"
+      ? [resolvedExecutable, "run", "stable", "cargo", ...arguments_]
+      : [resolvedExecutable, ...arguments_];
+  const process_ = Bun.spawn(invocation, {
     stderr: "inherit",
     stdout: "inherit",
   });

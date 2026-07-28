@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly toolchain='1.88.0'
 readonly linux_target='x86_64-unknown-linux-gnu'
 readonly windows_target='x86_64-pc-windows-msvc'
 readonly unsupported_diagnostic='Phrasic Local Media supports x86-64 Linux GNU and Windows MSVC targets only; generic macOS and native ARM64 are unsupported.'
@@ -11,7 +10,7 @@ require_exact_unsupported_diagnostic() {
   local output
 
   output="$(mktemp)"
-  if cargo "+${toolchain}" check --locked -p phrasic --target "$target" >"$output" 2>&1; then
+  if cargo check --locked -p phrasic --target "$target" >"$output" 2>&1; then
     rm -f "$output"
     printf 'unsupported target unexpectedly compiled: %s\n' "$target" >&2
     return 1
@@ -45,13 +44,13 @@ require_dep_info_adapter() {
 }
 
 for target in "$linux_target" "$windows_target"; do
-  cargo "+${toolchain}" metadata --locked --format-version=1 --filter-platform "$target" >/dev/null
-  cargo "+${toolchain}" tree --locked -p phrasic --target "$target" --all-features --edges all
-  cargo "+${toolchain}" check --locked -p phrasic --all-targets --target "$target"
+  cargo metadata --locked --format-version=1 --filter-platform "$target" >/dev/null
+  cargo tree --locked -p phrasic --target "$target" --all-features --edges all
+  cargo check --locked -p phrasic --all-targets --target "$target"
 done
 
-rustc "+${toolchain}" --print cfg --target "$linux_target" | grep -Fx 'target_vendor="unknown"'
-rustc "+${toolchain}" --print cfg --target "$windows_target" | grep -Fx 'target_vendor="pc"'
+rustc --print cfg --target "$linux_target" | grep -Fx 'target_vendor="unknown"'
+rustc --print cfg --target "$windows_target" | grep -Fx 'target_vendor="pc"'
 require_dep_info_adapter "$linux_target" 'crates/phrasic/src/platform/linux.rs' 'crates/phrasic/src/platform/windows.rs'
 require_dep_info_adapter "$windows_target" 'crates/phrasic/src/platform/windows.rs' 'crates/phrasic/src/platform/linux.rs'
 
@@ -89,7 +88,7 @@ require_exact_unsupported_diagnostic x86_64-apple-darwin
 require_exact_unsupported_diagnostic aarch64-unknown-linux-gnu
 require_exact_unsupported_diagnostic riscv64gc-unknown-linux-gnu
 
-cargo "+${toolchain}" build --locked --release --target "$linux_target" -p phrasic
+cargo build --locked --release --target "$linux_target" -p phrasic
 readonly linux_binary="target/${linux_target}/release/phrasic"
 readonly highest_glibc="$({ readelf --version-info "$linux_binary" | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sed 's/GLIBC_//' | sort -V | tail -n 1; } || true)"
 

@@ -190,7 +190,8 @@ async fn supervise_bun(
     handoff: BrowserHandoff,
     shutdown: CancellationToken,
 ) -> Result<(), Diagnostic> {
-    let mut child = child_command(&endpoint, &instance_id)
+    let port = browser_port(&endpoint)?;
+    let mut child = child_command(&endpoint, port, &instance_id)
         .spawn()
         .map_err(|_| Diagnostic::new(DiagnosticCode::BunLaunchFailed))?;
     let stdin = match child.stdin.take() {
@@ -211,7 +212,7 @@ async fn supervise_bun(
         }
     };
     let control = tokio::select! {
-        control = read_control_record(stdout, browser_port(&endpoint)?) => control,
+        control = read_control_record(stdout, port) => control,
         _ = shutdown.cancelled() => Err(Diagnostic::new(DiagnosticCode::BunExited)),
     };
     let url = match control {
@@ -352,7 +353,7 @@ fn host_program() -> OsString {
     }
 }
 
-fn child_command(endpoint: &str, instance_id: &InstanceId) -> Command {
+fn child_command(endpoint: &str, browser_port: u16, instance_id: &InstanceId) -> Command {
     let program = host_program();
     let mut command = Command::new(program);
     command
@@ -360,6 +361,8 @@ fn child_command(endpoint: &str, instance_id: &InstanceId) -> Command {
         .arg(endpoint)
         .arg("--expected-instance-id")
         .arg(hex_instance_id(instance_id))
+        .arg("--browser-port")
+        .arg(browser_port.to_string())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -499,10 +502,11 @@ mod tests {
     fn pipe_name_is_local_v1_and_child_uses_only_non_secret_connection_data() {
         let endpoint = named_pipe_endpoint(8080);
         assert_eq!(endpoint, r"\\.\pipe\LOCAL\phrasic-local-v1-8080");
-        let command = child_command(&endpoint, &InstanceId::from_bytes([1_u8; 16]));
+        let command = child_command(&endpoint, 8080, &InstanceId::from_bytes([1_u8; 16]));
         let debug = format!("{command:?}");
         assert!(debug.contains("--native-endpoint"));
         assert!(debug.contains("--expected-instance-id"));
+        assert!(debug.contains("--browser-port"));
         assert!(!debug.contains("api-major"));
     }
 }
