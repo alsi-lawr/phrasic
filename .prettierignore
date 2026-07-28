@@ -6,6 +6,8 @@ node_modules/
 
 # Generated and build output
 dist/
+/browser/generated/
+/fixtures/local-media/
 coverage/
 .vercel/
 *.tsbuildinfo

@@ -11,6 +11,6 @@ pub(super) fn run_empty_adapter(configuration: &ServingConfiguration) -> Result<
     );
     // Keeps the matching adapter marker inspectable in a release binary.
     let _ = std::hint::black_box(MODULE_MARKER);
-    let _ = phrasic_rpc::boundary();
+    let _ = phrasic_rpc::local::GetSnapshotResponse::default();
     Ok(())
 }

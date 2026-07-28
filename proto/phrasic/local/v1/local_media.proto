@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package phrasic.local.v1;
+
+service LocalMedia {
+  rpc GetInstanceInfo(GetInstanceInfoRequest) returns (GetInstanceInfoResponse);
+  rpc GetSnapshot(GetSnapshotRequest) returns (GetSnapshotResponse);
+}
+
+message GetInstanceInfoRequest {}
+
+message GetInstanceInfoResponse {
+  bytes instance_id = 1;
+  CapabilityState capability = 2;
+}
+
+message GetSnapshotRequest {
+  bytes expected_instance_id = 1;
+}
+
+message GetSnapshotResponse {
+  bytes instance_id = 1;
+  uint64 revision = 2;
+  uint64 observed_at_monotonic_milliseconds = 3;
+  uint32 poll_hint_milliseconds = 4;
+  CapabilityState capability = 5;
+
+  oneof outcome {
+    AvailableSnapshot available = 6;
+    EmptySnapshot empty = 7;
+    AmbiguousSnapshot ambiguous = 8;
+    UnavailableSnapshot unavailable = 9;
+    StaleSnapshot stale = 10;
+  }
+}
+
+message CapabilityState {
+  CapabilityStatus status = 1;
+}
+
+enum CapabilityStatus {
+  CAPABILITY_STATUS_UNSPECIFIED = 0;
+  CAPABILITY_STATUS_AVAILABLE = 1;
+  CAPABILITY_STATUS_UNSUPPORTED_PLATFORM = 2;
+  CAPABILITY_STATUS_NATIVE_SESSION_UNAVAILABLE = 3;
+}
+
+message AvailableSnapshot {
+  PlaybackActivity activity = 1;
+  PlaybackItem item = 2;
+  Timeline timeline = 3;
+  SelectionReason selection_reason = 4;
+}
+
+message EmptySnapshot {
+  SelectionReason selection_reason = 1;
+}
+
+message AmbiguousSnapshot {
+  AmbiguityReason reason = 1;
+}
+
+message UnavailableSnapshot {
+  UnavailableReason reason = 1;
+}
+
+message StaleSnapshot {
+  AvailableSnapshot last_snapshot = 1;
+  UnavailableReason reason = 2;
+  uint64 last_success_age_milliseconds = 3;
+}
+
+enum PlaybackActivity {
+  PLAYBACK_ACTIVITY_UNSPECIFIED = 0;
+  PLAYBACK_ACTIVITY_PLAYING = 1;
+  PLAYBACK_ACTIVITY_PAUSED = 2;
+  PLAYBACK_ACTIVITY_STOPPED = 3;
+}
+
+enum SelectionReason {
+  SELECTION_REASON_UNSPECIFIED = 0;
+  SELECTION_REASON_STRICT_PIN = 1;
+  SELECTION_REASON_SOLE_PLAYING = 2;
+  SELECTION_REASON_SOLE_NON_PLAYING = 3;
+}
+
+enum AmbiguityReason {
+  AMBIGUITY_REASON_UNSPECIFIED = 0;
+  AMBIGUITY_REASON_MULTIPLE_PLAYING = 1;
+  AMBIGUITY_REASON_MULTIPLE_NON_PLAYING = 2;
+}
+
+enum UnavailableReason {
+  UNAVAILABLE_REASON_UNSPECIFIED = 0;
+  UNAVAILABLE_REASON_NO_SOURCE = 1;
+  UNAVAILABLE_REASON_STRICT_PIN_LOST = 2;
+  UNAVAILABLE_REASON_NATIVE_SESSION_UNAVAILABLE = 3;
+}
+
+message PlaybackItem {
+  optional string title = 1;
+  optional string creator = 2;
+  optional string collection = 3;
+  optional string destination = 4;
+  optional string native_identity = 5;
+  optional Artwork artwork = 6;
+}
+
+message Timeline {
+  optional uint64 position_milliseconds = 1;
+  optional uint64 duration_milliseconds = 2;
+}
+
+message Artwork {
+  ArtworkFormat format = 1;
+  bytes data = 2;
+}
+
+enum ArtworkFormat {
+  ARTWORK_FORMAT_UNSPECIFIED = 0;
+  ARTWORK_FORMAT_PNG = 1;
+  ARTWORK_FORMAT_JPEG = 2;
+  ARTWORK_FORMAT_WEBP = 3;
+}
