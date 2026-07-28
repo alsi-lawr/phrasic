@@ -7,6 +7,7 @@
 # Local dependencies and generated output
 /node_modules
 /dist
+/target
 /coverage
 /logs
 *.log
@@ -15,4 +16,3 @@
 /.env*
 /config.json
 /public/config.json
-/deploy

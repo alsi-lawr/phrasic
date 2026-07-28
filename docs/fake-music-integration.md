@@ -7,13 +7,13 @@ controlled demonstrations.
 
 ## Enable the entry
 
-Vite serves the entry during development:
+Bun serves the entry during development:
 
 ```sh
-npm run dev
+bun run dev
 ```
 
-Open `http://localhost:5173/fake/`. The Caddy deployment returns HTTP 404 for
+Open `http://localhost:5173/fake/`. The Bun production host returns HTTP 404 for
 `/fake`, `/fake/`, and `/fake/index.html` by default. Enable those paths only
 when deliberately exposing the test facility:
 
@@ -23,8 +23,8 @@ docker run --rm --publish 127.0.0.1:8080:8080 \
   phrasic
 ```
 
-Hosts that do not use the bundled Caddyfile must reproduce the same default-off
-gate. Keep the route disabled in normal production deployments.
+Keep the route disabled in normal production deployments. The bundled Bun host
+is the only supported production serving route.
 
 ## Regenerate the demonstration
 
@@ -36,7 +36,7 @@ transparency at 24 fps, and replaces `docs/fake-music-flow.webp`:
 docs/generate-fake-music-flow.sh
 ```
 
-It requires the repository's npm dependencies, `google-chrome`, and `ffmpeg`.
+It requires the repository's Bun dependencies, `google-chrome`, and `ffmpeg`.
 Set `CHROME_BIN`, `PREVIEW_PORT`, or `CHROME_DEBUG_PORT` to override their
 defaults. Temporary frames and the intermediate transparent GIF are removed
 after the WebP is written.

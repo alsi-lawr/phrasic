@@ -22,11 +22,15 @@
     "components/**/*.ts",
     "components/**/*.tsx",
     "domain/**/*.ts",
+    "server/**/*.ts",
     "test/browser/**/*.ts",
+    "test/hosted/**/*.ts",
+    "test/local-playback-domain.test.ts",
     "test/playback-domain.test.ts",
+    "test/types/local-playback.type-test.ts",
     "test/types/browser-*.type-test.ts",
     "test/types/playback-domain.type-test.ts",
-    "vite.config.ts"
+    "scripts/**/*.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }

@@ -43,6 +43,7 @@ import {
   parseProviderId,
   type ProviderId,
 } from "../../../domain/playback-values.ts";
+import type { BrowserFetch } from "../../../browser/fetch.ts";
 
 type RuntimeFixture = {
   readonly authFetch: QueuedSpotifyAuthFetch;
@@ -94,14 +95,14 @@ type ScheduledEntry = {
 };
 
 type AbortableHttpFetch = {
-  readonly fetchImplementation: typeof globalThis.fetch;
+  readonly fetchImplementation: BrowserFetch;
   readonly latestSignal: AbortSignal | undefined;
   readonly maximumConcurrentRequests: number;
   readonly requestCount: number;
 };
 
 type DeferredResponseHttpFetch = {
-  readonly fetchImplementation: typeof globalThis.fetch;
+  readonly fetchImplementation: BrowserFetch;
   readonly latestSignal: AbortSignal | undefined;
   readonly requestCount: number;
   readonly resolve: (response: Response) => void;
@@ -184,7 +185,7 @@ export function abortableNeverSettlingFetch(): AbortableHttpFetch {
   const observedSignals: AbortSignal[] = [];
   let activeRequests = 0;
   let maximumRequests = 0;
-  const fetchImplementation: typeof globalThis.fetch = (
+  const fetchImplementation: BrowserFetch = (
     _input,
     init,
   ): Promise<Response> => {
@@ -219,7 +220,7 @@ export function abortableNeverSettlingFetch(): AbortableHttpFetch {
 export function deferredResponseFetch(): DeferredResponseHttpFetch {
   const observedSignals: AbortSignal[] = [];
   let resolveResponse: ((response: Response) => void) | undefined;
-  const fetchImplementation: typeof globalThis.fetch = (
+  const fetchImplementation: BrowserFetch = (
     _input,
     init,
   ): Promise<Response> => {

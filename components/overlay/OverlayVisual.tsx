@@ -1,29 +1,13 @@
-import { type ReactElement, useReducer } from "react";
+import type { ReactElement } from "react";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
 import { OverlayArtwork } from "./OverlayArtwork.tsx";
-import { OverlayItemAppearance } from "./OverlayItemAppearance.tsx";
 import { type OverlayGeometry } from "./overlay-geometry.ts";
 import { overlayAnimationIdentityKey } from "./overlay-identities.ts";
 import { type OverlayMotionDecision } from "./overlay-motion.ts";
-import {
-  emptyOverlayTextWidths,
-  overlayMetadataAvailableWidth,
-  overlayShell,
-  overlayShellClipPathId,
-  overlayShellWidthForTextWidths,
-  overlayTextWidthsWithMeasurement,
-  type OverlayTextMeasurement,
-  type OverlayTextMeasurementReporter,
-  type OverlayTextWidths,
-} from "./overlay-layout.ts";
 import { OverlayMetadata } from "./OverlayMetadata.tsx";
-import { OverlayShell } from "./OverlayShell.tsx";
+import { OverlayVisualFrame } from "./OverlayVisualFrame.tsx";
 import { OverlayVisualProviderLinks } from "./OverlayVisualProviderLinks.tsx";
 import type { OverlayPresentation } from "./overlay-presentation.ts";
-import {
-  type OverlayShellTransitionPhase,
-  useOverlayShellTransition,
-} from "./useOverlayShellTransition.ts";
 
 type OverlayVisualProps = {
   readonly geometry: OverlayGeometry;
@@ -38,113 +22,39 @@ export function OverlayVisual({
   presentation,
   snapshot,
 }: OverlayVisualProps): ReactElement {
-  const shellTransition = useOverlayShellTransition(snapshot, motion);
-  const displayedSnapshot = shellTransition.snapshot;
-  const animationIdentityKey = overlayAnimationIdentityKey(displayedSnapshot);
-  const contentSizedShell = useContentSizedShell(animationIdentityKey);
-  const shellWidth = shellWidthForTransition(
-    shellTransition.phase,
-    contentSizedShell.width,
-  );
   const Attribution = presentation.attribution;
 
   return (
-    <div className="relative shrink-0">
-      <svg
-        aria-hidden="true"
-        className="block"
-        width={geometry.width.value}
-        height={geometry.height.value}
-        viewBox={geometry.viewBox}
-      >
-        <OverlayShell
-          motion={motion}
-          onWidthTransitionEnd={shellTransition.completeWidthTransition}
-          width={shellWidth}
+    <OverlayVisualFrame
+      animationIdentity={overlayAnimationIdentityKey}
+      geometry={geometry}
+      motion={motion}
+      renderArtwork={(props): ReactElement => <OverlayArtwork {...props} />}
+      renderAttribution={(shellWidth): ReactElement | null => (
+        <Attribution shellWidth={shellWidth} />
+      )}
+      renderInteractionLayer={({ availableWidth, snapshot: displayed }) => (
+        <OverlayVisualProviderLinks
+          availableWidth={availableWidth}
+          presentation={presentation}
+          snapshot={displayed}
         />
-        <g clipPath={`url(#${overlayShellClipPathId})`}>
-          <OverlayArtwork motion={motion} snapshot={displayedSnapshot} />
-          <OverlayItemAppearance
-            identity={animationIdentityKey}
-            motion={motion}
-          >
-            <OverlayMetadata
-              availableWidth={contentSizedShell.availableWidth}
-              motion={motion}
-              onTextMeasurement={contentSizedShell.reportTextMeasurement}
-              presentation={presentation}
-              snapshot={displayedSnapshot}
-            />
-            <Attribution shellWidth={shellWidth} />
-          </OverlayItemAppearance>
-        </g>
-      </svg>
-      <OverlayVisualProviderLinks
-        availableWidth={contentSizedShell.availableWidth}
-        presentation={presentation}
-        snapshot={displayedSnapshot}
-      />
-    </div>
+      )}
+      renderMetadata={({
+        availableWidth,
+        motion: displayedMotion,
+        onTextMeasurement,
+        snapshot: displayed,
+      }): ReactElement => (
+        <OverlayMetadata
+          availableWidth={availableWidth}
+          motion={displayedMotion}
+          onTextMeasurement={onTextMeasurement}
+          presentation={presentation}
+          snapshot={displayed}
+        />
+      )}
+      snapshot={snapshot}
+    />
   );
-}
-
-function shellWidthForTransition(
-  phase: OverlayShellTransitionPhase,
-  contentWidth: number,
-): number {
-  return phase === "collapsing" ? overlayShell.minimumWidth : contentWidth;
-}
-
-type OverlayTextMeasurements = {
-  readonly identity: string;
-  readonly widths: OverlayTextWidths;
-};
-
-type ContentSizedShell = {
-  readonly availableWidth: number;
-  readonly reportTextMeasurement: OverlayTextMeasurementReporter;
-  readonly width: number;
-};
-
-function useContentSizedShell(identity: string): ContentSizedShell {
-  const [measurements, reportTextMeasurement] = useReducer(
-    overlayTextMeasurementsReducer,
-    identity,
-    initialOverlayTextMeasurements,
-  );
-  const widths =
-    measurements.identity === identity
-      ? measurements.widths
-      : emptyOverlayTextWidths;
-  const width = overlayShellWidthForTextWidths(widths);
-  const availableWidth = overlayMetadataAvailableWidth(width);
-
-  return {
-    availableWidth,
-    reportTextMeasurement,
-    width,
-  };
-}
-
-function initialOverlayTextMeasurements(
-  identity: string,
-): OverlayTextMeasurements {
-  return { identity, widths: emptyOverlayTextWidths };
-}
-
-function overlayTextMeasurementsReducer(
-  current: OverlayTextMeasurements,
-  measurement: OverlayTextMeasurement,
-): OverlayTextMeasurements {
-  const currentWidths =
-    current.identity === measurement.identity
-      ? current.widths
-      : emptyOverlayTextWidths;
-  const widths = overlayTextWidthsWithMeasurement(currentWidths, measurement);
-
-  if (current.identity === measurement.identity && widths === current.widths) {
-    return current;
-  }
-
-  return { identity: measurement.identity, widths };
 }

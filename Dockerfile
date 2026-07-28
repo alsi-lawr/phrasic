@@ -1,20 +1,25 @@
-FROM node:26-alpine AS build
+FROM oven/bun:alpine AS build
 
 WORKDIR /app
 
 ENV HUSKY=0
 
-RUN npm install --global npm@12
-
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json bun.lock ./
+RUN bun ci --frozen-lockfile --omit peer
 
 COPY . .
-RUN npm run build
+RUN bun run build
 
-FROM caddy:2-alpine
+FROM oven/bun:alpine
 
-COPY Caddyfile /etc/caddy/Caddyfile
-COPY --from=build /app/dist /srv
+WORKDIR /app
+
+ENV PORT=8080
+
+RUN rm -f /usr/local/bun-node-fallback-bin/node /usr/local/bun-node-fallback-bin/npm /usr/local/bun-node-fallback-bin/npx
+
+COPY --from=build /app/dist /app
 
 EXPOSE 8080
+
+CMD ["bun", "/app/server.js"]

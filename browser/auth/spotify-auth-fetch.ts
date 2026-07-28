@@ -2,6 +2,7 @@ import type {
   BrowserRequestDeadline,
   BrowserRequestDeadlinePort,
 } from "../request-deadline.ts";
+import type { BrowserFetch } from "../fetch.ts";
 
 export type SpotifyAuthFetchRequest = {
   readonly url: URL;
@@ -44,7 +45,7 @@ export type SpotifyAuthFetchPort = {
 };
 
 export type CreateSpotifyAuthFetchPortOptions = {
-  readonly fetchImplementation: typeof globalThis.fetch;
+  readonly fetchImplementation: BrowserFetch;
   readonly requestDeadline: BrowserRequestDeadlinePort;
   readonly timeoutMilliseconds: number;
 };

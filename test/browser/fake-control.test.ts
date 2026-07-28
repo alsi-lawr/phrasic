@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "bun:test";
 import { parseFakeControlEnvelope } from "../../browser/fake/control.ts";
 
 const applicationUrl = new URL("https://display.example/fake/");

@@ -5,8 +5,9 @@ node_modules/
 .yarn/
 
 # Generated and build output
-package-lock.json
 dist/
+/browser/generated/
+/fixtures/local-media/
 coverage/
 .vercel/
 *.tsbuildinfo

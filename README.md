@@ -40,7 +40,7 @@ application server.
 | 📀 **Tracks and episodes**            | Presents artwork and linked item, creator, collection, show, and publisher metadata where the provider supplies it.                                |
 | 📐 **Responsive by default**          | Scales from `320` through `7680` pixels with content-aware sizing, long-text motion, and proportional artwork.                                     |
 | 🔄 **Honest connection states**       | Shows authorization, empty, unsupported, reconnecting, stale-content, failure, and fatal states rather than an ambiguous blank surface.            |
-| 🔒 **Browser-owned authorization**    | Keeps credentials in the browser profile. There is no application server, client secret, playback history, or audio rebroadcasting.                |
+| 🔒 **Browser-owned authorization**    | Keeps credentials in the browser profile. The Bun host has no client secret, playback history, or audio rebroadcasting.                            |
 | ♿ **Accessible motion and controls** | Includes semantic status updates, keyboard-operable setup controls, and reduced-motion behavior.                                                   |
 
 ## Providers
@@ -51,8 +51,8 @@ application server.
 | **Fake Music** | `/fake/`    | Development/demo | Memory-only authorization and playback controlled by same-window messages; no storage or network calls.      |
 
 Fake Music is enabled by the development server and disabled by default in the
-Caddy deployment. Set `FAKE_PROVIDER_ENABLED=true` only where the testing route
-should be public.
+Bun production host. Set `FAKE_PROVIDER_ENABLED=true` only where the testing
+route should be public.
 
 ## How it works
 
@@ -107,28 +107,20 @@ secret, tokens, query string, fragment, or additional fields.
 docker pull alsilawr/phrasic:2.0.1
 
 docker run --rm --publish 127.0.0.1:8080:8080 \
-  --mount type=bind,src="$(pwd)/config.json",dst=/srv/config.json,readonly \
+  --mount type=bind,src="$(pwd)/config.json",dst=/app/config.json,readonly \
   alsilawr/phrasic:2.0.1
 ```
 
-The container serves the production build through Caddy on loopback port
-`8080`. Release tags publish versioned, major/minor, major, and `latest`
-multi-platform images for AMD64 and ARM64.
+The container runs the bundled Bun production host on port `8080`. The operator
+owns host-interface publication, reverse proxying, and TLS. Release tags
+publish versioned, major/minor, major, and `latest` multi-platform images for
+AMD64 and ARM64.
 
 ### 3. Put it behind HTTPS
 
-Proxy the container through the TLS-owning server for the public origin. For an
-outer Caddy instance:
-
-```caddyfile
-display.example {
-  reverse_proxy 127.0.0.1:8080
-}
-```
-
-The bundled Caddyfile owns static files, caching, and security headers. Other
-static hosts and CDNs must reproduce the
-[static-host response header contract](deploy/static-host-headers.md).
+Proxy the container through the TLS-owning server for the public origin. The
+bundled Bun host owns its route, cache, and security-header policy; do not
+publish the container directly on a public interface.
 
 ## Use the display
 
@@ -162,21 +154,72 @@ diagnostic and fall back to a safe configuration.
 
 ## Develop offline
 
-The locked Nix development shell provides Node.js 26 with its bundled npm,
-Chromium, and ffmpeg:
+The locked Nix development shell provides Bun, Chromium, ffmpeg, and rustup.
+The current stable Rust toolchain is declared in `rust-toolchain.toml`:
 
 ```sh
 nix develop
-npm ci
-npm run dev
+bun ci --frozen-lockfile --omit peer
+bun run dev
 ```
 
-Without Nix, Phrasic requires Node.js 26 and npm 12. Install Chromium and
+Without Nix, Phrasic tracks the latest stable Bun release. Install Chromium and
 ffmpeg as well when regenerating the demonstration.
 
 ```sh
-npm ci
-npm run dev
+bun ci --frozen-lockfile --omit peer
+bun run dev
+```
+
+Run a built production host locally with:
+
+```sh
+bun run build
+bun run serve
+```
+
+Run the hosted Nix package with the same Bun server route:
+
+```sh
+nix build .#default
+PHRASIC_CONFIG_PATH="$(pwd)/config.json" ./result/bin/phrasic-host
+```
+
+### Local playback
+
+On supported x86-64 Linux and Windows hosts, `phrasic serve <config>` starts the
+private native gRPC service and the paired Local browser page on the configured
+`127.0.0.1` port. Build the matching Bun host before running from source:
+
+```toml
+schema_version = 1
+port = 8080
+source_pin = "optional exact source identifier"
+browser_handoff = "open"
+```
+
+Only `schema_version`, `port`, optional `source_pin`, and optional
+`browser_handoff` are accepted. `schema_version` is exactly `1`; `port` is an
+integer from `1024` through `65535`; `browser_handoff` is `open` (the default)
+or `print`.
+
+```sh
+bun run build:local-host
+PHRASIC_LOCAL_HOST="$(pwd)/dist/native/linux/phrasic-local-host" \
+  cargo run --locked -p phrasic -- serve ./phrasic.toml
+```
+
+The default `open` handoff launches the one-use fragment URL. `print` writes it
+only to a controlling terminal. Pairing creates one process-lifetime browser
+session; restart `phrasic serve` to pair a different browser.
+
+Use the stable toolchain and locked checks:
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+scripts/verify-rust-target-isolation.sh
 ```
 
 Open `http://localhost:5173/fake/`, select **Connect Fake Music**, and drive the
@@ -187,7 +230,7 @@ control schema, lifecycle, examples, and deployment gate.
 Regenerate the README demonstration from start to finish with:
 
 ```sh
-node docs/fake-music-flow/generate.mjs
+bun docs/fake-music-flow/generate.mjs
 ```
 
 The harness builds Phrasic, launches a local preview and isolated headless
@@ -221,6 +264,6 @@ standalone service, and do not redistribute Spotify audio. Read the repository's
 
 ## Version 2 boundary
 
-Version 2 has no version 1 migration. Deploy the current static `dist/` output,
-provide the current `/config.json`, and authorize again for every deployed
-origin and browser profile.
+Version 2 has no version 1 migration. Deploy the bundled Bun host with its
+current `dist/` output, provide the current `/config.json`, and authorize again
+for every deployed origin and browser profile.

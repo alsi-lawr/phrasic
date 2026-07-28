@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "bun:test";
 import { SpotifyAccessToken } from "../../../browser/auth/spotify-token-values.ts";
+import type { BrowserFetch } from "../../../browser/fetch.ts";
 import type { PlaybackProviderPort } from "../../../browser/providers/provider.ts";
 import { createSpotifyPlaybackProvider } from "../../../browser/providers/spotify.ts";
 import { createBrowserRequestDeadlinePort } from "../../../browser/request-deadline.ts";
@@ -204,7 +205,7 @@ type SpotifyPlaybackProviderFixture = {
 };
 
 function playbackProviderFixture(
-  fetchImplementation: typeof globalThis.fetch,
+  fetchImplementation: BrowserFetch,
 ): SpotifyPlaybackProviderFixture {
   const scheduler = new ManualRequestDeadlineScheduler();
   const provider = createSpotifyPlaybackProvider({
@@ -219,12 +220,9 @@ function playbackProviderFixture(
 function queuedFetch(
   responses: ReadonlyArray<Response>,
   capturedRequests: CapturedFetchRequest[] = [],
-): typeof globalThis.fetch {
+): BrowserFetch {
   const queue = [...responses];
-  const fetch: typeof globalThis.fetch = async (
-    input,
-    init,
-  ): Promise<Response> => {
+  const fetch: BrowserFetch = async (input, init): Promise<Response> => {
     const response = queue.shift();
     if (response === undefined) {
       throw new Error("Unexpected Spotify worker fetch.");
@@ -256,8 +254,8 @@ function fetchUrl(input: RequestInfo | URL): string {
 
 function abortableNeverSettlingFetch(
   capture: AbortableFetchCapture,
-): typeof globalThis.fetch {
-  const fetch: typeof globalThis.fetch = (_input, init): Promise<Response> => {
+): BrowserFetch {
+  const fetch: BrowserFetch = (_input, init): Promise<Response> => {
     const signal = init?.signal;
     if (signal === undefined || signal === null) {
       return Promise.reject(new Error("Expected a request deadline signal."));

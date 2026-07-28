@@ -1,9 +1,9 @@
 #!/bin/sh
 set -eu
 
-npm run format:check
-npm run lint
-npm run typecheck
-npm run typecheck:browser
-npm test
-npm run build
+bun run format:check
+bun run lint
+bun run typecheck
+bun run typecheck:browser
+bun test --seed 20260713
+bun run build

@@ -7,8 +7,11 @@
 # testing
 /coverage
 
-# Vite build output
+# Bun build output
 /dist
+
+# Rust build output
+/target
 
 # misc
 .DS_Store

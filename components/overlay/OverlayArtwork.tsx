@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { BrowserPlaybackApplicationSnapshot } from "../../browser/application.ts";
 import {
   currentPlaybackItem,
@@ -24,27 +24,52 @@ export function OverlayArtwork({
   snapshot,
 }: OverlayArtworkProps): ReactElement {
   return (
-    <g>
-      <ArtworkClipPath />
-      <g clipPath={`url(#${overlayArtworkClipPathId})`}>
-        <ArtworkWithFadeIn motion={motion} snapshot={snapshot} />
-      </g>
-    </g>
+    <OverlayArtworkFrame identity={artworkIdentity(snapshot)} motion={motion}>
+      <ArtworkForSnapshot motion={motion} snapshot={snapshot} />
+    </OverlayArtworkFrame>
   );
 }
 
-function ArtworkWithFadeIn({
+type OverlayFallbackArtworkProps = {
+  readonly identity: string;
+  readonly motion: OverlayMotionDecision;
+};
+
+export function OverlayFallbackArtwork({
+  identity,
   motion,
-  snapshot,
-}: OverlayArtworkProps): ReactElement {
+}: OverlayFallbackArtworkProps): ReactElement {
   return (
-    <g
-      key={artworkIdentity(snapshot)}
-      className={
-        motion.kind === "enabled" ? "animate-artwork-fade-in" : undefined
-      }
-    >
-      <ArtworkForSnapshot motion={motion} snapshot={snapshot} />
+    <OverlayArtworkFrame identity={identity} motion={motion}>
+      <FallbackVinyl motion={motion} />
+    </OverlayArtworkFrame>
+  );
+}
+
+type OverlayArtworkFrameProps = {
+  readonly children: ReactNode;
+  readonly identity: string;
+  readonly motion: OverlayMotionDecision;
+};
+
+function OverlayArtworkFrame({
+  children,
+  identity,
+  motion,
+}: OverlayArtworkFrameProps): ReactElement {
+  return (
+    <g>
+      <ArtworkClipPath />
+      <g clipPath={`url(#${overlayArtworkClipPathId})`}>
+        <g
+          key={identity}
+          className={
+            motion.kind === "enabled" ? "animate-artwork-fade-in" : undefined
+          }
+        >
+          {children}
+        </g>
+      </g>
     </g>
   );
 }
