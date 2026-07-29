@@ -15,4 +15,4 @@
 # Local environment and deployment configuration
 /.env*
 /config.json
-/public/config.json
+/apps/web/public/config.json

@@ -2,13 +2,10 @@
   "extends": "./tsconfig.json",
   "compilerOptions": { "incremental": false },
   "include": [
-    "browser/**/*.ts",
-    "browser/**/*.tsx",
-    "components/**/*.ts",
-    "components/**/*.tsx",
-    "domain/**/*.ts",
-    "test/browser/**/*.test.ts",
-    "test/types/browser-*.type-test.ts"
+    "apps/web/src/**/*.ts",
+    "apps/web/src/**/*.tsx",
+    "packages/**/*.ts",
+    "tests/browser/**/*.test.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }

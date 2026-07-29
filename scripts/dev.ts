@@ -1,6 +1,9 @@
-import fake from "../fake/index.html";
-import index from "../index.html";
-import spotify from "../spotify/index.html";
+import fake from "../apps/web/fake/index.html";
+import index from "../apps/web/index.html";
+import spotify from "../apps/web/spotify/index.html";
+import { join } from "node:path";
+
+const webSourceRoot = join(import.meta.dir, "..", "apps", "web", "src");
 
 const [spotifyWorker, fakeWorker] = await Promise.all([
   buildDevelopmentWorker("browser/worker/entry.ts"),
@@ -25,7 +28,7 @@ console.info(`Phrasic development server: ${server.url}`);
 
 async function buildDevelopmentWorker(entrypoint: string): Promise<Response> {
   const result = await Bun.build({
-    entrypoints: [entrypoint],
+    entrypoints: [join(webSourceRoot, entrypoint)],
     env: "disable",
     minify: false,
     sourcemap: "none",

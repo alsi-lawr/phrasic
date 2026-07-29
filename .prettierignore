@@ -6,7 +6,7 @@ node_modules/
 
 # Generated and build output
 dist/
-/browser/generated/
+/apps/web/src/browser/generated/
 /fixtures/local-media/
 coverage/
 .vercel/

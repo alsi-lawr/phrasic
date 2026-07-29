@@ -1,4 +1,4 @@
-import { startProductionHost } from "../server/host.ts";
+import { startProductionHost } from "../apps/host/src/host.ts";
 
 const host = await startProductionHost({
   assetDirectory: Bun.env.PHRASIC_ASSET_ROOT ?? "dist",

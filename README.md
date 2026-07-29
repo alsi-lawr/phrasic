@@ -6,88 +6,55 @@
 
 **A provider-neutral, browser-based now-playing display.**
 
-Turn live playback metadata into a polished, responsive visual with artwork,
-attribution, long-text motion, and resilient connection states—without an
-application server.
+Turn live playback metadata into a responsive visual with artwork, attribution,
+long-text motion, accessible status updates, and honest connection states.
 
 <p>
   <a href="https://github.com/alsi-lawr/phrasic/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/alsi-lawr/phrasic/actions/workflows/ci.yml/badge.svg?branch=master"></a>
   <a href="https://github.com/alsi-lawr/phrasic/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/alsi-lawr/phrasic?display_name=tag&sort=semver"></a>
 </p>
 
-[Providers](#providers) · [Quick start](#quick-start) ·
-[Use the display](#use-the-display) · [Develop offline](#develop-offline)
+[Get started](#get-started) · [Use the display](#use-the-display) ·
+[Wiki](https://github.com/alsi-lawr/phrasic/wiki) ·
+[Contributing](CONTRIBUTING.md)
 
 </div>
 
 <p align="center">
   <img
-    src="docs/fake-music-flow.webp"
+    src="assets/fake-music-flow.webp"
     alt="Phrasic demonstrating authorization, playback, artwork transitions, reconnecting, and long-title motion"
     width="100%"
   >
 </p>
 
-<p align="center">
-  <sub>Recorded with the bundled Fake Music provider—no account or external service required.</sub>
-</p>
+## Features
 
-## What Phrasic does
-
-|                                       |                                                                                                                                                    |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🎵 **Provider-aware presentation**    | Applies each provider's identity, attribution, destinations, authorization language, and display policy without leaking one provider into another. |
-| 📀 **Tracks and episodes**            | Presents artwork and linked item, creator, collection, show, and publisher metadata where the provider supplies it.                                |
-| 📐 **Responsive by default**          | Scales from `320` through `7680` pixels with content-aware sizing, long-text motion, and proportional artwork.                                     |
-| 🔄 **Honest connection states**       | Shows authorization, empty, unsupported, reconnecting, stale-content, failure, and fatal states rather than an ambiguous blank surface.            |
-| 🔒 **Browser-owned authorization**    | Keeps credentials in the browser profile. The Bun host has no client secret, playback history, or audio rebroadcasting.                            |
-| ♿ **Accessible motion and controls** | Includes semantic status updates, keyboard-operable setup controls, and reduced-motion behavior.                                                   |
+- Spotify tracks and podcast episodes with provider attribution and destinations.
+- Native Local playback on supported x86-64 Linux and Windows hosts.
+- Responsive layouts from `320` through `7680` pixels.
+- Artwork transitions, long-text motion, and reduced-motion behavior.
+- Explicit authorization, empty, unsupported, reconnecting, stale, and failure states.
+- Browser-owned Spotify PKCE credentials; no client secret or playback history on the host.
 
 ## Providers
 
-| Provider       | Route       | Intended use     | Authorization and data                                                                                       |
-| -------------- | ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Spotify**    | `/spotify/` | Live playback    | Browser-based PKCE; displays Spotify tracks and podcast episodes with required attribution and destinations. |
-| **Fake Music** | `/fake/`    | Development/demo | Memory-only authorization and playback controlled by same-window messages; no storage or network calls.      |
+| Provider       | Route       | Use                                                 |
+| -------------- | ----------- | --------------------------------------------------- |
+| **Spotify**    | `/spotify/` | Live Spotify playback through browser-based PKCE.   |
+| **Local**      | `/local/`   | Playback selected by the paired native service.     |
+| **Fake Music** | `/fake/`    | Memory-only development and demonstration provider. |
 
-Fake Music is enabled by the development server and disabled by default in the
-Bun production host. Set `FAKE_PROVIDER_ENABLED=true` only where the testing
-route should be public.
+## Get started
 
-## How it works
-
-```mermaid
-flowchart LR
-    Surface["Browser surface"] --> App["Phrasic"]
-    App --> Presentation["Shared presentation"]
-    App --> Provider["Provider adapter"]
-    Provider --> Spotify["Spotify Accounts + Web API"]
-    Provider --> Fake["In-memory Fake Music"]
-    App -.-> Profile["Browser-owned authorization state"]
-```
-
-Each entry loads only its provider-specific composition and worker. Spotify's
-PKCE, storage, API calls, branding, and policy stay isolated from Fake Music;
-the fake entry contains no Spotify configuration, authentication, text, logo,
-or links.
-
-## Quick start
-
-### Requirements
-
-- A public HTTPS origin.
-- A [Spotify Developer](https://developer.spotify.com/dashboard) application.
-- Docker for the packaged deployment.
-
-### 1. Configure Spotify
-
-Register the exact callback in the Spotify Dashboard:
+You need a public HTTPS origin, a Spotify Developer application, and Docker.
+Register the exact callback:
 
 ```text
 https://display.example/spotify/
 ```
 
-Create a deployment-specific `config.json`:
+Create `config.json`:
 
 ```json
 {
@@ -98,178 +65,47 @@ Create a deployment-specific `config.json`:
 }
 ```
 
-The `/spotify/` path and trailing slash must match exactly. Do not add a client
-secret, tokens, query string, fragment, or additional fields.
-
-### 2. Run the published image
+Run the published image:
 
 ```sh
-docker pull alsilawr/phrasic:2.0.1
+docker pull alsilawr/phrasic:latest
 
 docker run --rm --publish 127.0.0.1:8080:8080 \
   --mount type=bind,src="$(pwd)/config.json",dst=/app/config.json,readonly \
-  alsilawr/phrasic:2.0.1
+  alsilawr/phrasic:latest
 ```
 
-The container runs the bundled Bun production host on port `8080`. The operator
-owns host-interface publication, reverse proxying, and TLS. Release tags
-publish versioned, major/minor, major, and `latest` multi-platform images for
-AMD64 and ARM64.
-
-### 3. Put it behind HTTPS
-
-Proxy the container through the TLS-owning server for the public origin. The
-bundled Bun host owns its route, cache, and security-header policy; do not
-publish the container directly on a public interface.
+Put the container behind the HTTPS-owning reverse proxy for your public origin.
+Do not add a Spotify client secret or publish the container directly on a public
+interface. See the [deployment guide](https://github.com/alsi-lawr/phrasic/wiki/Deployment)
+for the complete configuration and host boundary.
 
 ## Use the display
 
-Open or embed the setup URL in any browser surface:
+Open the setup URL, select **Connect Spotify**, and complete authorization in
+that browser profile:
 
 ```text
 https://display.example/spotify/?width=1920&setup=1
 ```
 
-Select **Connect Spotify**, complete authorization in that browser profile,
-then use the clean display URL:
+Then use the display without `setup=1`. Phrasic works in a browser window, web
+view, signage surface, stream compositor, or browser-source implementation.
 
-```text
-https://display.example/spotify/?width=1920
-```
+| Parameter | Value                            |
+| --------- | -------------------------------- |
+| `width`   | An integer from `320` to `7680`. |
+| `setup`   | `1` to show setup controls.      |
 
-Phrasic is ordinary transparent web content. It can run in a browser window,
-web view, signage surface, stream compositor, or browser-source implementation.
-When the host offers an interaction mode—such as OBS Browser Source's
-**Interact** command—use it while `setup=1` is present.
+For native playback, see [Local playback](https://github.com/alsi-lawr/phrasic/wiki/Local-Playback).
 
-### Display options
+## Documentation
 
-| Parameter | Purpose                                                               | Accepted value                         |
-| --------- | --------------------------------------------------------------------- | -------------------------------------- |
-| `width`   | Matches the rendered display to its host surface. Defaults to `1920`. | One integer from `320` through `7680`. |
-| `setup`   | Shows reconnect, retry, and disconnect controls.                      | `1`                                    |
+- [Deployment](https://github.com/alsi-lawr/phrasic/wiki/Deployment)
+- [Local playback](https://github.com/alsi-lawr/phrasic/wiki/Local-Playback)
+- [Troubleshooting](https://github.com/alsi-lawr/phrasic/wiki/Troubleshooting)
+- [Fake Music provider](https://github.com/alsi-lawr/phrasic/wiki/Fake-Music-Provider)
+- [Spotify display policy](https://github.com/alsi-lawr/phrasic/wiki/Spotify-Display-Policy)
+- [Contributing](CONTRIBUTING.md)
 
-Malformed, repeated, unsupported, or out-of-range parameters show an in-display
-diagnostic and fall back to a safe configuration.
-
-## Develop offline
-
-The locked Nix development shell provides Bun, Chromium, ffmpeg, and rustup.
-The current stable Rust toolchain is declared in `rust-toolchain.toml`:
-
-```sh
-nix develop
-bun ci --frozen-lockfile --omit peer
-bun run dev
-```
-
-Without Nix, Phrasic tracks the latest stable Bun release. Install Chromium and
-ffmpeg as well when regenerating the demonstration.
-
-```sh
-bun ci --frozen-lockfile --omit peer
-bun run dev
-```
-
-Run a built production host locally with:
-
-```sh
-bun run build
-bun run serve
-```
-
-Run the hosted Nix package with the same Bun server route:
-
-```sh
-nix build .#default
-PHRASIC_CONFIG_PATH="$(pwd)/config.json" ./result/bin/phrasic-host
-```
-
-### Local playback
-
-On supported x86-64 Linux and Windows hosts, `phrasic serve <config>` starts the
-private native gRPC service and the paired Local browser page on the configured
-`127.0.0.1` port. Build the matching Bun host before running from source:
-
-```toml
-schema_version = 1
-port = 8080
-source_pin = "optional exact source identifier"
-browser_handoff = "open"
-```
-
-Only `schema_version`, `port`, optional `source_pin`, and optional
-`browser_handoff` are accepted. `schema_version` is exactly `1`; `port` is an
-integer from `1024` through `65535`; `browser_handoff` is `open` (the default)
-or `print`.
-
-```sh
-bun run build:local-host
-PHRASIC_LOCAL_HOST="$(pwd)/dist/native/linux/phrasic-local-host" \
-  cargo run --locked -p phrasic -- serve ./phrasic.toml
-```
-
-The default `open` handoff launches the one-use fragment URL. `print` writes it
-only to a controlling terminal. Pairing creates one process-lifetime browser
-session; restart `phrasic serve` to pair a different browser.
-
-On Linux, the selected MPRIS source may provide PNG, JPEG, or WebP artwork
-through a local `file://` URL or a public HTTPS URL. Phrasic reads only the
-selected source, follows no redirects, and sends embedded image bytes to the
-browser rather than the source URL. Missing, invalid, inaccessible, or slow
-artwork keeps playback metadata available and uses the vinyl fallback.
-
-Use the stable toolchain and locked checks:
-
-```sh
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
-scripts/verify-rust-target-isolation.sh
-```
-
-Open `http://localhost:5173/fake/`, select **Connect Fake Music**, and drive the
-memory-only provider from the browser console. The
-[Fake Music integration reference](docs/fake-music-integration.md) contains the
-control schema, lifecycle, examples, and deployment gate.
-
-Regenerate the README demonstration from start to finish with:
-
-```sh
-bun docs/fake-music-flow/generate.mjs
-```
-
-The harness builds Phrasic, launches a local preview and isolated headless
-Chrome, drives a realistic authorization and playback flow, records native
-transparency at 24 fps, and replaces `docs/fake-music-flow.webp`.
-
-## Troubleshooting
-
-| Symptom                               | What to check                                                                                                             |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Spotify rejects the callback          | Register the exact HTTPS callback, match `redirectUri` in `/config.json`, and retain `/spotify/` with its trailing slash. |
-| Provider configuration is unavailable | Serve the exact two-field `/config.json` as JSON, disable caching for it, and remove extra fields.                        |
-| Spotify access was revoked            | Open `?setup=1`, disconnect, then connect and approve Spotify again.                                                      |
-| Nothing is playing                    | Start a Spotify track or episode. Phrasic displays metadata; it does not play audio.                                      |
-| The current item is unsupported       | The Spotify provider currently displays tracks and podcast episodes.                                                      |
-| A width diagnostic appears            | Supply one integer `width` from `320` through `7680`; use `setup=1` only when controls are needed.                        |
-
-## Security and Spotify display policy
-
-Spotify authorization uses PKCE and keeps refresh material separate from the
-playback worker. Phrasic attributes Spotify with its full logo; metadata and
-Spotify-provided artwork link to the applicable Spotify content. Artwork keeps
-its original aspect ratio and is not cropped, overlaid, recolored, blurred,
-distorted, or persisted.
-
-Do not use the Spotify provider to present Spotify metadata or artwork as a
-standalone service, and do not redistribute Spotify audio. Read the repository's
-[Spotify display policy](docs/spotify-display-policy.md) alongside the
-[Spotify Developer Policy](https://developer.spotify.com/policy) and
-[Spotify Design & Branding Guidelines](https://developer.spotify.com/documentation/design).
-
-## Version 2 boundary
-
-Version 2 has no version 1 migration. Deploy the bundled Bun host with its
-current `dist/` output, provide the current `/config.json`, and authorize again
-for every deployed origin and browser profile.
+Phrasic displays metadata only. It does not play, record, or redistribute audio.

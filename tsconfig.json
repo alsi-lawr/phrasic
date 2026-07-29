@@ -17,19 +17,13 @@
     "incremental": false
   },
   "include": [
-    "browser/**/*.ts",
-    "browser/**/*.tsx",
-    "components/**/*.ts",
-    "components/**/*.tsx",
-    "domain/**/*.ts",
-    "server/**/*.ts",
-    "test/browser/**/*.ts",
-    "test/hosted/**/*.ts",
-    "test/local-playback-domain.test.ts",
-    "test/playback-domain.test.ts",
-    "test/types/local-playback.type-test.ts",
-    "test/types/browser-*.type-test.ts",
-    "test/types/playback-domain.type-test.ts",
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "packages/**/*.ts",
+    "tests/browser/**/*.ts",
+    "tests/hosted/**/*.ts",
+    "tests/local-playback-domain.test.ts",
+    "tests/playback-domain.test.ts",
     "scripts/**/*.ts"
   ],
   "exclude": ["dist", "node_modules"]

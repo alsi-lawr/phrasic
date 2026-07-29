@@ -10,7 +10,7 @@
     "build": "bun run scripts/build.ts",
     "build:local-host": "bun run scripts/build-local-host.ts",
     "codegen": "bun run scripts/codegen.ts",
-    "codegen:check": "bun run codegen && git diff --exit-code -- browser/generated fixtures/local-media/v1",
+    "codegen:check": "bun run codegen && git diff --exit-code -- apps/web/src/browser/generated fixtures/local-media/v1",
     "serve": "bun scripts/serve.ts",
     "lint": "oxlint",
     "format": "prettier --write .",

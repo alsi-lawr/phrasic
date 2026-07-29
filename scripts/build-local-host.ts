@@ -28,7 +28,7 @@ try {
     scratchRoot,
     worker.path,
     workerPublicPath,
-    join(repositoryRoot, "public", "fonts", "GeistVF.woff"),
+    join(repositoryRoot, "apps", "web", "public", "fonts", "GeistVF.woff"),
   );
   const result = await Bun.build({
     compile: {
@@ -87,7 +87,17 @@ async function buildWorker(
   outputDirectory: string,
 ): Promise<Bun.BuildArtifact> {
   const result = await Bun.build({
-    entrypoints: [join(repositoryRoot, "browser", "local", "worker-entry.ts")],
+    entrypoints: [
+      join(
+        repositoryRoot,
+        "apps",
+        "web",
+        "src",
+        "browser",
+        "local",
+        "worker-entry.ts",
+      ),
+    ],
     env: "disable",
     minify: true,
     naming: "local-worker-[hash].[ext]",
@@ -114,10 +124,10 @@ async function writeWrapper(
 ): Promise<string> {
   const wrapperPath = join(outputDirectory, "local-host-entry.ts");
   const source = [
-    `import localPage from ${JSON.stringify(join(repositoryRoot, "local", "index.html"))};`,
+    `import localPage from ${JSON.stringify(join(repositoryRoot, "apps", "web", "local", "index.html"))};`,
     `import workerPath from ${JSON.stringify(workerPath)} with { type: "file" };`,
     `import fontPath from ${JSON.stringify(fontPath)} with { type: "file" };`,
-    `import { runLocalHost } from ${JSON.stringify(join(repositoryRoot, "server", "local", "runtime.ts"))};`,
+    `import { runLocalHost } from ${JSON.stringify(join(repositoryRoot, "apps", "host", "src", "local", "runtime.ts"))};`,
     `await runLocalHost({ font: { embeddedPath: fontPath, publicPath: ${JSON.stringify(fontPublicPath)} }, localPage, worker: { embeddedPath: workerPath, publicPath: ${JSON.stringify(workerPublicPath)} } });`,
     "",
   ].join("\n");

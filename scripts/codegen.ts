@@ -42,7 +42,14 @@ const cacheRoot = join(
   "phrasic-codegen",
   "protoc-35.1-js-4.0.2-grpc-web-2.0.2",
 );
-const generatedRoot = join(workspaceRoot, "browser", "generated");
+const generatedRoot = join(
+  workspaceRoot,
+  "apps",
+  "web",
+  "src",
+  "browser",
+  "generated",
+);
 const fixtureRoot = join(workspaceRoot, "fixtures", "local-media", "v1");
 const protoRoot = join(workspaceRoot, "proto");
 const schemaPath = join(
