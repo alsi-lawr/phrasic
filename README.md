@@ -47,7 +47,8 @@ long-text motion, accessible status updates, and honest connection states.
 
 ## Get started
 
-You need a public HTTPS origin, a Spotify Developer application, and Docker.
+You need a public HTTPS origin, a Spotify Developer application, and Docker or
+Nix.
 Register the exact callback:
 
 ```text
@@ -79,6 +80,19 @@ Put the container behind the HTTPS-owning reverse proxy for your public origin.
 Do not add a Spotify client secret or publish the container directly on a public
 interface. See the [deployment guide](https://github.com/alsi-lawr/phrasic/wiki/Deployment)
 for the complete configuration and host boundary.
+
+On x86-64 Linux, the Nix flake installs the hosted server and the complete Local
+playback path:
+
+```sh
+nix profile add github:alsi-lawr/phrasic
+phrasic serve ./phrasic.toml
+```
+
+The same profile provides `phrasic-host` for hosted deployment. Set
+`PHRASIC_CONFIG_PATH` to the public JSON configuration before starting it.
+ARM64 Linux exposes the hosted-only package as
+`github:alsi-lawr/phrasic#host`.
 
 ## Use the display
 
