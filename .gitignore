@@ -37,4 +37,4 @@ assets/*.jpg
 assets/*.json
 
 # Host-provided public OAuth configuration
-/public/config.json
+/apps/web/public/config.json

@@ -3,4 +3,4 @@ omit = ["peer"]
 
 [serve.static]
 env = "disable"
-plugins = ["bun-plugin-tailwind"]
+plugins = ["bun-plugin-tailwind", "./scripts/dev-static-assets.ts"]

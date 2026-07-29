@@ -3,8 +3,8 @@ import type { BunPlugin } from "bun";
 import {
   createRuntimeAssetManifest,
   serializeRuntimeAssetManifest,
-} from "../server/manifest.ts";
-import { publicRuntimeFiles } from "../server/published-files.ts";
+} from "../apps/host/src/manifest.ts";
+import { publicRuntimeFiles } from "../apps/host/src/published-files.ts";
 
 const applicationEntries = [
   "index.html",
@@ -15,6 +15,8 @@ const applicationEntries = [
 const publicFiles = publicRuntimeFiles.map((file) => file.path.toString());
 const publicFontUrl = "/fonts/GeistVF.woff";
 const repositoryRoot = `${import.meta.dir}/..`;
+const webRoot = `${repositoryRoot}/apps/web`;
+const webSourceRoot = `${webRoot}/src`;
 
 const buildMetadata = {
   bunVersion: Bun.version,
@@ -51,7 +53,7 @@ export async function buildApplication(
   ]);
 
   const result = await Bun.build({
-    entrypoints: applicationEntries.map(sourcePath),
+    entrypoints: applicationEntries.map(webPath),
     define: { "process.env.NODE_ENV": JSON.stringify("production") },
     env: "disable",
     external: [publicFontUrl],
@@ -63,7 +65,7 @@ export async function buildApplication(
     },
     outdir: outputDirectory,
     plugins: [tailwind, generatedWorkerUrlPlugin(workerUrls)],
-    root: repositoryRoot,
+    root: webRoot,
     sourcemap: "none",
     splitting: true,
     target: "browser",
@@ -78,7 +80,7 @@ export async function buildApplication(
   for (const publicFile of publicFiles) {
     await Bun.write(
       `${outputDirectory}/${publicFile}`,
-      Bun.file(sourcePath(`public/${publicFile}`)),
+      Bun.file(webPath(`public/${publicFile}`)),
     );
   }
 
@@ -99,7 +101,7 @@ export async function buildApplication(
 
 async function buildProductionHost(outputDirectory: string): Promise<void> {
   const result = await Bun.build({
-    entrypoints: [sourcePath("server/runtime.ts")],
+    entrypoints: [repositoryPath("apps/host/src/runtime.ts")],
     env: "disable",
     minify: true,
     naming: { entry: "server.js" },
@@ -160,12 +162,12 @@ async function buildWorker(
   outputDirectory: string,
 ): Promise<WorkerBuild> {
   const result = await Bun.build({
-    entrypoints: [sourcePath(entrypoint)],
+    entrypoints: [webSourcePath(entrypoint)],
     env: "disable",
     minify: true,
     naming: { entry: "assets/[dir]/[name]-[hash].[ext]" },
     outdir: outputDirectory,
-    root: repositoryRoot,
+    root: webSourceRoot,
     sourcemap: "none",
     target: "browser",
   });
@@ -191,8 +193,16 @@ async function buildWorker(
   return { entrypoint, url: relativePath };
 }
 
-function sourcePath(path: string): string {
+function repositoryPath(path: string): string {
   return `${repositoryRoot}/${path}`;
+}
+
+function webPath(path: string): string {
+  return `${webRoot}/${path}`;
+}
+
+function webSourcePath(path: string): string {
+  return `${webSourceRoot}/${path}`;
 }
 
 function generatedWorkerUrlPlugin(

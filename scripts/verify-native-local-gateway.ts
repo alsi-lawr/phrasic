@@ -6,7 +6,7 @@ import {
   GetInstanceInfoResponse,
   GetSnapshotRequest,
   GetSnapshotResponse,
-} from "../browser/generated/phrasic/local/v1/local_media_pb.js";
+} from "../apps/web/src/browser/generated/phrasic/local/v1/local_media_pb.js";
 
 const root = resolve(import.meta.dir, "..");
 

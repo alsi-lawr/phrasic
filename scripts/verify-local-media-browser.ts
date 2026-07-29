@@ -25,7 +25,12 @@ if (chrome === null) {
 try {
   const build = await Bun.build({
     entrypoints: [
-      join(workspaceRoot, "test", "browser", "local-media-contract-runtime.ts"),
+      join(
+        workspaceRoot,
+        "tests",
+        "browser",
+        "local-media-contract-runtime.ts",
+      ),
     ],
     format: "esm",
     outdir: scratchRoot,
