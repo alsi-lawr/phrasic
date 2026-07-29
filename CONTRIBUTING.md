@@ -39,6 +39,13 @@ bun run build
 bun run serve
 ```
 
+Build the complete x86-64 Linux Nix package or its hosted-only output:
+
+```sh
+nix build
+nix build .#host
+```
+
 ## Local playback development
 
 Build the target-specific Local host before running the Rust service:

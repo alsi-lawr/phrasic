@@ -24,14 +24,12 @@ async function smoke(target: string | undefined): Promise<void> {
   const record = join(scratch, "pairing");
   const release = join(scratch, "release");
   const proxyPath = join(scratch, `proxy${suffix}`);
-  const hostPath = join(
-    root,
-    "dist",
-    "native",
-    platform,
-    `phrasic-local-host${suffix}`,
-  );
-  const rustPath = join(root, "target", "debug", `phrasic${suffix}`);
+  const hostPath =
+    process.env.PHRASIC_GATEWAY_LOCAL_HOST ??
+    join(root, "dist", "native", platform, `phrasic-local-host${suffix}`);
+  const rustPath =
+    process.env.PHRASIC_GATEWAY_NATIVE_SERVICE ??
+    join(root, "target", "debug", `phrasic${suffix}`);
   const port = 43_123;
   const origin = `http://127.0.0.1:${port}`;
   const endpoint =
