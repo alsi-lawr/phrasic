@@ -7,7 +7,7 @@
       "dependencies": {
         "@grpc/grpc-js": "^1.14.4",
         "google-protobuf": "^4.0.2",
-        "grpc-web": "^2.0.2",
+        "grpc-web": "^2.1.1",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
       },
@@ -196,7 +196,7 @@
 
     "google-protobuf": ["google-protobuf@4.0.2", "", {}, "sha512-yD2fqbNgvJPuQwdKJiPdbUcXveNRxgqy070gzsBsCyFJA8Qdj9oxa9xtkddb/JEhcDk0RD5SfGUWg+nhINfMxA=="],
 
-    "grpc-web": ["grpc-web@2.0.2", "", {}, "sha512-bvBP0/d5jyVM3eGxxffJhRLAPpH6eXhJeUzBT+bSIEgUKkG4a/BotEimVeW3phP0WLnsJnkRl8uQdRf2yDLaVA=="],
+    "grpc-web": ["grpc-web@2.1.1", "", {}, "sha512-6Yxso4djycqREHvhCBGdcxxqhgEf2EYWa7QqQ07v4drZBHg/N9C3f27epjJYjl4KIsGpkB0g+wn9TrYepSC35Q=="],
 
     "husky": ["husky@9.1.7", "", { "bin": "bin.js" }, "sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA=="],
 
